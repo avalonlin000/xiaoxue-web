@@ -1,0 +1,1262 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=1920">
+<title>小雪工作台 · 对话驱动</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Noto+Sans+SC:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ============================================================
+   THEME · B站粉蓝 + 对话驱动
+   ============================================================ */
+:root {
+  --pink: #FB7299;
+  --pink-deep: #F65D85;
+  --pink-light: #FFE0EB;
+  --pink-bg: #FFF5F8;
+  --blue: #00AEEC;
+  --blue-deep: #0098D1;
+  --blue-light: #CDEEFB;
+  --orange: #FF9F2D;
+  --green: #00C08E;
+  --red: #F45454;
+  --red-bg: #FFEDED;
+
+  --bg-0: #FFFFFF;
+  --bg-1: #F6F7F8;
+  --bg-2: #EDEFF1;
+  --line: #E3E5E7;
+  --line-strong: #C9CDD2;
+  --ink-0: #18191C;
+  --ink-1: #2F3338;
+  --ink-2: #61666D;
+  --ink-3: #9499A0;
+
+  --font: 'Noto Sans SC', 'PingFang SC', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', 'SF Mono', Consolas, monospace;
+
+  --s: 8px;
+  --top-h: 52px;
+  --cmd-h: 80px;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%;
+  background: var(--bg-1);
+  color: var(--ink-0);
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+::selection { background: var(--pink-light); color: var(--pink-deep); }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 3px; }
+:focus { outline: none; }
+:focus-visible { outline: 2px solid var(--pink); outline-offset: 2px; border-radius: 4px; }
+
+/* ============================================================
+   SHELL
+   ============================================================ */
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+/* ─── Top Bar ─────────────────────────────────── */
+.top {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s)*3);
+  padding: 0 calc(var(--s)*3);
+  height: var(--top-h);
+  background: var(--bg-0);
+  border-bottom: 1px solid var(--line);
+  flex-shrink: 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--s)*1.5);
+  font-weight: 800;
+  font-size: 17px;
+  white-space: nowrap;
+}
+.brand .pink { color: var(--pink); }
+.brand .blue { color: var(--blue); }
+.brand-tv {
+  display: flex; align-items: center; justify-content: center;
+  width: 34px; height: 26px;
+  background: linear-gradient(135deg, var(--pink), var(--blue));
+  border-radius: 6px;
+  color: #fff; font-size: 13px; font-weight: 800;
+  font-family: var(--mono);
+}
+.top-spacer { flex: 1; }
+
+/* Team selector */
+.sel-team {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 16px;
+  background: var(--bg-1);
+  border: none; border-radius: 20px;
+  font: inherit; font-size: 14px; font-weight: 600;
+  cursor: pointer;
+  transition: background 120ms;
+}
+.sel-team:hover { background: var(--pink-light); color: var(--pink-deep); }
+.sel-team .code {
+  font-family: var(--mono); font-size: 12px;
+  color: var(--ink-2); font-weight: 700;
+}
+
+/* Tool buttons (graph, analyst) */
+.btn-tool {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 14px;
+  background: transparent;
+  border: 1px dashed var(--line-strong); border-radius: 20px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--ink-2); cursor: pointer;
+  transition: all 120ms;
+}
+.btn-tool:hover {
+  border-color: var(--blue); color: var(--blue);
+  background: var(--blue-light);
+}
+.btn-tool.active {
+  border-color: var(--blue); color: var(--blue);
+  background: var(--blue-light);
+}
+
+/* Status dot */
+.status {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; color: var(--ink-2);
+}
+.status .dot {
+  width: 8px; height: 8px; background: var(--green);
+  border-radius: 50%;
+}
+.status .clock {
+  font-family: var(--mono); font-weight: 600; color: var(--ink-1);
+}
+
+/* ─── Command Bar ──────────────────────────────── */
+.cmd {
+  display: flex;
+  align-items: center;
+  padding: calc(var(--s)*1.5) calc(var(--s)*3);
+  gap: calc(var(--s)*1.5);
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-0);
+}
+.cmd-input {
+  flex: 1;
+  height: 52px;
+  padding: 0 calc(var(--s)*2.5);
+  font: inherit; font-size: 16px;
+  border: 2px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-1);
+  color: var(--ink-0);
+  transition: border-color 150ms;
+}
+.cmd-input:focus {
+  border-color: var(--pink);
+  background: var(--bg-0);
+  box-shadow: 0 0 0 4px var(--pink-light);
+}
+.cmd-input::placeholder { color: var(--ink-3); }
+.cmd-hints {
+  display: flex; gap: 8px;
+  font-size: 12px; color: var(--ink-3);
+  white-space: nowrap;
+}
+.cmd-hint {
+  padding: 4px 10px;
+  background: var(--bg-1);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 120ms;
+}
+.cmd-hint:hover { background: var(--pink-light); color: var(--pink-deep); }
+
+/* ─── Content Area ─────────────────────────────── */
+.main {
+  flex: 1;
+  display: flex;
+  gap: calc(var(--s)*2);
+  padding: calc(var(--s)*2);
+  overflow: hidden;
+}
+
+/* Empty state */
+.empty-state {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--s)*2);
+  color: var(--ink-3);
+}
+.empty-state .icon {
+  font-size: 48px; opacity: 0.3;
+}
+.empty-state .msg {
+  font-size: 15px;
+}
+.empty-state .tips {
+  font-size: 13px; color: var(--ink-2);
+  text-align: center; line-height: 2;
+}
+.empty-state .tips code {
+  background: var(--bg-2); padding: 2px 8px; border-radius: 4px;
+  font-family: var(--mono); font-size: 12px;
+}
+
+/* Content columns */
+.col-profile {
+  width: 420px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  background: var(--bg-0);
+  border-radius: 12px;
+  padding: calc(var(--s)*3);
+  min-height: 0;
+  position: relative;
+  transition: width 250ms ease, padding 250ms ease;
+}
+.col-profile.collapsed {
+  width: 44px;
+  padding: calc(var(--s)*1.5) calc(var(--s)*0.5);
+  overflow: hidden;
+}
+.col-profile.collapsed .profile-content { display: none; }
+.col-profile.collapsed .profile-toggle { right: 6px; }
+
+.profile-toggle {
+  position: absolute;
+  top: calc(var(--s)*1.5);
+  right: calc(var(--s)*1.5);
+  z-index: 10;
+  width: 26px; height: 26px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 11px;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 150ms;
+}
+.profile-toggle:hover {
+  background: var(--pink-light); color: var(--pink-deep);
+  border-color: var(--pink);
+}
+.col-profile.collapsed .profile-toggle {
+  transform: rotate(180deg);
+}
+.col-data {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--s)*2);
+  overflow-y: auto;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Panel cards */
+.card {
+  background: var(--bg-0);
+  border-radius: 12px;
+  flex-shrink: 0;
+}
+.col-data .card:last-child {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.col-data .card:last-child .card-body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+.card-head {
+  display: flex; align-items: center; gap: 10px;
+  padding: calc(var(--s)*2) calc(var(--s)*3);
+  border-bottom: 1px solid var(--line);
+  font-weight: 700; font-size: 15px;
+}
+.card-head .badge {
+  padding: 2px 10px;
+  background: var(--pink); color: #fff;
+  font-size: 11px; font-weight: 800;
+  font-family: var(--mono); border-radius: 10px;
+}
+.card-body { padding: calc(var(--s)*2) calc(var(--s)*3); }
+.card-body.scroll { max-height: 400px; overflow-y: auto; }
+
+/* Profile content (from SKILL.md) */
+.profile-content { font-size: 14px; line-height: 1.8; }
+.profile-content h1 { font-size: 18px; margin: 16px 0 8px; color: var(--ink-0); }
+.profile-content h2 { font-size: 16px; margin: 14px 0 6px; color: var(--ink-1); }
+.profile-content h3 { font-size: 15px; margin: 12px 0 4px; color: var(--ink-1); }
+.profile-content h4 { font-size: 14px; margin: 10px 0 4px; color: var(--ink-2); }
+.profile-content p { margin: 6px 0; }
+.profile-content ul { padding-left: 20px; margin: 6px 0; }
+.profile-content li { margin: 3px 0; }
+.profile-content table {
+  width: 100%; border-collapse: collapse; margin: 8px 0;
+  font-size: 13px;
+}
+.profile-content th {
+  background: var(--bg-1); padding: 6px 10px;
+  text-align: left; font-weight: 600;
+  border-bottom: 2px solid var(--line);
+}
+.profile-content td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.profile-content blockquote {
+  border-left: 3px solid var(--pink);
+  padding: 4px 12px; margin: 8px 0;
+  background: var(--pink-bg); color: var(--ink-1);
+  font-size: 13px;
+}
+.profile-content hr { border: none; border-top: 1px solid var(--line); margin: 12px 0; }
+.profile-content .code-block {
+  background: var(--bg-1);
+  padding: 10px 14px; border-radius: 8px;
+  font-family: var(--mono); font-size: 12px;
+  overflow-x: auto; white-space: pre-wrap;
+  margin: 8px 0;
+}
+
+/* 3D data grid */
+.dim-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: calc(var(--s)*2);
+}
+.dim-card {
+  background: var(--bg-1);
+  border-radius: 10px;
+  padding: calc(var(--s)*2);
+  text-align: center;
+  transition: all 120ms;
+  border: 2px solid transparent;
+}
+.dim-card:hover { border-color: var(--pink-light); }
+.dim-label {
+  font-size: 12px; font-weight: 600; color: var(--ink-2);
+  text-transform: uppercase; letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.dim-value {
+  font-size: 28px; font-weight: 800;
+  font-family: var(--mono);
+  color: var(--ink-0);
+  cursor: text;
+  border: none; background: transparent;
+  text-align: center; width: 100%; padding: 4px 0;
+  border-radius: 4px;
+  transition: background 100ms;
+}
+.dim-value:focus {
+  background: var(--bg-0);
+  outline: 2px solid var(--pink);
+}
+
+/* Notes section */
+.notes-area {
+  width: 100%;
+  min-height: 80px;
+  padding: calc(var(--s)*1.5);
+  font: inherit; font-size: 14px; line-height: 1.7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+  background: var(--bg-1);
+  transition: border-color 120ms;
+}
+.notes-area:focus { border-color: var(--pink); background: var(--bg-0); }
+
+/* Version understanding */
+.version-text {
+  width: 100%;
+  min-height: 80px;
+  padding: calc(var(--s)*1.5);
+  font: inherit; font-size: 14px; line-height: 1.7;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  resize: vertical;
+  background: var(--bg-1);
+  transition: border-color 120ms;
+}
+.version-text:focus { border-color: var(--pink); background: var(--bg-0); }
+
+/* Save button */
+.btn-save {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 20px;
+  background: var(--pink); color: #fff;
+  border: none; border-radius: 8px;
+  font: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  transition: all 120ms;
+}
+.btn-save:hover { background: var(--pink-deep); }
+.btn-save:disabled { background: var(--line-strong); cursor: not-allowed; }
+.btn-save .saved { display: none; }
+.btn-save.saved .unsaved { display: none; }
+.btn-save.saved .saved { display: inline; }
+
+.save-row {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 12px;
+}
+.save-msg {
+  font-size: 12px; color: var(--green);
+  opacity: 0;
+  transition: opacity 200ms;
+}
+.save-msg.show { opacity: 1; }
+.save-msg.err { color: var(--red); }
+
+/* ─── TK (redesigned: larger, expandable, editable) ─── */
+.tk-search-inner {
+  display: flex; gap: 10px;
+  margin-bottom: calc(var(--s)*2);
+}
+.tk-search-input {
+  flex: 1;
+  padding: 10px 16px;
+  font: inherit; font-size: 15px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+}
+.tk-search-input:focus { border-color: var(--pink); background: var(--bg-0); }
+
+.btn-tk-new {
+  padding: 10px 18px;
+  background: var(--blue); color: #fff;
+  border: none; border-radius: 8px;
+  font: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms;
+}
+.btn-tk-new:hover { background: var(--blue-deep); }
+
+.tk-item {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+  transition: background 120ms;
+}
+.tk-item:hover { background: var(--bg-1); margin: 0 calc(var(--s)*-3); padding-left: calc(var(--s)*3); padding-right: calc(var(--s)*3); }
+.tk-item:last-child { border-bottom: none; }
+
+.tk-title {
+  font-size: 15px; font-weight: 700; color: var(--ink-0);
+  margin-bottom: 6px;
+  line-height: 1.5;
+  display: flex; align-items: flex-start; gap: 8px;
+}
+.tk-title .tk-expand-icon {
+  font-size: 12px; color: var(--ink-3);
+  transition: transform 200ms;
+  flex-shrink: 0; margin-top: 2px;
+}
+.tk-item.expanded .tk-expand-icon { transform: rotate(90deg); }
+
+.tk-preview {
+  font-size: 14px; color: var(--ink-1); line-height: 1.7;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tk-item.expanded .tk-preview {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-height: none;
+}
+
+.tk-full {
+  display: none;
+  margin-top: 10px;
+  padding: 14px;
+  background: var(--bg-1);
+  border-radius: 8px;
+  font-size: 14px; line-height: 1.8; color: var(--ink-1);
+  white-space: pre-wrap;
+}
+.tk-item.expanded .tk-full { display: block; }
+
+.tk-actions {
+  display: none;
+  gap: 8px; margin-top: 10px;
+}
+.tk-item.expanded .tk-actions { display: flex; }
+.tk-actions button {
+  padding: 6px 14px;
+  font: inherit; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: all 120ms;
+}
+.tk-actions button:hover { border-color: var(--pink); color: var(--pink-deep); }
+.tk-actions button.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+.tk-meta {
+  font-size: 12px; color: var(--ink-3); margin-top: 6px;
+  display: flex; gap: 14px; align-items: center;
+}
+.tk-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  background: var(--blue-light); color: var(--blue-deep);
+  font-size: 12px; font-weight: 600;
+  border-radius: 10px;
+}
+.tk-empty { text-align: center; color: var(--ink-3); padding: 32px 0; font-size: 14px; }
+.tk-empty-shell { opacity: 0.4; }
+.tk-empty-shell .tk-title { color: var(--ink-3); }
+
+/* TK editor (slide-in for new/edit) */
+.tk-editor-overlay {
+  display: none;
+  position: fixed; inset: 0; z-index: 150;
+  background: rgba(0,0,0,0.3);
+  align-items: center; justify-content: center;
+}
+.tk-editor-overlay.open { display: flex; }
+.tk-editor {
+  width: 600px; max-height: 80vh;
+  background: var(--bg-0);
+  border-radius: 14px;
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+}
+.tk-editor-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(var(--s)*2) calc(var(--s)*3);
+  border-bottom: 1px solid var(--line);
+  font-weight: 700; font-size: 15px;
+}
+.tk-editor-body {
+  flex: 1; overflow-y: auto;
+  padding: calc(var(--s)*2) calc(var(--s)*3);
+  display: flex; flex-direction: column; gap: 12px;
+}
+.tk-editor-body label {
+  font-size: 13px; font-weight: 600; color: var(--ink-2);
+}
+.tk-editor-body input,
+.tk-editor-body textarea {
+  padding: 10px 14px;
+  font: inherit; font-size: 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+}
+.tk-editor-body input:focus,
+.tk-editor-body textarea:focus { border-color: var(--pink); background: var(--bg-0); }
+.tk-editor-body textarea {
+  min-height: 200px; resize: vertical;
+}
+.tk-editor-foot {
+  display: flex; align-items: center; justify-content: flex-end;
+  gap: 10px;
+  padding: calc(var(--s)*2) calc(var(--s)*3);
+  border-top: 1px solid var(--line);
+}
+
+/* Graph area (expandable below TK) */
+.graph-area {
+  margin-top: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--bg-0);
+}
+.graph-head {
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(var(--s)*1.5) calc(var(--s)*3);
+  border-bottom: 1px solid var(--line);
+  font-size: 15px; font-weight: 700;
+}
+.compare-close {
+  padding: 6px 16px;
+  background: var(--bg-1); border: none; border-radius: 8px;
+  font: inherit; font-size: 13px; cursor: pointer;
+}
+
+/* Analyst cards */
+.analyst-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(var(--s)*2);
+}
+.analyst-col {
+  padding: calc(var(--s)*2);
+  background: var(--bg-1);
+  border-radius: 10px;
+}
+.analyst-col h4 {
+  font-size: 14px; font-weight: 700;
+  margin-bottom: calc(var(--s)*1.5);
+  color: var(--ink-0);
+}
+.analyst-content {
+  font-size: 14px; line-height: 1.8;
+  color: var(--ink-1);
+  white-space: pre-wrap;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.analyst-bp-box {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: start;
+  margin-bottom: calc(var(--s)*2);
+}
+.analyst-bp-input {
+  width: 100%;
+  min-height: 92px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-1);
+  color: var(--ink-0);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.7;
+  resize: vertical;
+}
+.analyst-bp-input:focus { border-color: var(--blue); background: var(--bg-0); box-shadow: 0 0 0 3px var(--blue-light); }
+.analyst-bp-actions { display: flex; flex-direction: column; gap: 8px; }
+.analyst-bp-hint { grid-column: 1 / -1; font-size: 12px; color: var(--ink-3); }
+
+/* MSI workspace */
+.msi-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: calc(var(--s)*2);
+}
+.msi-panel {
+  background: var(--bg-1);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: calc(var(--s)*2);
+  min-height: 160px;
+}
+.msi-panel-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--ink-1);
+  margin-bottom: calc(var(--s)*1.5);
+}
+.msi-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msi-empty {
+  color: var(--ink-3);
+  font-size: 13px;
+  padding: 20px 0;
+  text-align: center;
+}
+.msi-match {
+  display: grid;
+  grid-template-columns: 84px 1fr auto;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.msi-match-time {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--orange);
+  font-weight: 800;
+}
+.msi-match-teams {
+  font-size: 14px;
+  font-weight: 700;
+}
+.msi-match-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+.msi-region-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: calc(var(--s)*1.5);
+}
+.msi-region {
+  padding: 8px 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  font: 700 12px var(--mono);
+  cursor: pointer;
+}
+.msi-region.active,
+.msi-region:hover {
+  border-color: var(--orange);
+  color: var(--orange);
+  background: #fff5e8;
+}
+.msi-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.msi-compare div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+.msi-compare strong { color: var(--ink-1); }
+.msi-compare span { color: var(--ink-2); text-align: right; }
+.msi-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: calc(var(--s)*2);
+}
+
+
+
+/* Trade records */
+.trade-shell {
+  display: grid;
+  grid-template-columns: 1.05fr 1.35fr;
+  gap: calc(var(--s)*2);
+}
+.trade-form, .trade-board {
+  background: linear-gradient(180deg, #fff, var(--bg-1));
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: calc(var(--s)*2);
+}
+.trade-games {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: calc(var(--s)*2);
+}
+.trade-game {
+  padding: 9px 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  font: 800 12px var(--mono);
+  cursor: pointer;
+}
+.trade-game.active, .trade-game:hover {
+  color: #fff;
+  border-color: var(--pink);
+  background: linear-gradient(135deg, var(--pink), var(--blue));
+}
+.trade-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.trade-field.full { grid-column: 1 / -1; }
+.trade-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.trade-field input, .trade-field select, .trade-field textarea {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  color: var(--ink-0);
+  font: inherit;
+  font-size: 13px;
+}
+.trade-field textarea { min-height: 66px; resize: vertical; }
+.trade-help { margin-top: 4px; font-size: 11px; color: var(--ink-3); }
+.trade-field input:focus, .trade-field select:focus, .trade-field textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 3px var(--pink-light); }
+.trade-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+.trade-msg { font-size: 12px; color: var(--ink-3); }
+.trade-stats {
+  display: none;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.trade-stat {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg-0);
+  border: 1px solid var(--line);
+}
+.trade-stat b { display:block; font: 900 18px var(--mono); color: var(--pink-deep); }
+.trade-stat span { font-size: 11px; color: var(--ink-3); }
+.trade-stat.hot { border-color: var(--pink); background: var(--pink-bg); }
+.trade-list { display: flex; flex-direction: column; gap: 9px; max-height: 350px; overflow-y: auto; }
+.trade-item {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 10px;
+  background: var(--bg-0);
+}
+.trade-item-head { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.trade-match { font-weight: 900; color: var(--ink-0); }
+.trade-meta { font: 700 11px var(--mono); color: var(--ink-3); }
+.trade-picks { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.trade-pill { padding: 3px 9px; border-radius: 999px; background: var(--pink-bg); color: var(--pink-deep); font-size: 12px; font-weight: 800; }
+.trade-pill.blue { background: var(--blue-light); color: var(--blue-deep); }
+.trade-pill.gray { background: var(--bg-2); color: var(--ink-2); }
+.trade-reason { font-size: 13px; color: var(--ink-1); line-height: 1.6; white-space: pre-wrap; }
+.trade-item-actions { display: flex; gap: 8px; margin-top: 8px; }
+.trade-item-actions button { padding: 4px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-1); color: var(--ink-2); font: 700 12px var(--font); cursor:pointer; }
+.trade-item-actions button:hover { border-color: var(--blue); color: var(--blue); }
+.trade-item-actions button.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+
+/* Fundamentals workspace */
+.workspace-tabs {
+  display: flex; gap: 8px; align-items: center;
+  padding: 0 12px;
+  background: var(--bg-1);
+  border-radius: 999px;
+  height: 38px;
+}
+.workspace-tab {
+  border: none;
+  border-radius: 999px;
+  padding: 7px 16px;
+  background: transparent;
+  color: var(--ink-2);
+  font: 800 13px var(--font);
+  cursor: pointer;
+}
+.workspace-tab.active {
+  color: #fff;
+  background: linear-gradient(135deg, var(--pink), var(--blue));
+}
+.fund-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: calc(var(--s)*2);
+}
+.fund-tile {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff, var(--bg-1));
+  padding: calc(var(--s)*2);
+}
+.fund-tile b { display:block; font: 900 22px var(--mono); color: var(--pink-deep); }
+.fund-tile span { color: var(--ink-2); font-size: 12px; }
+.scope-row { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+.scope-btn {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 7px 14px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  font: 800 12px var(--mono);
+  cursor: pointer;
+}
+.scope-btn.active, .scope-btn:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
+.fund-table { display:flex; flex-direction:column; gap:8px; }
+.fund-row {
+  display: grid;
+  grid-template-columns: 86px 60px 72px 76px 76px 82px 1fr 84px;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+  cursor: pointer;
+}
+.fund-row:hover { border-color: var(--pink); box-shadow: 0 0 0 3px var(--pink-light); }
+.fund-head { background: var(--bg-1); color: var(--ink-2); font-size: 12px; font-weight: 900; cursor: default; }
+.fund-team { font: 900 15px var(--mono); color: var(--ink-0); }
+.quality { border-radius:999px; padding:3px 8px; font-size:12px; font-weight:800; text-align:center; }
+.quality.good { background:#e9fff8; color:var(--green); }
+.quality.mid { background:#fff5e8; color:var(--orange); }
+.quality.low { background:var(--red-bg); color:var(--red); }
+.page-market #card-fundamentals,
+.page-market #card-analyst,
+.page-market #card-msi,
+.page-market #card-3d,
+.page-market #card-tk { display:none; }
+.page-fundamentals #card-trades { display:none; }
+
+/* Loading */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  padding: 40px; color: var(--ink-3); font-size: 14px;
+}
+
+/* Tabs for content sections */
+.content-tabs {
+  display: flex; gap: 0;
+  margin-bottom: calc(var(--s)*2);
+}
+.content-tab {
+  padding: 8px 20px;
+  font: inherit; font-size: 14px; font-weight: 600;
+  color: var(--ink-2);
+  background: transparent;
+  border: none; border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 120ms;
+}
+.content-tab.active {
+  color: var(--pink-deep);
+  border-bottom-color: var(--pink);
+}
+.content-tab:hover { color: var(--ink-0); }
+
+/* Meta info strip */
+.meta-strip {
+  display: flex; gap: 16px; align-items: center;
+  font-size: 12px; color: var(--ink-3);
+  margin-bottom: calc(var(--s)*2);
+}
+.meta-strip strong { color: var(--ink-1); }
+</style>
+</head>
+<body>
+
+<div class="app">
+  <!-- ============================================================
+       TOP BAR
+       ============================================================ -->
+  <div class="top">
+    <div class="brand">
+      <div class="brand-tv">雪</div>
+      <span class="pink">小雪</span><span class="blue">工作台</span>
+    </div>
+
+    <div class="workspace-tabs">
+      <button class="workspace-tab active" id="tab-fundamentals" onclick="setPage('fundamentals')">基本面</button>
+      <button class="workspace-tab" id="tab-market" onclick="setPage('market')">交易</button>
+    </div>
+
+    <div class="top-spacer"></div>
+
+    <button class="sel-team" id="sel-team" onclick="toggleTeamDropdown()">
+      <span id="sel-team-label">选择队伍…</span>
+      <span class="code" id="sel-team-code"></span>
+      <span style="font-size:10px">▾</span>
+    </button>
+
+    <a class="btn-tool" id="btn-graph" href="/tk-graph/index.html" target="_blank" style="display:none;text-decoration:none">
+      📊 关联图
+    </a>
+
+    <button class="btn-tool" id="btn-analyst" onclick="loadAnalyst()" style="display:none">
+      分析师 / 单场分析
+    </button>
+
+    <div class="status">
+      <span class="dot"></span>
+      <span class="clock" id="clock">--:--:--</span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       COMMAND BAR
+       ============================================================ -->
+  <div class="cmd">
+    <input class="cmd-input" id="cmd-input"
+      placeholder="说人话…（如：看AL / TK版本理解 / 改操稳B+）"
+      autocomplete="off"
+      onkeydown="if(event.key==='Enter')runCommand()">
+    <div class="cmd-hints">
+      <span class="cmd-hint" onclick="setPage('fundamentals')">基本面</span>
+      <span class="cmd-hint" onclick="loadFundamentals('msi')">MSI研究</span>
+      <span class="cmd-hint" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">MSI概念图</span>
+      <span class="cmd-hint" onclick="setPage('market')">交易页</span>
+      <span class="cmd-hint" onclick="loadAnalyst()">分析师 / 单场分析</span>
+      <span class="cmd-hint" onclick="quickCmd('TK版本理解')">TK版本理解</span>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN CONTENT
+       ============================================================ -->
+  <div class="main" id="main-area">
+    <!-- Empty state -->
+    <div class="empty-state" id="empty-state">
+      <div class="icon">🎯</div>
+      <div class="msg">在上面输入指令，数据跟着变</div>
+      <div class="tips">
+        试试：<code>看AL</code> · <code>看TES</code> · <code>TK版本理解</code><br>
+        或者点快捷标签直接开始 · 右上「📊 关联图」新标签页打开
+      </div>
+    </div>
+
+    <!-- Content (hidden until team loaded) -->
+    <div id="content-area" class="page-fundamentals" style="display:none;flex:1;flex-direction:row;gap:calc(var(--s)*2);overflow:hidden">
+      <!-- Profile column -->
+      <div class="col-profile" id="col-profile">
+        <button class="profile-toggle" id="profile-toggle" onclick="toggleProfile()" title="折叠/展开画像">◀</button>
+        <div class="profile-content" id="profile-content">
+          <div class="loading">加载画像中…</div>
+        </div>
+      </div>
+
+      <!-- Data column -->
+      <div class="col-data" id="col-data">
+        <!-- Fundamentals card -->
+        <div class="card" id="card-fundamentals">
+          <div class="card-head">
+            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">LOL</span> 横向基本面
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">版本 / 队伍 / MSI 国际赛环境</span>
+            <span style="flex:1"></span>
+            <button class="compare-close" onclick="loadFundamentals('msi')">刷新</button>
+          </div>
+          <div class="card-body">
+            <div class="fund-grid" id="msi-summary">
+              <div class="fund-tile"><b>--</b><span>MSI 队伍池</span></div>
+              <div class="fund-tile"><b>--</b><span>资料缺口</span></div>
+              <div class="fund-tile"><b>MSI</b><span>国际赛环境研究，不是赛程表</span></div>
+            </div>
+            <div style="margin-top:16px" class="scope-row">
+              <button class="scope-btn active" data-scope="msi" onclick="loadFundamentals('msi')">MSI</button>
+              <button class="scope-btn" data-scope="lpl" onclick="loadFundamentals('lpl')">LPL</button>
+              <button class="scope-btn" data-scope="lck" onclick="loadFundamentals('lck')">LCK</button>
+              <button class="scope-btn" data-scope="intl" onclick="loadFundamentals('intl')">INTL</button>
+              <button class="scope-btn" data-scope="all" onclick="loadFundamentals('all')">ALL</button>
+            </div>
+            <div id="fundamentals-table" class="fund-table"><div class="tk-empty">加载横向基本面中…</div></div>
+            <div class="msi-actions">
+              <button class="compare-close" onclick="quickCmd('TK MSI')">搜索 MSI TK</button>
+              <button class="compare-close" onclick="quickCmd('TK版本理解')">搜索版本理解</button>
+              <button class="btn-tk-new" onclick="toggleGraphEmbed()">嵌入 / 收起 MSI 概念图</button>
+              <button class="compare-close" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">新标签打开</button>
+            </div>
+            <div id="graph-embed" class="graph-area" style="display:none;height:460px">
+              <div class="graph-head">MSI 概念图 / TK 关系</div>
+              <iframe src="/tk-graph/index.html?q=MSI" style="width:100%;height:410px;border:0;background:#fff"></iframe>
+            </div>
+          </div>
+        </div>
+
+        <!-- Analyst card -->
+        <div class="card" id="card-analyst">
+          <div class="card-head">
+            <span class="badge" style="background:linear-gradient(135deg,var(--blue),var(--pink))">AI</span> 分析师 / 单场分析
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">调用 /api/analyst/{team}；轻量查看队伍、BP、体系分析，不影响基本面主链路</span>
+            <span style="flex:1"></span>
+            <button class="compare-close" onclick="loadAnalyst('中年电竞人')">中年电竞人</button>
+            <button class="compare-close" onclick="loadAnalyst('心语悦无言')">心语悦无言</button>
+          </div>
+          <div class="card-body">
+            <div class="analyst-bp-box">
+              <textarea class="analyst-bp-input" id="analyst-bp-input" placeholder="粘贴 BP/阵容：蓝色方T1 VN上单 巨魔 蛇女 炸弹人 慎；红色方GEN ..."></textarea>
+              <div class="analyst-bp-actions">
+                <button class="btn-tk-new" onclick="generateAnalystPrompt()">整理阵容</button>
+                <button class="compare-close" onclick="generateAnalystPrompt()">生成分析提示</button>
+              </div>
+              <div class="analyst-bp-hint">只在前端整理提示文本，不调用 LLM、不保存；复制这段去问小雪/分析师。</div>
+            </div>
+            <div class="analyst-content" id="analyst-output">选择队伍后点上方分析师按钮，生成单场/BP 分析入口；也可以先粘贴 BP/阵容，点“整理阵容”生成结构化提示。</div>
+          </div>
+        </div>
+
+        <!-- MSI card -->
+        <div class="card" id="card-msi">
+          <div class="card-head">
+            <span class="badge" style="background:var(--orange)">MSI</span> MSI 环境资料
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400" id="msi-updated">赛程数据只做分析关联</span>
+          </div>
+          <div class="card-body">
+            <div class="msi-grid">
+              <div class="msi-panel">
+                <div class="msi-panel-title">队伍池 / 阶段背景</div>
+                <div id="msi-schedules" class="msi-list">
+                  <div class="msi-empty">不作为看赛程入口，只用于识别 MSI 队伍池和对局背景</div>
+                </div>
+              </div>
+              <div class="msi-panel">
+                <div class="msi-panel-title">跨赛区对比</div>
+                <div class="msi-region-grid" id="msi-regions">
+                  <button class="msi-region active" data-region="ALL" onclick="setMsiRegion('ALL')">ALL</button>
+                  <button class="msi-region" data-region="LPL" onclick="setMsiRegion('LPL')">LPL</button>
+                  <button class="msi-region" data-region="LCK" onclick="setMsiRegion('LCK')">LCK</button>
+                  <button class="msi-region" data-region="INTL" onclick="setMsiRegion('INTL')">INTL</button>
+                </div>
+                <div id="msi-compare" class="msi-compare">
+                  <div><strong>Play-In</strong><span>T1 / TLAW / KC / DCG</span></div>
+                  <div><strong>正赛窗口</strong><span>7月3日 - 7月12日</span></div>
+                  <div><strong>工程入口</strong><span>赛程、队伍画像、3D 对比</span></div>
+                </div>
+              </div>
+            </div>
+            <div class="msi-actions">
+              <button class="btn-tk-new" onclick="loadMsiSchedules()">刷新 MSI 赛程</button>
+              <button class="compare-close" onclick="quickCmd('TK MSI')">搜索 MSI TK</button>
+              <button class="compare-close" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">打开 MSI 概念图</button>
+            </div>
+          </div>
+        </div>
+
+
+        <!-- Trade records card -->
+        <div class="card" id="card-trades">
+          <div class="card-head">
+            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">TRADE</span> 交易页
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">交易分析单独放这里；不混进基本面，不自动生成后续判断</span>
+            <span style="flex:1"></span>
+            <button class="compare-close" onclick="loadTrades()">刷新</button>
+          </div>
+          <div class="card-body">
+            <div class="trade-shell">
+              <div class="trade-form">
+                <div class="trade-games" id="trade-games">
+                  <button class="trade-game active" data-game="lol" onclick="setTradeGame('lol')">LOL</button>
+                  <button class="trade-game" data-game="cs" onclick="setTradeGame('cs')">CS</button>
+                  <button class="trade-game" data-game="valorant" onclick="setTradeGame('valorant')">无畏</button>
+                  <button class="trade-game" data-game="football" onclick="setTradeGame('football')">足球</button>
+                </div>
+                <div class="trade-grid">
+                  <div class="trade-field full"><label>对象 / 比赛</label><input id="trade-match" placeholder="如 T1 vs GEN / MSI某场"><div class="trade-help">点“带入当前队伍”只带入对象，不替你生成分析逻辑。</div></div>
+                  <div class="trade-field"><label>时间</label><input id="trade-time" type="datetime-local"></div>
+                  <div class="trade-field"><label>信心</label><select id="trade-confidence"><option>中</option><option>高</option><option>低</option></select></div>
+                  <div class="trade-field"><label>盘口 / 方向</label><input id="trade-winner" placeholder="手动写：让分 / 独赢 / 观望 / 放弃"></div>
+                  <div class="trade-field"><label>大小</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
+                  <div class="trade-field"><label>比分 / 赔率</label><input id="trade-score" placeholder="2-1 / 赔率 / 水位变化"></div>
+                  <div class="trade-field" style="display:none"><label>结果</label><select id="trade-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option></select></div>
+                  <div class="trade-field full"><label>交易分析</label><textarea id="trade-reason" placeholder="手动写你的分析：盘口、赔率、临场观察、分歧点、破相条件。这里不自动生成。"></textarea></div>
+                  <div class="trade-field full"><label>备注</label><textarea id="trade-review" placeholder="可选：后面想到什么再补"></textarea></div>
+                </div>
+                <div class="trade-actions">
+                  <button class="btn-save" onclick="saveTradeRecord()">保存记录</button>
+                  <button class="compare-close" onclick="prefillTradeFromTeam()">只带入对象</button>
+                  <span class="trade-msg" id="trade-msg"></span>
+                </div>
+              </div>
+              <div class="trade-board">
+                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无交易草稿</div></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3D card -->
+        <div class="card" id="card-3d">
+          <div class="card-head">
+            <span class="badge">3D</span> 三维数据
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400" id="dim-updated"></span>
+          </div>
+          <div class="card-body">
+            <div class="dim-grid" id="dim-grid">
+              <div class="dim-card"><div class="dim-label" id="d1-label">---</div><input class="dim-value" id="d1-val" value="-" onchange="markDirty()"></div>
+              <div class="dim-card"><div class="dim-label" id="d2-label">---</div><input class="dim-value" id="d2-val" value="-" onchange="markDirty()"></div>
+              <div class="dim-card"><div class="dim-label" id="d3-label">---</div><input class="dim-value" id="d3-val" value="-" onchange="markDirty()"></div>
+            </div>
+            <div style="margin-top:16px">
+              <div style="font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px">📝 战术笔记</div>
+              <textarea class="notes-area" id="notes-area" placeholder="战术要点…" onchange="markDirty()"></textarea>
+            </div>
+            <div style="margin-top:12px">
+              <div style="font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px">📖 版本理解</div>
+              <textarea class="version-text" id="version-area" placeholder="版本理解…" onchange="markDirty()"></textarea>
+            </div>
+            <div class="save-row">
+              <button class="btn-save" id="btn-save" onclick="save3D()">
+                <span class="unsaved">💾 保存修改</span>
+                <span class="saved">✅ 已保存</span>
+              </button>
+              <span class="save-msg" id="save-msg"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- TK card -->
+        <div class="card" id="card-tk">
+          <div class="card-head">
+            <span class="badge" style="background:var(--blue)">TK</span> 战术知识
+            <span style="flex:1"></span>
+            <button class="btn-tk-new" onclick="openTKEditor()">+ 新建</button>
+          </div>
+          <div class="card-body">
+            <div class="tk-search-inner">
+              <input class="tk-search-input" id="tk-search" placeholder="搜索 TK 概念…" onkeydown="if(event.key==='Enter')searchTK()">
+              <button class="btn-save" style="background:var(--blue);padding:10px 18px;font-size:14px" onclick="searchTK()">搜索</button>
+            </div>
+            <div id="tk-results">
+              <div class="tk-empty">输入关键词搜索，或加载队伍后自动显示相关TK</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Team dropdown -->
+  <div id="team-dropdown" style="display:none;position:fixed;z-index:200;background:var(--bg-0);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 30px rgba(0,0,0,0.12);max-height:400px;overflow-y:auto;min-width:200px"></div>
+
+  <!-- TK Editor overlay -->
+  <div class="tk-editor-overlay" id="tk-editor-overlay" onclick="if(event.target===this)closeTKEditor()">
+    <div class="tk-editor">
+      <div class="tk-editor-head">
+        <span id="tk-editor-title">新建 TK 条目</span>
+        <button class="compare-close" onclick="closeTKEditor()">✕</button>
+      </div>
+      <div class="tk-editor-body">
+        <label>关联队伍</label>
+        <input id="tk-editor-team" placeholder="如 AL（可选）">
+        <label>标签（逗号分隔）</label>
+        <input id="tk-editor-tags" placeholder="如 版本理解,BP,打野">
+        <label>内容</label>
+        <textarea id="tk-editor-content" placeholder="TK 条目内容…&#10;&#10;推荐格式：&#10;【结论】一句话总结&#10;【因果】为什么&#10;【推演】后续影响"></textarea>
+      </div>
+      <div class="tk-editor-foot">
+        <span id="tk-editor-msg" style="font-size:12px;color:var(--ink-3);margin-right:auto"></span>
+        <button class="compare-close" onclick="closeTKEditor()">取消</button>
+        <button class="btn-save" id="tk-editor-save" onclick="saveTKEntry()">保存</button>
+        <input type="hidden" id="tk-editor-filename">
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

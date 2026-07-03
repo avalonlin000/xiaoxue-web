@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Python/runtime cache
+__pycache__/
+*.py[cod]
+
+# Local backups made during remote maintenance
+*.bak.*
+
+# Logs and temp files
+*.log
+.DS_Store
+tmp/
+.tmp/
