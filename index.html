@@ -931,6 +931,7 @@ html, body {
 .quality.mid { background:#fff5e8; color:var(--orange); }
 .quality.low { background:var(--red-bg); color:var(--red); }
 .page-market #card-fundamentals,
+.page-market #card-today-content,
 .page-market #card-analyst,
 .page-market #card-msi,
 .page-market #card-3d,
@@ -970,6 +971,61 @@ html, body {
   margin-bottom: calc(var(--s)*2);
 }
 .meta-strip strong { color: var(--ink-1); }
+
+/* 今日内容 / 单场分析入口 */
+.today-content-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: calc(var(--s)*2);
+}
+.today-match-list,
+.today-entry-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.today-match {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff, var(--bg-1));
+  padding: 12px 14px;
+}
+.today-match-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-weight: 900;
+  color: var(--ink-0);
+}
+.today-match-title span:first-child { font-family: var(--mono); color: var(--orange); }
+.today-match-copy { margin-top: 8px; color: var(--ink-1); font-size: 13px; line-height: 1.65; }
+.today-entry {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg-0);
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.65;
+}
+.today-entry b { display: block; color: var(--ink-0); margin-bottom: 3px; }
+.today-path {
+  display: block;
+  margin-top: 4px;
+  font: 700 11px var(--mono);
+  color: var(--blue-deep);
+  word-break: break-all;
+}
+.today-boundary {
+  margin-top: calc(var(--s)*2);
+  border: 1px dashed var(--orange);
+  border-radius: 10px;
+  background: #fff8ed;
+  padding: 10px 12px;
+  color: var(--ink-1);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.today-boundary strong { color: var(--orange); }
 </style>
 </head>
 <body>
@@ -1086,6 +1142,51 @@ html, body {
             <div id="graph-embed" class="graph-area" style="display:none;height:460px">
               <div class="graph-head">MSI 概念图 / TK 关系</div>
               <iframe src="/tk-graph/index.html?q=MSI" style="width:100%;height:410px;border:0;background:#fff"></iframe>
+            </div>
+          </div>
+        </div>
+
+        <!-- Today content / single-match entry card -->
+        <div class="card" id="card-today-content">
+          <div class="card-head">
+            <span class="badge" style="background:linear-gradient(135deg,var(--orange),var(--pink))">TODAY</span> 今日内容 / 单场分析入口
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">2026-07-05 MSI 日报、赛前卡、分析师入口可见层；静态入口，不新增接口</span>
+            <span style="flex:1"></span>
+            <button class="compare-close" onclick="document.getElementById('card-analyst')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">去分析师入口</button>
+            <button class="compare-close" onclick="setPage('market')">去盘口页</button>
+          </div>
+          <div class="card-body">
+            <div class="today-content-grid">
+              <div class="today-match-list">
+                <div class="today-match">
+                  <div class="today-match-title"><span>11:00</span><span>TSW vs TES · BO5 / MSI季中赛</span></div>
+                  <div class="today-match-copy">日报已写入 TS 底表：TSW mu 22.8 / σ 6.0 / TS 4.8；TES mu 26.9 / σ 0.5 / TS 25.5。赛前卡提示 TES 是更稳强弱基准，TSW 的重点是极高波动带来的单局扰动；盘口只看观察顺序，不给自动交易结论。</div>
+                </div>
+                <div class="today-match">
+                  <div class="today-match-title"><span>16:00</span><span>HLE vs G2 · BO5 / MSI季中赛</span></div>
+                  <div class="today-match-copy">日报已写入 TS 底表：HLE mu 31.8 / σ 0.8 / TS 29.5；G2 mu 26.0 / σ 4.8 / TS 11.6。赛前卡提示 HLE 是更高均值和更高下界的一方，G2 看体系变化、中期团战和高 σ 是否拖入非标准局。</div>
+                </div>
+              </div>
+              <div class="today-entry-list">
+                <div class="today-entry">
+                  <b>日报入口路径</b>
+                  包含今日两场 MSI、TS/mu/sigma 单场底表、队伍三维摘要、TK/RAG 摘要和钧钧赛前阅读版。
+                  <span class="today-path">/home/ubuntu/lol_data/scripts/LOL电竞日报_2026-07-05.md</span>
+                </div>
+                <div class="today-entry">
+                  <b>赛前内容卡路径</b>
+                  给钧钧赛前直接阅读：实力差、波动差、TS 下界、盘口观察顺序、BP/临场待补字段。
+                  <span class="today-path">/home/ubuntu/lol_data/scripts/MSI赛前内容卡_2026-07-05.md</span>
+                </div>
+                <div class="today-entry">
+                  <b>分析师入口说明摘要</b>
+                  输入日期 + 对局即可开始；赛前先看基本面、TS 波动、盘口观察和 BP 待补；BP 后补蓝红方与五个英雄，拆阵容核心链、时间边界和风险点；赛后再补比分、关键资源团和转折，做复盘沉淀。
+                  <span class="today-path">/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md</span>
+                </div>
+              </div>
+            </div>
+            <div class="today-boundary">
+              <strong>待补与边界：</strong>BP、首发、蓝红方、每局阵容、赛后比分、关键资源团和盘口实际变化都必须等信息出现后再补；赛前不得伪造成事实。小雪只输出盘口观察、市场分歧、风险提示和赛后偏差复盘，禁止自动交易结论，最终交易判断由钧钧自己定。
             </div>
           </div>
         </div>
