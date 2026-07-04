@@ -19,6 +19,24 @@ SKILL_DIR_MAIN = "/home/ubuntu/.hermes/skills"
 RAG_API = "http://localhost:8768/api/search"
 REINDEX_API = "http://localhost:8768/api/reindex"
 
+DAILY_CONTENT_FILES = {
+    "daily_report": {
+        "title": "LOL电竞日报 2026-07-05",
+        "kind": "daily_report",
+        "path": "/home/ubuntu/lol_data/scripts/LOL电竞日报_2026-07-05.md",
+    },
+    "pre_match_card": {
+        "title": "MSI赛前内容卡 2026-07-05",
+        "kind": "pre_match_card",
+        "path": "/home/ubuntu/lol_data/scripts/MSI赛前内容卡_2026-07-05.md",
+    },
+    "analyst_entry_copy": {
+        "title": "分析师入口说明",
+        "kind": "analyst_entry_copy",
+        "path": "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md",
+    },
+}
+
 # DeepSeek API config — read from hermes config.yaml when available.
 # In Hermes profile shells, HOME may point at ~/.hermes/profiles/<profile>/home,
 # so expanduser('~/.hermes/config.yaml') is not always the real shared config path.
@@ -1285,6 +1303,67 @@ def trade_stats(game: str = Query("")):
         "pushes": pushes,
         "win_rate": round(wins / len(settled) * 100, 1) if settled else 0,
         "by_game": by_game,
+    }
+
+
+# ─── 今日内容入口 ────────────────────────────────────────
+
+
+def _daily_content_summary(text: str, max_chars: int = 180) -> str:
+    """提取本地内容文件摘要；只处理白名单文件读取结果。"""
+    if not text:
+        return ""
+    lines = []
+    in_frontmatter = False
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line == "---":
+            in_frontmatter = not in_frontmatter
+            continue
+        if in_frontmatter or not line:
+            continue
+        if line.startswith("#"):
+            line = line.lstrip("#").strip()
+        if line:
+            lines.append(line)
+        if len(" ".join(lines)) >= max_chars:
+            break
+    summary = " ".join(lines).strip()
+    if len(summary) > max_chars:
+        summary = summary[:max_chars].rstrip() + "…"
+    return summary
+
+
+@app.get("/api/daily-content")
+def get_daily_content():
+    """只读今日内容入口：固定白名单路径，不接受任意 path 参数。"""
+    items = []
+    for key, meta in DAILY_CONTENT_FILES.items():
+        path = meta["path"]
+        exists = os.path.exists(path)
+        stat = os.stat(path) if exists else None
+        summary = ""
+        if exists:
+            try:
+                with open(path, encoding="utf-8") as f:
+                    summary = _daily_content_summary(f.read(12000))
+            except Exception as exc:
+                summary = f"摘要读取失败：{exc}"
+        items.append({
+            "id": key,
+            "title": meta["title"],
+            "kind": meta["kind"],
+            "path": path,
+            "exists": exists,
+            "updated_at": datetime.fromtimestamp(stat.st_mtime).isoformat(timespec="seconds") if stat else None,
+            "size_bytes": stat.st_size if stat else 0,
+            "summary": summary,
+        })
+    return {
+        "ok": True,
+        "date": "2026-07-05",
+        "source": "local_whitelist",
+        "items": items,
     }
 
 

@@ -37,6 +37,7 @@ async function init() {
   }
   setPage('fundamentals');
   loadFundamentals('msi');
+  loadDailyContent();
   loadTrades();
 }
 init();
@@ -107,6 +108,38 @@ async function loadFundamentals(scope = 'msi') {
   } catch (e) {
     if (table) table.innerHTML = '<div class="tk-empty" style="color:var(--red)">横向基本面加载失败</div>';
   }
+}
+
+async function loadDailyContent() {
+  const status = document.getElementById('today-content-status');
+  try {
+    const data = await API('/daily-content');
+    const items = data.items || [];
+    items.forEach(renderDailyContentItem);
+    if (status) status.textContent = `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
+  } catch (e) {
+    console.warn('daily content API failed, keeping static fallback:', e);
+    if (status) status.textContent = '2026-07-05 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 失败，保留静态 fallback';
+  }
+}
+
+function renderDailyContentItem(item) {
+  const el = document.querySelector(`[data-content-id="${escAttr(item.id || '')}"]`);
+  if (!el) return;
+  el.classList.toggle('exists', !!item.exists);
+  el.classList.toggle('missing', !item.exists);
+  const title = el.querySelector('b');
+  const summary = el.querySelector('.today-summary');
+  const meta = el.querySelector('.today-meta');
+  const path = el.querySelector('.today-path');
+  if (title && item.title) title.textContent = item.title;
+  if (summary && item.summary) summary.textContent = item.summary;
+  if (meta) {
+    meta.textContent = item.exists
+      ? `已读取本地文件 · 更新时间 ${item.updated_at || '-'} · ${item.size_bytes || 0} bytes`
+      : '本地文件不存在；当前显示静态 fallback 文案';
+  }
+  if (path && item.path) path.textContent = item.path;
 }
 
 function renderMsiSummary(data) {
