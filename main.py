@@ -328,22 +328,41 @@ def _search_tk_files(q: str, team: str, limit: int):
     return results[:limit]
 
 
+def _safe_tk_filename(filename: str) -> str:
+    """Return a basename-only TK filename under TK_DIR, or reject path traversal."""
+    safe = os.path.basename(filename or "")
+    if not safe or safe != filename or not safe.endswith(".md"):
+        raise HTTPException(400, "非法 TK 文件名")
+    return safe
+
+
+def _tk_markdown(data: dict, *, source: str = "手动录入", created: str | None = None) -> str:
+    content = data.get("content", "")
+    tags = data.get("tags", "")
+    team = data.get("team", "")
+    player = data.get("player", "")
+    tag_list = []
+    if team:
+        tag_list.append(f"队伍:{team}")
+    if player:
+        tag_list.append(f"选手:{player}")
+    if isinstance(tags, str) and tags:
+        tag_list.extend(t.strip() for t in tags.split(",") if t.strip())
+    if not tag_list:
+        tag_list.append("通用")
+    date_str = created or datetime.now().strftime("%Y-%m-%d")
+    return f"---\nsource: {source}\nsource_type: manual\ntags: [{', '.join(tag_list)}]\ncreated: {date_str}\n---\n\n{content}\n"
+
+
 @app.post("/api/tk")
 def create_tk(data: dict):
     content = data.get("content", ""); source = data.get("source", "手动录入")
-    tags = data.get("tags", ""); team = data.get("team", ""); player = data.get("player", "")
     if not content or len(content.strip()) < 10: raise HTTPException(400, "内容太短")
-    tag_list = []
-    if team: tag_list.append(f"队伍:{team}")
-    if player: tag_list.append(f"选手:{player}")
-    if isinstance(tags, str) and tags: tag_list.extend(t.strip() for t in tags.split(",") if t.strip())
-    if not tag_list: tag_list.append("通用")
     os.makedirs(TK_DIR, exist_ok=True)
     title = content.strip().split("\n")[0][:60]
     fname = re.sub(r'[^\w\u4e00-\u9fff\-]', '_', title)[:50].strip("_") or "untitled"
-    date_str = datetime.now().strftime("%Y-%m-%d")
     fname = f"manual_{hash(content) % 10000}_{fname}.md"
-    md = f"---\nsource: {source}\nsource_type: manual\ntags: [{', '.join(tag_list)}]\ncreated: {date_str}\n---\n\n{content}\n"
+    md = _tk_markdown(data, source=source)
     fpath = os.path.join(TK_DIR, fname)
     with open(fpath, "w", encoding="utf-8") as f: f.write(md)
     try:
@@ -352,9 +371,39 @@ def create_tk(data: dict):
     return {"ok": True, "filename": fname, "path": fpath}
 
 
+@app.put("/api/tk/{filename}")
+def update_tk(filename: str, data: dict):
+    safe = _safe_tk_filename(filename)
+    fpath = os.path.join(TK_DIR, safe)
+    if not os.path.exists(fpath):
+        raise HTTPException(404, "TK 条目未找到")
+    content = data.get("content", "")
+    source = data.get("source", "手动录入")
+    if not content or len(content.strip()) < 10:
+        raise HTTPException(400, "内容太短")
+    created = None
+    try:
+        with open(fpath, encoding="utf-8") as f:
+            old = f.read(1000)
+        for line in old.split("\n"):
+            if line.strip().startswith("created:"):
+                created = _extract_date(line.replace("created:", "").strip()) or None
+                break
+    except Exception:
+        created = None
+    md = _tk_markdown(data, source=source, created=created)
+    with open(fpath, "w", encoding="utf-8") as f:
+        f.write(md)
+    try:
+        import requests; requests.post(REINDEX_API, json={"force": False}, timeout=3)
+    except: pass
+    return {"ok": True, "filename": safe, "path": fpath}
+
+
 @app.delete("/api/tk/{filename}")
 def delete_tk(filename: str):
-    fpath = os.path.join(TK_DIR, filename)
+    safe = _safe_tk_filename(filename)
+    fpath = os.path.join(TK_DIR, safe)
     if not os.path.exists(fpath): raise HTTPException(404, "TK 条目未找到")
     os.remove(fpath)
     try:
@@ -473,6 +522,37 @@ def _team_tk_count(team: str) -> int:
     return count
 
 
+def _team_starter_cards(conn, team_id: str) -> list[dict]:
+    """Lightweight player cards from roster source only; never infer missing facts."""
+    if not team_id:
+        return []
+    rows = conn.execute("""
+        SELECT player_name, role, position, is_starter, status
+        FROM rosters
+        WHERE team_id = ? AND status = 'active'
+        ORDER BY is_starter DESC,
+                 CASE COALESCE(role, position)
+                   WHEN '上单' THEN 1 WHEN 'TOP' THEN 1
+                   WHEN '打野' THEN 2 WHEN 'JUNGLE' THEN 2
+                   WHEN '中单' THEN 3 WHEN 'MID' THEN 3
+                   WHEN 'ADC' THEN 4 WHEN 'BOT' THEN 4
+                   WHEN '辅助' THEN 5 WHEN 'SUPPORT' THEN 5
+                   ELSE 9 END,
+                 player_name
+        LIMIT 8
+    """, (team_id,)).fetchall()
+    cards = []
+    for r in rows:
+        role = r["role"] or r["position"] or "位置暂无数据"
+        status = "首发" if r["is_starter"] else "轮换/替补"
+        cards.append({
+            "name": r["player_name"] or "暂无数据",
+            "role": role,
+            "status": status,
+        })
+    return cards
+
+
 def _scope_where(scope: str):
     scope = (scope or "all").lower()
     if scope == "lpl":
@@ -510,7 +590,6 @@ def fundamentals_teams(scope: str = Query("all"), limit: int = Query(80)):
         ORDER BY {order_by}
         LIMIT ?
     """, params + [limit]).fetchall()
-    conn.close()
 
     teams = []
     for r in rows:
@@ -519,6 +598,7 @@ def fundamentals_teams(scope: str = Query("all"), limit: int = Query(80)):
         has_profile = bool(profile_md)
         tk_count = _team_tk_count(code)
         has_3d = bool(r["dim_1_value"] or r["dim_2_value"] or r["dim_3_value"])
+        players = _team_starter_cards(conn, r["team_id"])
         if has_profile and has_3d and tk_count:
             quality = "完整"
         elif has_profile or has_3d or tk_count:
@@ -542,6 +622,8 @@ def fundamentals_teams(scope: str = Query("all"), limit: int = Query(80)):
             "has_3d": has_3d,
             "has_tk": tk_count > 0,
             "tk_count": tk_count,
+            "players": players,
+            "players_note": "首发/关键选手来自 rosters；缺数据不推断" if players else "资料缺口/暂无数据",
             "dim_1_name": r["dim_1_name"] or "优势局",
             "dim_1_value": r["dim_1_value"] or "-",
             "dim_2_name": r["dim_2_name"] or "劣势局",
@@ -553,6 +635,7 @@ def fundamentals_teams(scope: str = Query("all"), limit: int = Query(80)):
             "updated_at": r["updated_at"] or "",
             "data_quality": quality,
         })
+    conn.close()
     return {"scope": scope, "teams": teams}
 
 

@@ -134,7 +134,7 @@ function renderFundamentalsTable(rows) {
     el.innerHTML = '<div class="tk-empty">暂无横向基本面数据</div>';
     return;
   }
-  const head = `<div class="fund-row fund-head"><span>队伍</span><span>赛区</span><span>赔率</span><span>mu</span><span>σ</span><span>TS</span><span>版本/风格摘要</span><span>资料</span></div>`;
+  const head = `<div class="fund-row fund-head"><span>队伍</span><span>赛区</span><span>赔率</span><span>mu</span><span>σ</span><span>TS</span><span>版本/风格摘要</span><span>首发/关键选手</span><span>资料</span></div>`;
   const body = rows.map(t => {
     const q = t.data_quality === '完整' ? 'good' : (t.data_quality === '部分' ? 'mid' : 'low');
     const summary = t.version_summary || t.notes_summary || '暂无摘要，待补画像/TK';
@@ -142,6 +142,7 @@ function renderFundamentalsTable(rows) {
     const sigma = Number(t.seed_sigma ?? t.sigma ?? 0).toFixed(1);
     const ts = Number(t.seed_ts ?? t.ts_score ?? 0).toFixed(1);
     const odds = t.odds ? Number(t.odds).toFixed(1) : '-';
+    const players = renderPlayerCards(t.players || [], t.players_note);
     return `<div class="fund-row" onclick="selectTeam('${escAttr(t.short_name)}')">
       <span class="fund-team">${escHtml(t.short_name)}</span>
       <span>${escHtml(t.region || '-')}</span>
@@ -150,10 +151,23 @@ function renderFundamentalsTable(rows) {
       <span>${escHtml(sigma)}</span>
       <span>${escHtml(ts)}</span>
       <span>${escHtml(summary)}</span>
+      <span class="player-cards">${players}</span>
       <span class="quality ${q}">${escHtml(t.data_quality || '资料不足')}</span>
     </div>`;
   }).join('');
   el.innerHTML = head + body;
+}
+
+function renderPlayerCards(players, note) {
+  if (!players.length) {
+    return `<span class="player-card gap">${escHtml(note || '资料缺口/暂无数据')}</span>`;
+  }
+  return players.map(p => {
+    const role = p.role || '位置暂无数据';
+    const name = p.name || '暂无数据';
+    const status = p.status || '资料缺口';
+    return `<span class="player-card" title="${escAttr(status)}"><b>${escHtml(role)}</b>${escHtml(name)}</span>`;
+  }).join('');
 }
 
 function generateAnalystPrompt() {
@@ -575,6 +589,7 @@ async function saveTKEntry() {
   const msg = document.getElementById('tk-editor-msg');
   msg.textContent = '保存中…';
   try {
+    const filename = document.getElementById('tk-editor-filename').value.trim();
     const body = {
       content: content,
       source: '手动录入',
@@ -582,12 +597,13 @@ async function saveTKEntry() {
       team: document.getElementById('tk-editor-team').value || state.team || '',
       player: '',
     };
-    await fetch('/api/tk', {
-      method: 'POST',
+    const resp = await fetch(filename ? '/api/tk/' + encodeURIComponent(filename) : '/api/tk', {
+      method: filename ? 'PUT' : 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    msg.textContent = '✅ 已保存';
+    if (!resp.ok) throw new Error(String(resp.status));
+    msg.textContent = filename ? '✅ 已更新' : '✅ 已保存';
     setTimeout(() => { closeTKEditor(); searchTK(); }, 800);
   } catch (e) {
     msg.textContent = '❌ 保存失败';
@@ -751,7 +767,7 @@ function getTeamInfo(code) {
 async function loadTrades() {
   const list = document.getElementById('trade-list');
   if (!list) return;
-  list.innerHTML = '<div class="tk-empty">加载交易草稿中…</div>';
+  list.innerHTML = '<div class="tk-empty">加载盘口草稿中…</div>';
   try {
     const [recordsData, stats] = await Promise.all([
       API('/market-notes?game=' + encodeURIComponent(state.tradeGame) + '&limit=30'),
@@ -761,12 +777,12 @@ async function loadTrades() {
     renderTradeStats(stats || {});
     renderTrades(state.trades);
   } catch (e) {
-    list.innerHTML = '<div class="tk-empty" style="color:var(--red)">交易草稿加载失败</div>';
+    list.innerHTML = '<div class="tk-empty" style="color:var(--red)">盘口草稿加载失败</div>';
   }
 }
 
 function renderTradeStats(stats) {
-  // 交易页不展示命中率/输赢统计，只保留钧钧自己的分析草稿。
+  // 盘口页不展示命中率/输赢统计，只保留钧钧自己的盘口分析草稿。
 }
 
 function renderTrades(rows) {
@@ -832,20 +848,8 @@ async function saveTradeRecord() {
   }
 }
 
-async function settleTrade(id, result) {
-  const msg = document.getElementById('trade-msg');
-  if (msg) msg.textContent = `结算为${result}…`;
-  try {
-    await fetch('/api/trades/' + id, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ result }) });
-    await loadTrades();
-    if (msg) msg.textContent = `已结算：${result}，统计已刷新`;
-  } catch (e) {
-    if (msg) msg.textContent = '结算失败';
-  }
-}
-
 async function deleteTrade(id) {
-  if (!confirm('删除这条交易草稿？')) return;
+  if (!confirm('删除这条盘口草稿？')) return;
   const msg = document.getElementById('trade-msg');
   if (msg) msg.textContent = '删除中…';
   try {
@@ -941,6 +945,5 @@ window.setTradeGame = setTradeGame;
 window.prefillTradeFromTeam = prefillTradeFromTeam;
 window.loadTrades = loadTrades;
 window.saveTradeRecord = saveTradeRecord;
-window.settleTrade = settleTrade;
 window.deleteTrade = deleteTrade;
 window.tradeToTK = tradeToTK;

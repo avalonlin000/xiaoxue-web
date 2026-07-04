@@ -901,7 +901,7 @@ html, body {
 .fund-table { display:flex; flex-direction:column; gap:8px; }
 .fund-row {
   display: grid;
-  grid-template-columns: 86px 60px 72px 76px 76px 82px 1fr 84px;
+  grid-template-columns: 78px 54px 62px 60px 60px 66px 1fr 230px 78px;
   gap: 10px;
   align-items: center;
   padding: 10px 12px;
@@ -913,6 +913,19 @@ html, body {
 .fund-row:hover { border-color: var(--pink); box-shadow: 0 0 0 3px var(--pink-light); }
 .fund-head { background: var(--bg-1); color: var(--ink-2); font-size: 12px; font-weight: 900; cursor: default; }
 .fund-team { font: 900 15px var(--mono); color: var(--ink-0); }
+.player-cards { display:flex; flex-wrap:wrap; gap:5px; align-items:center; }
+.player-card {
+  display:inline-flex; gap:4px; align-items:center;
+  padding:2px 7px;
+  border:1px solid var(--line);
+  border-radius:999px;
+  background:var(--bg-1);
+  font-size:11px;
+  line-height:1.5;
+  color:var(--ink-2);
+}
+.player-card b { font-family:var(--mono); color:var(--ink-0); }
+.player-card.gap { border-style:dashed; color:var(--ink-3); }
 .quality { border-radius:999px; padding:3px 8px; font-size:12px; font-weight:800; text-align:center; }
 .quality.good { background:#e9fff8; color:var(--green); }
 .quality.mid { background:#fff5e8; color:var(--orange); }
@@ -973,7 +986,7 @@ html, body {
 
     <div class="workspace-tabs">
       <button class="workspace-tab active" id="tab-fundamentals" onclick="setPage('fundamentals')">基本面</button>
-      <button class="workspace-tab" id="tab-market" onclick="setPage('market')">交易</button>
+      <button class="workspace-tab" id="tab-market" onclick="setPage('market')">盘口</button>
     </div>
 
     <div class="top-spacer"></div>
@@ -984,8 +997,8 @@ html, body {
       <span style="font-size:10px">▾</span>
     </button>
 
-    <a class="btn-tool" id="btn-graph" href="/tk-graph/index.html" target="_blank" style="display:none;text-decoration:none">
-      📊 关联图
+    <a class="btn-tool" id="btn-graph" href="/tk-graph/index.html?q=MSI" target="_blank" style="display:none;text-decoration:none">
+      MSI 概念图
     </a>
 
     <button class="btn-tool" id="btn-analyst" onclick="loadAnalyst()" style="display:none">
@@ -1010,7 +1023,7 @@ html, body {
       <span class="cmd-hint" onclick="setPage('fundamentals')">基本面</span>
       <span class="cmd-hint" onclick="loadFundamentals('msi')">MSI研究</span>
       <span class="cmd-hint" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">MSI概念图</span>
-      <span class="cmd-hint" onclick="setPage('market')">交易页</span>
+      <span class="cmd-hint" onclick="setPage('market')">盘口页</span>
       <span class="cmd-hint" onclick="loadAnalyst()">分析师 / 单场分析</span>
       <span class="cmd-hint" onclick="quickCmd('TK版本理解')">TK版本理解</span>
     </div>
@@ -1026,7 +1039,7 @@ html, body {
       <div class="msg">在上面输入指令，数据跟着变</div>
       <div class="tips">
         试试：<code>看AL</code> · <code>看TES</code> · <code>TK版本理解</code><br>
-        或者点快捷标签直接开始 · 右上「📊 关联图」新标签页打开
+        或者点快捷标签直接开始 · 右上「MSI 概念图」新标签页打开
       </div>
     </div>
 
@@ -1068,7 +1081,7 @@ html, body {
               <button class="compare-close" onclick="quickCmd('TK MSI')">搜索 MSI TK</button>
               <button class="compare-close" onclick="quickCmd('TK版本理解')">搜索版本理解</button>
               <button class="btn-tk-new" onclick="toggleGraphEmbed()">嵌入 / 收起 MSI 概念图</button>
-              <button class="compare-close" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">新标签打开</button>
+              <button class="compare-close" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">新标签打开 MSI 概念图</button>
             </div>
             <div id="graph-embed" class="graph-area" style="display:none;height:460px">
               <div class="graph-head">MSI 概念图 / TK 关系</div>
@@ -1137,11 +1150,11 @@ html, body {
         </div>
 
 
-        <!-- Trade records card -->
+        <!-- Market notes card -->
         <div class="card" id="card-trades">
           <div class="card-head">
-            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">TRADE</span> 交易页
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">交易分析单独放这里；不混进基本面，不自动生成后续判断</span>
+            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">MARKET</span> 盘口页
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">盘口分析单独放这里；不混进基本面，不自动生成交易方向</span>
             <span style="flex:1"></span>
             <button class="compare-close" onclick="loadTrades()">刷新</button>
           </div>
@@ -1162,7 +1175,7 @@ html, body {
                   <div class="trade-field"><label>大小</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
                   <div class="trade-field"><label>比分 / 赔率</label><input id="trade-score" placeholder="2-1 / 赔率 / 水位变化"></div>
                   <div class="trade-field" style="display:none"><label>结果</label><select id="trade-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option></select></div>
-                  <div class="trade-field full"><label>交易分析</label><textarea id="trade-reason" placeholder="手动写你的分析：盘口、赔率、临场观察、分歧点、破相条件。这里不自动生成。"></textarea></div>
+                  <div class="trade-field full"><label>盘口分析</label><textarea id="trade-reason" placeholder="手动写你的分析：盘口、赔率、临场观察、分歧点、破相条件。这里不自动生成。"></textarea></div>
                   <div class="trade-field full"><label>备注</label><textarea id="trade-review" placeholder="可选：后面想到什么再补"></textarea></div>
                 </div>
                 <div class="trade-actions">
@@ -1172,7 +1185,7 @@ html, body {
                 </div>
               </div>
               <div class="trade-board">
-                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无交易草稿</div></div>
+                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无盘口草稿</div></div>
               </div>
             </div>
           </div>
