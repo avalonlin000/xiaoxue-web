@@ -1025,6 +1025,18 @@ html, body {
   font-size: 13px;
   line-height: 1.65;
 }
+.today-content-state {
+  margin-bottom: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--orange);
+  border-radius: 10px;
+  background: #fff8ed;
+  padding: 10px 12px;
+  color: var(--ink-1);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.today-content-state strong { color: var(--orange); }
 .today-entry b { display: block; color: var(--ink-0); margin-bottom: 3px; }
 .today-summary { display: block; }
 .today-meta {
@@ -1034,6 +1046,11 @@ html, body {
   font-size: 12px;
 }
 .today-entry.missing .today-meta { color: var(--red); }
+.today-entry.api-failed {
+  border-color: var(--orange);
+  background: #fff8ed;
+}
+.today-entry.api-failed .today-meta { color: var(--orange); }
 .today-entry.exists .today-meta { color: var(--green); }
 .today-path {
   display: block;
@@ -1257,6 +1274,9 @@ html, body {
             <button class="compare-close" onclick="setPage('market')">去盘口页</button>
           </div>
           <div class="card-body">
+            <div class="today-content-state" id="today-content-state" data-slice="D127">
+              <strong>内容状态：</strong>等待 /api/daily-content 白名单校验；若本地文件不存在或接口失败，会明确标出缺日报、缺赛前卡、缺分析师入口说明，当前显示静态 fallback。
+            </div>
             <div class="today-content-grid">
               <div class="today-match-list">
                 <div class="today-match">
@@ -1280,19 +1300,19 @@ html, body {
                 <div class="today-entry" data-content-id="daily_report">
                   <b>日报入口路径</b>
                   <span class="today-summary">包含今日两场 MSI、TS/mu/sigma 单场底表、队伍三维摘要、TK/RAG 摘要和钧钧赛前阅读版。</span>
-                  <span class="today-meta">静态 fallback：等待 /api/daily-content 返回存在状态和更新时间。</span>
+                  <span class="today-meta">缺日报状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
                   <span class="today-path">/home/ubuntu/lol_data/scripts/LOL电竞日报_2026-07-05.md</span>
                 </div>
                 <div class="today-entry" data-content-id="pre_match_card">
                   <b>赛前内容卡路径</b>
                   <span class="today-summary">给钧钧赛前直接阅读：实力差、波动差、TS 下界、盘口观察顺序、BP/临场待补字段。</span>
-                  <span class="today-meta">静态 fallback：等待 /api/daily-content 返回存在状态和更新时间。</span>
+                  <span class="today-meta">缺赛前卡状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
                   <span class="today-path">/home/ubuntu/lol_data/scripts/MSI赛前内容卡_2026-07-05.md</span>
                 </div>
                 <div class="today-entry" data-content-id="analyst_entry_copy">
                   <b>分析师入口说明摘要</b>
                   <span class="today-summary">输入日期 + 对局即可开始；赛前先看基本面、TS 波动、盘口观察和 BP 待补；BP 后补蓝红方与五个英雄，拆阵容核心链、时间边界和风险点；赛后再补比分、关键资源团和转折，做复盘沉淀。</span>
-                  <span class="today-meta">静态 fallback：等待 /api/daily-content 返回存在状态和更新时间。</span>
+                  <span class="today-meta">缺分析师入口说明状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
                   <span class="today-path">/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md</span>
                 </div>
               </div>

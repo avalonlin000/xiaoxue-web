@@ -112,14 +112,27 @@ async function loadFundamentals(scope = 'msi') {
 
 async function loadDailyContent() {
   const status = document.getElementById('today-content-status');
+  const stateEl = document.getElementById('today-content-state');
   try {
     const data = await API('/daily-content');
     const items = data.items || [];
     items.forEach(renderDailyContentItem);
-    if (status) status.textContent = `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
+    const missing = items.filter(item => !item.exists);
+    if (status) {
+      status.textContent = missing.length
+        ? `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
+        : `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
+    }
+    if (stateEl) {
+      stateEl.innerHTML = missing.length
+        ? `<strong>内容状态：</strong>已读取 /api/daily-content；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
+        : '<strong>内容状态：</strong>/api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺分析师入口说明。';
+    }
   } catch (e) {
     console.warn('daily content API failed, keeping static fallback:', e);
-    if (status) status.textContent = '2026-07-05 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 失败，保留静态 fallback';
+    markDailyContentApiFailed();
+    if (status) status.textContent = '2026-07-05 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback';
+    if (stateEl) stateEl.innerHTML = '<strong>内容状态：</strong>/api/daily-content 接口失败；缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback。';
   }
 }
 
@@ -137,9 +150,32 @@ function renderDailyContentItem(item) {
   if (meta) {
     meta.textContent = item.exists
       ? `已读取本地文件 · 更新时间 ${item.updated_at || '-'} · ${item.size_bytes || 0} bytes`
-      : '本地文件不存在；当前显示静态 fallback 文案';
+      : dailyContentMissingText(item);
   }
   if (path && item.path) path.textContent = item.path;
+}
+
+function dailyContentMissingText(item) {
+  return `缺${missingDailyContentLabel(item)}：本地文件不存在；当前显示静态 fallback 文案`;
+}
+
+function missingDailyContentLabel(itemOrId) {
+  const id = typeof itemOrId === 'string' ? itemOrId : (itemOrId?.id || itemOrId?.kind || '');
+  return {
+    daily_report: '日报',
+    pre_match_card: '赛前卡',
+    analyst_entry_copy: '分析师入口说明',
+  }[id] || '白名单文件';
+}
+
+function markDailyContentApiFailed() {
+  document.querySelectorAll('.today-entry[data-content-id]').forEach(el => {
+    el.classList.remove('exists', 'missing');
+    el.classList.add('api-failed');
+    const id = el.dataset.contentId || '';
+    const meta = el.querySelector('.today-meta');
+    if (meta) meta.textContent = `接口失败：无法确认是否缺${missingDailyContentLabel(id)}；当前显示静态 fallback 文案`;
+  });
 }
 
 function renderMsiSummary(data) {
