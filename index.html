@@ -102,6 +102,21 @@ html, body {
   font-family: var(--mono);
 }
 .top-spacer { flex: 1; }
+.product-mainline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: linear-gradient(180deg, #fff, var(--pink-bg));
+  color: var(--ink-2);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.product-mainline strong { color: var(--pink-deep); font-weight: 900; }
+.product-mainline .boundary { color: var(--ink-3); font-weight: 600; }
 
 /* Team selector */
 .sel-team {
@@ -1227,6 +1242,12 @@ html, body {
       <button class="workspace-tab active" id="tab-fundamentals" onclick="setPage('fundamentals')">基本面</button>
       <button class="workspace-tab" id="tab-today" onclick="scrollToTodayContent()">今日内容</button>
       <button class="workspace-tab" id="tab-market" onclick="setPage('market')">盘口</button>
+    </div>
+
+    <div class="product-mainline" data-slice="D142" title="产品主线提示：小雪电竞人生负责电竞/盘口/日报；结衣知行合一负责陪伴/复盘/知行闭环。">
+      <span>产品主线</span>
+      <strong>当前：小雪电竞人生</strong>
+      <span class="boundary">小雪：电竞/盘口/日报；结衣知行合一：陪伴/复盘/知行闭环</span>
     </div>
 
     <div class="top-spacer"></div>
