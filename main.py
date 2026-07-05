@@ -19,23 +19,43 @@ SKILL_DIR_MAIN = "/home/ubuntu/.hermes/skills"
 RAG_API = "http://localhost:8768/api/search"
 REINDEX_API = "http://localhost:8768/api/reindex"
 
-DAILY_CONTENT_FILES = {
-    "daily_report": {
-        "title": "LOL电竞日报 2026-07-05",
-        "kind": "daily_report",
-        "path": "/home/ubuntu/lol_data/scripts/LOL电竞日报_2026-07-05.md",
-    },
-    "pre_match_card": {
-        "title": "MSI赛前内容卡 2026-07-05",
-        "kind": "pre_match_card",
-        "path": "/home/ubuntu/lol_data/scripts/MSI赛前内容卡_2026-07-05.md",
-    },
-    "analyst_entry_copy": {
-        "title": "分析师入口说明",
-        "kind": "analyst_entry_copy",
-        "path": "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md",
-    },
-}
+DAILY_CONTENT_ROOT = "/home/ubuntu/lol_data/scripts"
+DAILY_ANALYST_ENTRY_COPY = "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md"
+DAILY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def _resolve_daily_content_date(value: str | None) -> str:
+    raw = (value or "today").strip().lower()
+    if raw == "today":
+        return datetime.now().strftime("%Y-%m-%d")
+    if not DAILY_DATE_RE.fullmatch(raw):
+        raise HTTPException(400, "非法 date 参数；只支持 today 或 YYYY-MM-DD")
+    try:
+        datetime.strptime(raw, "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, "非法 date 参数；只支持 today 或 YYYY-MM-DD")
+    return raw
+
+
+def _daily_content_files_for(date_str: str) -> dict:
+    """Generate the fixed daily-content whitelist for one safe date only."""
+    return {
+        "daily_report": {
+            "title": f"LOL电竞日报 {date_str}",
+            "kind": "daily_report",
+            "path": os.path.join(DAILY_CONTENT_ROOT, f"LOL电竞日报_{date_str}.md"),
+        },
+        "pre_match_card": {
+            "title": f"MSI赛前内容卡 {date_str}",
+            "kind": "pre_match_card",
+            "path": os.path.join(DAILY_CONTENT_ROOT, f"MSI赛前内容卡_{date_str}.md"),
+        },
+        "analyst_entry_copy": {
+            "title": "分析师入口说明",
+            "kind": "analyst_entry_copy",
+            "path": DAILY_ANALYST_ENTRY_COPY,
+        },
+    }
 
 # DeepSeek API config — read from hermes config.yaml when available.
 # In Hermes profile shells, HOME may point at ~/.hermes/profiles/<profile>/home,
@@ -1335,10 +1355,12 @@ def _daily_content_summary(text: str, max_chars: int = 180) -> str:
 
 
 @app.get("/api/daily-content")
-def get_daily_content():
-    """只读今日内容入口：固定白名单路径，不接受任意 path 参数。"""
+def get_daily_content(date: str = Query("today")):
+    """只读今日内容入口：只接受 today/YYYY-MM-DD，并生成固定白名单路径。"""
+    date_str = _resolve_daily_content_date(date)
+    daily_content_files = _daily_content_files_for(date_str)
     items = []
-    for key, meta in DAILY_CONTENT_FILES.items():
+    for key, meta in daily_content_files.items():
         path = meta["path"]
         exists = os.path.exists(path)
         stat = os.stat(path) if exists else None
@@ -1361,7 +1383,7 @@ def get_daily_content():
         })
     return {
         "ok": True,
-        "date": "2026-07-05",
+        "date": date_str,
         "source": "local_whitelist",
         "items": items,
     }

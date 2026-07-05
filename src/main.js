@@ -115,23 +115,24 @@ async function loadDailyContent() {
   const stateEl = document.getElementById('today-content-state');
   try {
     const data = await API('/daily-content');
+    const dateLabel = data.date || 'today';
     const items = data.items || [];
     items.forEach(renderDailyContentItem);
     const missing = items.filter(item => !item.exists);
     if (status) {
       status.textContent = missing.length
-        ? `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
-        : `2026-07-05 MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
+        ? `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
+        : `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
     }
     if (stateEl) {
       stateEl.innerHTML = missing.length
-        ? `<strong>内容状态：</strong>已读取 /api/daily-content；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
-        : '<strong>内容状态：</strong>/api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺分析师入口说明。';
+        ? `<strong>内容状态：</strong>${escHtml(dateLabel)} 已读取 /api/daily-content；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
+        : `<strong>内容状态：</strong>${escHtml(dateLabel)} /api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺分析师入口说明。`;
     }
   } catch (e) {
     console.warn('daily content API failed, keeping static fallback:', e);
     markDailyContentApiFailed();
-    if (status) status.textContent = '2026-07-05 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback';
+    if (status) status.textContent = '今日 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback';
     if (stateEl) stateEl.innerHTML = '<strong>内容状态：</strong>/api/daily-content 接口失败；缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback。';
   }
 }

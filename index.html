@@ -1268,7 +1268,7 @@ html, body {
         <div class="card" id="card-today-content">
           <div class="card-head">
             <span class="badge" style="background:linear-gradient(135deg,var(--orange),var(--pink))">TODAY</span> 今日内容 / 单场分析入口
-            <span id="today-content-status" style="font-size:12px;color:var(--ink-3);font-weight:400">2026-07-05 MSI 日报、赛前卡、分析师入口可见层；后端读取本地白名单文件，失败保留静态 fallback</span>
+            <span id="today-content-status" style="font-size:12px;color:var(--ink-3);font-weight:400">今日 MSI 日报、赛前卡、分析师入口可见层；后端按 date=today/YYYY-MM-DD 读取本地白名单文件，失败保留静态 fallback</span>
             <span style="flex:1"></span>
             <button class="compare-close" onclick="document.getElementById('card-analyst')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">去分析师入口</button>
             <button class="compare-close" onclick="setPage('market')">去盘口页</button>
@@ -1301,13 +1301,13 @@ html, body {
                   <b>日报入口路径</b>
                   <span class="today-summary">包含今日两场 MSI、TS/mu/sigma 单场底表、队伍三维摘要、TK/RAG 摘要和钧钧赛前阅读版。</span>
                   <span class="today-meta">缺日报状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
-                  <span class="today-path">/home/ubuntu/lol_data/scripts/LOL电竞日报_2026-07-05.md</span>
+                  <span class="today-path">/home/ubuntu/lol_data/scripts/LOL电竞日报_<date>.md</span>
                 </div>
                 <div class="today-entry" data-content-id="pre_match_card">
                   <b>赛前内容卡路径</b>
                   <span class="today-summary">给钧钧赛前直接阅读：实力差、波动差、TS 下界、盘口观察顺序、BP/临场待补字段。</span>
                   <span class="today-meta">缺赛前卡状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
-                  <span class="today-path">/home/ubuntu/lol_data/scripts/MSI赛前内容卡_2026-07-05.md</span>
+                  <span class="today-path">/home/ubuntu/lol_data/scripts/MSI赛前内容卡_<date>.md</span>
                 </div>
                 <div class="today-entry" data-content-id="analyst_entry_copy">
                   <b>分析师入口说明摘要</b>
