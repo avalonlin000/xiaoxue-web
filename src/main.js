@@ -110,31 +110,60 @@ async function loadFundamentals(scope = 'msi') {
   }
 }
 
-async function loadDailyContent() {
+async function loadDailyContent(dateValue = 'today') {
   const status = document.getElementById('today-content-status');
   const stateEl = document.getElementById('today-content-state');
+  const safeDate = normalizeDailyContentDate(dateValue);
+  if (!safeDate) {
+    showDailyContentInvalidDate();
+    return;
+  }
   try {
-    const data = await API('/daily-content');
-    const dateLabel = data.date || 'today';
+    const data = await API('/daily-content?date=' + encodeURIComponent(safeDate));
+    const dateLabel = data.date || safeDate;
     const items = data.items || [];
     items.forEach(renderDailyContentItem);
     const missing = items.filter(item => !item.exists);
     if (status) {
       status.textContent = missing.length
-        ? `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
-        : `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content（${items.length} 个白名单文件）`;
+        ? `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
+        : `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}（${items.length} 个白名单文件）`;
     }
     if (stateEl) {
       stateEl.innerHTML = missing.length
-        ? `<strong>内容状态：</strong>${escHtml(dateLabel)} 已读取 /api/daily-content；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
+        ? `<strong>内容状态：</strong>${escHtml(dateLabel)} 已读取 /api/daily-content?date=${escHtml(safeDate)}；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
         : `<strong>内容状态：</strong>${escHtml(dateLabel)} /api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺分析师入口说明。`;
     }
   } catch (e) {
     console.warn('daily content API failed, keeping static fallback:', e);
     markDailyContentApiFailed();
-    if (status) status.textContent = '今日 MSI 日报、赛前卡、分析师入口可见层；/api/daily-content 接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback';
-    if (stateEl) stateEl.innerHTML = '<strong>内容状态：</strong>/api/daily-content 接口失败；缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback。';
+    if (status) status.textContent = `${safeDate} 今日内容接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback`;
+    if (stateEl) stateEl.innerHTML = `<strong>内容状态：</strong>${escHtml(safeDate)} /api/daily-content 接口失败；缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback。`;
   }
+}
+
+function normalizeDailyContentDate(value) {
+  const raw = String(value || 'today').trim();
+  if (!raw || raw.toLowerCase() === 'today') return 'today';
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return '';
+  const [y, m, d] = raw.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== m - 1 || dt.getUTCDate() !== d) return '';
+  return raw;
+}
+
+function loadDailyContentFromInput() {
+  const input = document.getElementById('today-date-input');
+  return loadDailyContent(input?.value || 'today');
+}
+
+function showDailyContentInvalidDate() {
+  const message = '非法日期：仅支持 today 或 YYYY-MM-DD；不读取任意路径';
+  const status = document.getElementById('today-content-status');
+  const stateEl = document.getElementById('today-content-state');
+  markDailyContentApiFailed();
+  if (status) status.textContent = message;
+  if (stateEl) stateEl.innerHTML = `<strong>内容状态：</strong>${message}。保留静态 fallback，不调用 /api/daily-content。`;
 }
 
 function renderDailyContentItem(item) {
@@ -464,7 +493,7 @@ function quickCmd(cmd) {
 
 function scrollToTodayContent() {
   setPage('fundamentals');
-  loadDailyContent();
+  loadDailyContentFromInput();
   setTimeout(() => {
     document.getElementById('card-today-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 80);
@@ -472,7 +501,7 @@ function scrollToTodayContent() {
 
 function scrollToTodayNextActions() {
   setPage('fundamentals');
-  loadDailyContent();
+  loadDailyContentFromInput();
   setTimeout(() => {
     document.getElementById('today-next-actions')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
   }, 80);
@@ -1141,6 +1170,7 @@ window.runCommand = runCommand;
 window.quickCmd = quickCmd;
 window.scrollToTodayContent = scrollToTodayContent;
 window.scrollToTodayNextActions = scrollToTodayNextActions;
+window.loadDailyContentFromInput = loadDailyContentFromInput;
 window.prefillTodayMatch = prefillTodayMatch;
 window.copyTodayBasisPrompt = copyTodayBasisPrompt;
 window.copyTodayActionGuide = copyTodayActionGuide;

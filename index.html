@@ -968,6 +968,36 @@ html, body {
   flex-wrap: wrap;
   justify-content: flex-end;
 }
+.today-date-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.today-date-controls label {
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ink-2);
+}
+.today-date-input {
+  width: 128px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-0);
+  color: var(--ink-0);
+  font: 800 12px var(--mono);
+}
+.today-date-input:focus {
+  border-color: var(--orange);
+  box-shadow: 0 0 0 3px #fff0d8;
+}
+.today-date-hint {
+  width: 100%;
+  text-align: right;
+  color: var(--ink-3);
+  font-size: 12px;
+}
 .page-market #card-fundamentals,
 .page-market #card-today-content,
 .page-market #card-analyst,
@@ -1282,6 +1312,12 @@ html, body {
                 <div class="today-summary-strip-copy">今日内容已接入本地只读白名单：MSI 日报、赛前卡、分析师入口说明；这里只做首屏跳转和前端提示，不保存、不自动交易。</div>
               </div>
               <div class="today-summary-strip-actions">
+                <div class="today-date-controls" data-slice="D139">
+                  <label for="today-date-input">内容日期</label>
+                  <input class="today-date-input" id="today-date-input" value="today" placeholder="today 或 YYYY-MM-DD" onkeydown="if(event.key==='Enter')loadDailyContentFromInput()">
+                  <button class="today-action primary" onclick="loadDailyContentFromInput()">读取日期</button>
+                  <span class="today-date-hint">仅支持 today 或 YYYY-MM-DD；不读取任意路径</span>
+                </div>
                 <button class="today-action primary" onclick="scrollToTodayContent()">看今日内容</button>
                 <button class="today-action" onclick="scrollToTodayNextActions()">下一步动作</button>
               </div>
