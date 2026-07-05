@@ -1053,6 +1053,40 @@ html, body {
   line-height: 1.7;
 }
 .today-boundary strong { color: var(--orange); }
+.today-basis {
+  margin-top: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff, var(--bg-1));
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.today-basis-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-weight: 900;
+  color: var(--ink-0);
+  margin-bottom: 8px;
+}
+.today-basis-title span:first-child { color: var(--blue-deep); }
+.today-basis-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+.today-basis-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  padding: 9px 10px;
+}
+.today-basis-item b { display: block; color: var(--ink-0); margin-bottom: 3px; }
+.today-basis-item span { color: var(--ink-2); }
+.today-basis-note { margin-top: 8px; color: var(--ink-3); }
 </style>
 </head>
 <body>
@@ -1224,6 +1258,27 @@ html, body {
                   <span class="today-path">/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md</span>
                 </div>
               </div>
+            </div>
+            <div class="today-basis" id="today-ts-tk-market-basis" data-slice="D121">
+              <div class="today-basis-title">
+                <span>TS / TK / 盘口依据</span>
+                <button class="today-action" onclick="copyTodayBasisPrompt()">复制依据说明</button>
+              </div>
+              <div class="today-basis-grid">
+                <div class="today-basis-item">
+                  <b>TS：mu - 3σ</b>
+                  <span>TS 是保守实力下界，用来和 mu、σ 一起看稳定性；不是单独的绝对实力排名。</span>
+                </div>
+                <div class="today-basis-item">
+                  <b>TK：Wiki / knowledge-rag</b>
+                  <span>TK 正源走 Wiki 与 knowledge-rag，只做战术、版本、队伍风格依据；不恢复旧 tk_library。</span>
+                </div>
+                <div class="today-basis-item">
+                  <b>盘口：观察顺序</b>
+                  <span>盘口只做市场位置、分歧点、风险和破相条件观察；不自动交易、不替钧钧下结论。</span>
+                </div>
+              </div>
+              <div class="today-basis-note">D121 前端说明区：只展示/复制提示，不保存、不 POST/PUT/DELETE。</div>
             </div>
             <div class="today-boundary">
               <strong>待补与边界：</strong>BP、首发、蓝红方、每局阵容、赛后比分、关键资源团和盘口实际变化都必须等信息出现后再补；赛前不得伪造成事实。小雪只输出盘口观察、市场分歧、风险提示和赛后偏差复盘，禁止自动交易结论，最终交易判断由钧钧自己定。

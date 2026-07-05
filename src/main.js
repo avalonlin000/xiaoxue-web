@@ -493,11 +493,31 @@ function prefillAnalystPromptFromToday(matchName, tsContext) {
     `今日对局：${matchName}`,
     '请按小雪单场分析框架处理：先看基本面/TS，再等 BP、首发、蓝红方、每局阵容和盘口变化。',
     tsLine,
+    'TS / TK / 盘口依据：TS = mu - 3σ，是保守实力下界；TK 正源走 Wiki / knowledge-rag；盘口只做观察顺序、市场分歧点、风险和破相条件，不自动交易。',
     '输出只要：观察顺序、待补字段、市场分歧点、破相条件；不要给自动交易结论。',
     '明确：本提示由前端生成，不调用 LLM、不保存。',
   ].join('\n');
   if (input) input.value = prompt;
   if (output) output.textContent = '【复制这段去问小雪/分析师】\n\n' + prompt;
+}
+
+async function copyTodayBasisPrompt() {
+  const text = [
+    'TS / TK / 盘口依据',
+    'TS = mu - 3σ：TS 是保守实力下界，用来和 mu、σ 一起看稳定性，不是单独的绝对实力排名。',
+    'TK 正源：Wiki / knowledge-rag，只做战术、版本、队伍风格依据，不恢复旧 tk_library。',
+    '盘口边界：盘口只做观察顺序、市场位置、分歧点、风险和破相条件；不自动交易、不替钧钧下结论。',
+    'D121：本按钮只复制前端提示，不保存、不 POST/PUT/DELETE。',
+  ].join('\n');
+  const status = document.getElementById('today-content-status');
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    if (status) status.textContent = '已复制 TS / TK / 盘口依据说明；只复制，不保存';
+  } catch (e) {
+    const output = document.getElementById('analyst-output');
+    if (output) output.textContent = text;
+    if (status) status.textContent = '复制失败，已把依据说明填到分析师输出区；不保存';
+  }
 }
 
 // ─── Render Profile ─────────────────────────────
@@ -1047,6 +1067,7 @@ window.runCommand = runCommand;
 window.quickCmd = quickCmd;
 window.scrollToTodayContent = scrollToTodayContent;
 window.prefillTodayMatch = prefillTodayMatch;
+window.copyTodayBasisPrompt = copyTodayBasisPrompt;
 window.save3D = save3D;
 window.searchTK = searchTK;
 window.markDirty = markDirty;
