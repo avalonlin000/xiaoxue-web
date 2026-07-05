@@ -428,6 +428,78 @@ function scrollToTodayContent() {
   }, 80);
 }
 
+async function prefillTodayMatch(matchName, opts = {}) {
+  const match = parseTodayMatch(matchName);
+  if (!match) return;
+  setPage('market');
+  state.tradeGame = 'lol';
+  document.querySelectorAll('.trade-game').forEach(btn => btn.classList.toggle('active', btn.dataset.game === 'lol'));
+
+  const matchEl = document.getElementById('trade-match');
+  const reasonEl = document.getElementById('trade-reason');
+  const msg = document.getElementById('trade-msg');
+  if (matchEl) matchEl.value = match.name;
+  if (msg) msg.textContent = '正在带入今日内容卡模板…';
+
+  const tsContext = await loadMsiMatchContext(match.teamA, match.teamB);
+  if (reasonEl) reasonEl.value = buildTodayMatchDraft(match.name, tsContext);
+  if (msg) msg.textContent = `已带入 ${match.name}：只填前端草稿，不保存`;
+
+  if (opts.analyst) {
+    prefillAnalystPromptFromToday(match.name, tsContext);
+    setTimeout(() => document.getElementById('card-analyst')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  } else {
+    setTimeout(() => document.getElementById('card-trades')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 80);
+  }
+}
+
+function parseTodayMatch(matchName) {
+  const parts = String(matchName || '').split(/\s+vs\s+/i).map(s => s.trim()).filter(Boolean);
+  if (parts.length !== 2) return null;
+  return { name: `${parts[0]} vs ${parts[1]}`, teamA: parts[0], teamB: parts[1] };
+}
+
+function buildTodayMatchDraft(matchName, tsContext) {
+  const lines = [
+    `对象：${matchName}`,
+    '来源：今日内容卡前端带入；不保存、不自动下结论。',
+  ];
+  if (tsContext && tsContext.compare) {
+    const a = tsContext.team_a;
+    const b = tsContext.team_b;
+    lines.push(`TS底表：${a.team} mu ${fmt1(a.mu)} / σ ${fmt1(a.sigma)} / TS ${fmt1(a.ts)}（${a.sample_confidence}，${a.volatility_tier}）；${b.team} mu ${fmt1(b.mu)} / σ ${fmt1(b.sigma)} / TS ${fmt1(b.ts)}（${b.sample_confidence}，${b.volatility_tier}）`);
+    lines.push(`观察顺序：${tsContext.compare.risk_note || '先看实力差、波动差、TS 下界，再等 BP/首发/盘口变化确认。'}`);
+    lines.push(tsContext.compare.market_note || '赔率只作市场位置参考，重点看市场是否把强队热度或弱队爆冷空间打满。');
+    lines.push(tsContext.compare.daily_summary || '');
+  } else {
+    lines.push('TS底表：只读 GET /api/fundamentals/msi-match-context 未返回，保留静态模板；手动核对 mu / σ / TS。');
+    lines.push('观察顺序：先看实力差与波动差，再看 BP/首发/蓝红方，最后核对盘口/水位是否同向。');
+  }
+  lines.push('当前盘口 / 赔率 / 水位：');
+  lines.push('我的判断：');
+  lines.push('市场分歧点：');
+  lines.push('破相条件：');
+  lines.push('边界：本按钮只在前端填草稿，不保存，不 POST/PUT/DELETE；最终交易判断由钧钧自己定。');
+  return lines.filter(Boolean).join('\n');
+}
+
+function prefillAnalystPromptFromToday(matchName, tsContext) {
+  const input = document.getElementById('analyst-bp-input');
+  const output = document.getElementById('analyst-output');
+  const tsLine = tsContext && tsContext.compare
+    ? `${tsContext.compare.daily_summary}\n${tsContext.compare.risk_note}\n${tsContext.compare.market_note}`
+    : 'TS底表暂未从只读 GET 取回，使用今日内容卡静态模板，后续手动补 mu / σ / TS。';
+  const prompt = [
+    `今日对局：${matchName}`,
+    '请按小雪单场分析框架处理：先看基本面/TS，再等 BP、首发、蓝红方、每局阵容和盘口变化。',
+    tsLine,
+    '输出只要：观察顺序、待补字段、市场分歧点、破相条件；不要给自动交易结论。',
+    '明确：本提示由前端生成，不调用 LLM、不保存。',
+  ].join('\n');
+  if (input) input.value = prompt;
+  if (output) output.textContent = '【复制这段去问小雪/分析师】\n\n' + prompt;
+}
+
 // ─── Render Profile ─────────────────────────────
 function renderProfile(profile) {
   const el = document.getElementById('profile-content');
@@ -974,6 +1046,7 @@ window.toggleGraphEmbed = toggleGraphEmbed;
 window.runCommand = runCommand;
 window.quickCmd = quickCmd;
 window.scrollToTodayContent = scrollToTodayContent;
+window.prefillTodayMatch = prefillTodayMatch;
 window.save3D = save3D;
 window.searchTK = searchTK;
 window.markDirty = markDirty;

@@ -999,6 +999,24 @@ html, body {
 }
 .today-match-title span:first-child { font-family: var(--mono); color: var(--orange); }
 .today-match-copy { margin-top: 8px; color: var(--ink-1); font-size: 13px; line-height: 1.65; }
+.today-match-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.today-action {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-0);
+  color: var(--ink-2);
+  padding: 6px 12px;
+  font: 800 12px var(--font);
+  cursor: pointer;
+  transition: all 120ms;
+}
+.today-action:hover { border-color: var(--pink); color: var(--pink-deep); background: var(--pink-bg); }
+.today-action.primary { border-color: var(--blue); color: var(--blue-deep); background: var(--blue-light); }
 .today-entry {
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -1172,10 +1190,18 @@ html, body {
                 <div class="today-match">
                   <div class="today-match-title"><span>11:00</span><span>TSW vs TES · BO5 / MSI季中赛</span></div>
                   <div class="today-match-copy">日报已写入 TS 底表：TSW mu 22.8 / σ 6.0 / TS 4.8；TES mu 26.9 / σ 0.5 / TS 25.5。赛前卡提示 TES 是更稳强弱基准，TSW 的重点是极高波动带来的单局扰动；盘口只看观察顺序，不给自动交易结论。</div>
+                  <div class="today-match-actions">
+                    <button class="today-action primary" onclick="prefillTodayMatch('TSW vs TES')">带入盘口草稿</button>
+                    <button class="today-action" onclick="prefillTodayMatch('TSW vs TES', { analyst: true })">复制分析提示 / 去分析师</button>
+                  </div>
                 </div>
                 <div class="today-match">
                   <div class="today-match-title"><span>16:00</span><span>HLE vs G2 · BO5 / MSI季中赛</span></div>
                   <div class="today-match-copy">日报已写入 TS 底表：HLE mu 31.8 / σ 0.8 / TS 29.5；G2 mu 26.0 / σ 4.8 / TS 11.6。赛前卡提示 HLE 是更高均值和更高下界的一方，G2 看体系变化、中期团战和高 σ 是否拖入非标准局。</div>
+                  <div class="today-match-actions">
+                    <button class="today-action primary" onclick="prefillTodayMatch('HLE vs G2')">带入盘口草稿</button>
+                    <button class="today-action" onclick="prefillTodayMatch('HLE vs G2', { analyst: true })">复制分析提示 / 去分析师</button>
+                  </div>
                 </div>
               </div>
               <div class="today-entry-list">
