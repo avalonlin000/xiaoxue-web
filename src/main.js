@@ -343,6 +343,11 @@ function runCommand() {
     return;
   }
 
+  if (/下一步动作|今日阅读顺序|阅读顺序|动作导览/i.test(cmd)) {
+    scrollToTodayNextActions();
+    return;
+  }
+
   if (/今日内容|日报|赛前卡|内容卡/i.test(cmd)) {
     scrollToTodayContent();
     return;
@@ -426,6 +431,38 @@ function scrollToTodayContent() {
   setTimeout(() => {
     document.getElementById('card-today-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 80);
+}
+
+function scrollToTodayNextActions() {
+  setPage('fundamentals');
+  loadDailyContent();
+  setTimeout(() => {
+    document.getElementById('today-next-actions')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 80);
+}
+
+async function copyTodayActionGuide() {
+  const text = buildTodayActionGuideText();
+  const status = document.getElementById('today-content-status');
+  try {
+    if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
+    if (status) status.textContent = '已复制今日阅读顺序 / 下一步动作导览；只复制，不保存';
+  } catch (e) {
+    const output = document.getElementById('analyst-output');
+    if (output) output.textContent = text;
+    if (status) status.textContent = '复制失败，已把下一步动作导览填到分析师输出区；不保存';
+  }
+}
+
+function buildTodayActionGuideText() {
+  return [
+    '今日阅读顺序 / 下一步动作导览',
+    '1) 看依据：先读 TS / TK / 盘口依据，确认 mu、σ、TS 下界和 Wiki / knowledge-rag 正源边界。',
+    '2) 带入盘口草稿：点每场“带入盘口草稿”，只填对象与观察模板，不保存、不 POST/PUT/DELETE。',
+    '3) 复制分析提示：需要问小雪/分析师时复制提示，带上单场 TS、TK、盘口观察顺序。',
+    '4) 等 BP / 首发 / 盘口变化：等蓝红方、阵容、首发、水位变化和赛后事实出现后再补，不伪造。',
+    'D124：本导览只滚动、复制或填前端提示；不保存、不自动交易、不替钧钧下结论。',
+  ].join('\n');
 }
 
 async function prefillTodayMatch(matchName, opts = {}) {
@@ -1066,8 +1103,10 @@ window.toggleGraphEmbed = toggleGraphEmbed;
 window.runCommand = runCommand;
 window.quickCmd = quickCmd;
 window.scrollToTodayContent = scrollToTodayContent;
+window.scrollToTodayNextActions = scrollToTodayNextActions;
 window.prefillTodayMatch = prefillTodayMatch;
 window.copyTodayBasisPrompt = copyTodayBasisPrompt;
+window.copyTodayActionGuide = copyTodayActionGuide;
 window.save3D = save3D;
 window.searchTK = searchTK;
 window.markDirty = markDirty;

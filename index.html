@@ -1087,6 +1087,43 @@ html, body {
 .today-basis-item b { display: block; color: var(--ink-0); margin-bottom: 3px; }
 .today-basis-item span { color: var(--ink-2); }
 .today-basis-note { margin-top: 8px; color: var(--ink-3); }
+.today-next-actions {
+  margin-top: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pink);
+  border-radius: 10px;
+  background: linear-gradient(180deg, #fff, var(--pink-bg));
+  padding: 12px 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.today-next-actions-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  font-weight: 900;
+  color: var(--ink-0);
+  margin-bottom: 10px;
+}
+.today-next-actions-title span:first-child { color: var(--pink-deep); }
+.today-action-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-action-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-0);
+  padding: 9px 10px;
+}
+.today-action-step b { display:block; color: var(--ink-0); margin-bottom: 3px; }
+.today-action-step span { color: var(--ink-2); }
+.today-next-actions-note { margin-top: 8px; color: var(--ink-3); }
 </style>
 </head>
 <body>
@@ -1140,6 +1177,7 @@ html, body {
     <div class="cmd-hints">
       <span class="cmd-hint" onclick="setPage('fundamentals')">基本面</span>
       <span class="cmd-hint" onclick="scrollToTodayContent()">今日内容</span>
+      <span class="cmd-hint" onclick="scrollToTodayNextActions()">下一步动作</span>
       <span class="cmd-hint" onclick="loadFundamentals('msi')">MSI研究</span>
       <span class="cmd-hint" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">MSI概念图</span>
       <span class="cmd-hint" onclick="setPage('market')">盘口页</span>
@@ -1279,6 +1317,31 @@ html, body {
                 </div>
               </div>
               <div class="today-basis-note">D121 前端说明区：只展示/复制提示，不保存、不 POST/PUT/DELETE。</div>
+            </div>
+            <div class="today-next-actions" id="today-next-actions" data-slice="D124">
+              <div class="today-next-actions-title">
+                <span>今日阅读顺序 / 下一步动作导览</span>
+                <button class="today-action" onclick="copyTodayActionGuide()">复制动作导览</button>
+              </div>
+              <ol class="today-action-steps">
+                <li class="today-action-step">
+                  <b>1) 看依据</b>
+                  <span>先读 TS / TK / 盘口依据，确认 mu、σ、TS 下界和知识正源边界。</span>
+                </li>
+                <li class="today-action-step">
+                  <b>2) 带入盘口草稿</b>
+                  <span>点每场“带入盘口草稿”，只填对象与观察模板，不保存。</span>
+                </li>
+                <li class="today-action-step">
+                  <b>3) 复制分析提示</b>
+                  <span>需要问小雪/分析师时复制提示，带上单场 TS、TK、盘口观察顺序。</span>
+                </li>
+                <li class="today-action-step">
+                  <b>4) 等 BP / 首发 / 盘口变化</b>
+                  <span>等蓝红方、阵容、首发、水位变化和赛后事实出现后再补，不伪造。</span>
+                </li>
+              </ol>
+              <div class="today-next-actions-note">D124 前端动作导览：只滚动、复制或填前端提示；不保存、不 POST/PUT/DELETE，不替钧钧下交易结论。</div>
             </div>
             <div class="today-boundary">
               <strong>待补与边界：</strong>BP、首发、蓝红方、每局阵容、赛后比分、关键资源团和盘口实际变化都必须等信息出现后再补；赛前不得伪造成事实。小雪只输出盘口观察、市场分歧、风险提示和赛后偏差复盘，禁止自动交易结论，最终交易判断由钧钧自己定。
