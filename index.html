@@ -1051,6 +1051,7 @@ html, body {
 
     <div class="workspace-tabs">
       <button class="workspace-tab active" id="tab-fundamentals" onclick="setPage('fundamentals')">基本面</button>
+      <button class="workspace-tab" id="tab-today" onclick="scrollToTodayContent()">今日内容</button>
       <button class="workspace-tab" id="tab-market" onclick="setPage('market')">盘口</button>
     </div>
 
@@ -1081,11 +1082,12 @@ html, body {
        ============================================================ -->
   <div class="cmd">
     <input class="cmd-input" id="cmd-input"
-      placeholder="说人话…（如：看AL / TK版本理解 / 改操稳B+）"
+      placeholder="说人话…（如：今日内容 / 看AL / TK版本理解 / 改操稳B+）"
       autocomplete="off"
       onkeydown="if(event.key==='Enter')runCommand()">
     <div class="cmd-hints">
       <span class="cmd-hint" onclick="setPage('fundamentals')">基本面</span>
+      <span class="cmd-hint" onclick="scrollToTodayContent()">今日内容</span>
       <span class="cmd-hint" onclick="loadFundamentals('msi')">MSI研究</span>
       <span class="cmd-hint" onclick="window.open('/tk-graph/index.html?q=MSI','_blank')">MSI概念图</span>
       <span class="cmd-hint" onclick="setPage('market')">盘口页</span>

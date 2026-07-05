@@ -343,6 +343,11 @@ function runCommand() {
     return;
   }
 
+  if (/今日内容|日报|赛前卡|内容卡/i.test(cmd)) {
+    scrollToTodayContent();
+    return;
+  }
+
   if (/分析师|单场分析|BP分析|bp分析/i.test(cmd)) {
     loadAnalyst();
     return;
@@ -413,6 +418,14 @@ function runCommand() {
 function quickCmd(cmd) {
   document.getElementById('cmd-input').value = cmd;
   runCommand();
+}
+
+function scrollToTodayContent() {
+  setPage('fundamentals');
+  loadDailyContent();
+  setTimeout(() => {
+    document.getElementById('card-today-content')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 80);
 }
 
 // ─── Render Profile ─────────────────────────────
@@ -960,6 +973,7 @@ window.loadFundamentals = loadFundamentals;
 window.toggleGraphEmbed = toggleGraphEmbed;
 window.runCommand = runCommand;
 window.quickCmd = quickCmd;
+window.scrollToTodayContent = scrollToTodayContent;
 window.save3D = save3D;
 window.searchTK = searchTK;
 window.markDirty = markDirty;
