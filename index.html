@@ -930,6 +930,44 @@ html, body {
 .quality.good { background:#e9fff8; color:var(--green); }
 .quality.mid { background:#fff5e8; color:var(--orange); }
 .quality.low { background:var(--red-bg); color:var(--red); }
+.today-summary-strip {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--orange);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #fff, #fff8ed);
+  padding: 12px 14px;
+}
+.today-summary-strip-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  color: var(--ink-0);
+  font-weight: 900;
+}
+.today-summary-strip-title .flag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--orange);
+  color: #fff;
+  font: 900 11px var(--mono);
+}
+.today-summary-strip-copy {
+  color: var(--ink-2);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.today-summary-strip-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
 .page-market #card-fundamentals,
 .page-market #card-today-content,
 .page-market #card-analyst,
@@ -1238,6 +1276,16 @@ html, body {
             <button class="compare-close" onclick="loadFundamentals('msi')">刷新</button>
           </div>
           <div class="card-body">
+            <div class="today-summary-strip" data-slice="D136">
+              <div>
+                <div class="today-summary-strip-title"><span class="flag">首屏</span><span>今日内容入口</span></div>
+                <div class="today-summary-strip-copy">今日内容已接入本地只读白名单：MSI 日报、赛前卡、分析师入口说明；这里只做首屏跳转和前端提示，不保存、不自动交易。</div>
+              </div>
+              <div class="today-summary-strip-actions">
+                <button class="today-action primary" onclick="scrollToTodayContent()">看今日内容</button>
+                <button class="today-action" onclick="scrollToTodayNextActions()">下一步动作</button>
+              </div>
+            </div>
             <div class="fund-grid" id="msi-summary">
               <div class="fund-tile"><b>--</b><span>MSI 队伍池</span></div>
               <div class="fund-tile"><b>--</b><span>资料缺口</span></div>
