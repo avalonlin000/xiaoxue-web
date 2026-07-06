@@ -775,7 +775,7 @@ html, body {
 /* Trade records */
 .trade-shell {
   display: grid;
-  grid-template-columns: 1.05fr 1.35fr;
+  grid-template-columns: 1.18fr 1.22fr;
   gap: calc(var(--s)*2);
 }
 .trade-form, .trade-board {
@@ -784,6 +784,18 @@ html, body {
   border-radius: 12px;
   padding: calc(var(--s)*2);
 }
+.trade-workspace-note {
+  margin-bottom: calc(var(--s)*2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--pink);
+  border-radius: 10px;
+  background: var(--pink-bg);
+  padding: 10px 12px;
+  color: var(--ink-1);
+  font-size: 13px;
+  line-height: 1.65;
+}
+.trade-workspace-note strong { color: var(--pink-deep); }
 .trade-games {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
@@ -828,6 +840,7 @@ html, body {
   font-size: 13px;
 }
 .trade-field textarea { min-height: 66px; resize: vertical; }
+.trade-field textarea.trade-judgment { min-height: 180px; }
 .trade-help { margin-top: 4px; font-size: 11px; color: var(--ink-3); }
 .trade-field input:focus, .trade-field select:focus, .trade-field textarea:focus { border-color: var(--pink); box-shadow: 0 0 0 3px var(--pink-light); }
 .trade-actions { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
@@ -1538,13 +1551,16 @@ html, body {
         <div class="card" id="card-trades">
           <div class="card-head">
             <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">MARKET</span> 盘口页
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">盘口分析单独放这里；不混进基本面，不自动生成交易方向</span>
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">盘口草稿单独放这里；给钧钧手写判断，不自动交易、不自动生成方向</span>
             <span style="flex:1"></span>
             <button class="compare-close" onclick="loadTrades()">刷新</button>
           </div>
           <div class="card-body">
             <div class="trade-shell">
               <div class="trade-form">
+                <div class="trade-workspace-note" data-slice="D146">
+                  <strong>手写判断工作区：</strong>带入盘口草稿后只帮你铺好对象、盘口/方向、赔率/比分、我的判断、市场分歧点、破相条件和备注；不自动交易，不替你下结论。
+                </div>
                 <div class="trade-games" id="trade-games">
                   <button class="trade-game active" data-game="lol" onclick="setTradeGame('lol')">LOL</button>
                   <button class="trade-game" data-game="cs" onclick="setTradeGame('cs')">CS</button>
@@ -1552,15 +1568,15 @@ html, body {
                   <button class="trade-game" data-game="football" onclick="setTradeGame('football')">足球</button>
                 </div>
                 <div class="trade-grid">
-                  <div class="trade-field full"><label>对象 / 比赛</label><input id="trade-match" placeholder="如 T1 vs GEN / MSI某场"><div class="trade-help">点“带入当前队伍”只带入对象，不替你生成分析逻辑。</div></div>
+                  <div class="trade-field full"><label>对象</label><input id="trade-match" placeholder="如 T1 vs GEN / MSI某场"><div class="trade-help">点“带入当前队伍/带入盘口草稿”只铺草稿，不保存、不自动交易。</div></div>
                   <div class="trade-field"><label>时间</label><input id="trade-time" type="datetime-local"></div>
                   <div class="trade-field"><label>信心</label><select id="trade-confidence"><option>中</option><option>高</option><option>低</option></select></div>
                   <div class="trade-field"><label>盘口 / 方向</label><input id="trade-winner" placeholder="手动写：让分 / 独赢 / 观望 / 放弃"></div>
-                  <div class="trade-field"><label>大小</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
-                  <div class="trade-field"><label>比分 / 赔率</label><input id="trade-score" placeholder="2-1 / 赔率 / 水位变化"></div>
+                  <div class="trade-field"><label>大小 / 总局数</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
+                  <div class="trade-field full"><label>赔率 / 比分</label><input id="trade-score" placeholder="赔率 / 水位变化 / 比分判断，如 1.72→1.65、2-1"></div>
                   <div class="trade-field" style="display:none"><label>结果</label><select id="trade-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option></select></div>
-                  <div class="trade-field full"><label>盘口分析</label><textarea id="trade-reason" placeholder="手动写你的分析：盘口、赔率、临场观察、分歧点、破相条件。这里不自动生成。"></textarea></div>
-                  <div class="trade-field full"><label>备注</label><textarea id="trade-review" placeholder="可选：后面想到什么再补"></textarea></div>
+                  <div class="trade-field full"><label>我的判断 / 市场分歧点 / 破相条件</label><textarea class="trade-judgment" id="trade-reason" placeholder="我的判断：\n市场分歧点：\n破相条件：\n\n手写盘口、赔率、临场观察；这里不自动交易、不自动生成结论。"></textarea><div class="trade-help">推荐按三段手写：我的判断 → 市场分歧点 → 破相条件。</div></div>
+                  <div class="trade-field full"><label>备注</label><textarea id="trade-review" placeholder="可选：BP、首发、临场水位、赛后复盘再补"></textarea></div>
                 </div>
                 <div class="trade-actions">
                   <button class="btn-save" onclick="saveTradeRecord()">保存记录</button>

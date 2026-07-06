@@ -15,6 +15,7 @@
 | 2026-06 v6 | 📊概念关系图：新标签页打开120节点力导向图 | ✅ 完成 | |
 | 2026-06 v6 | 分析师面板：DeepSeek API并行跑双skill框架 | ✅ 完成 | 仅飞书chat内调用，web不接入 |
 | 2026-07-03 | 运维增强：新增 `/api/health`，`vibe-status` 接入工作台/API/Vite/knowledge-rag 检查，并建立 git 稳定基线 | ✅ 完成 | 本地 Codex 代小白执行；后续改动可用 git diff/commit 管理 |
+| 2026-07-06 | 盘口页收敛为手写判断工作区，P0/P1 收口验证完成 | ✅ 完成 | `/api/market-notes` 为主链路；不自动交易、不自动生成方向 |
 
 ## 日报管道（daily-report cron）
 

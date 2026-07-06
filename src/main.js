@@ -578,11 +578,13 @@ function buildTodayMatchDraft(matchName, tsContext) {
     lines.push('TS底表：只读 GET /api/fundamentals/msi-match-context 未返回，保留静态模板；手动核对 mu / σ / TS。');
     lines.push('观察顺序：先看实力差与波动差，再看 BP/首发/蓝红方，最后核对盘口/水位是否同向。');
   }
-  lines.push('当前盘口 / 赔率 / 水位：');
+  lines.push('盘口 / 方向：');
+  lines.push('赔率 / 比分：');
   lines.push('我的判断：');
   lines.push('市场分歧点：');
   lines.push('破相条件：');
-  lines.push('边界：本按钮只在前端填草稿，不保存，不 POST/PUT/DELETE；最终交易判断由钧钧自己定。');
+  lines.push('备注：');
+  lines.push('边界：本按钮只在前端填手写草稿，不保存，不 POST/PUT/DELETE，不自动交易；最终交易判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
 }
 
@@ -989,10 +991,13 @@ function buildDailyTradeDraft(teamLine, tsContext) {
   } else {
     lines.push('TS底表：待补对手后自动带入 mu / σ / TS 对比');
   }
-  lines.push('盘口：');
+  lines.push('盘口 / 方向：');
+  lines.push('赔率 / 比分：');
   lines.push('我的判断：');
-  lines.push('分歧点：');
+  lines.push('市场分歧点：');
   lines.push('破相条件：');
+  lines.push('备注：');
+  lines.push('边界：只填手写草稿，不自动交易，最终判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
 }
 
