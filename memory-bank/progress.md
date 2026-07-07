@@ -1,6 +1,6 @@
 # 小雪工作台 — 开发进度
 
-> 最后更新：2026-06-12 | 更新人：小雪
+> 最后更新：2026-07-07 | 更新人：Codex / 小白
 
 ## 前端工作台（xiaoxue-web）
 
@@ -16,6 +16,9 @@
 | 2026-06 v6 | 分析师面板：DeepSeek API并行跑双skill框架 | ✅ 完成 | 仅飞书chat内调用，web不接入 |
 | 2026-07-03 | 运维增强：新增 `/api/health`，`vibe-status` 接入工作台/API/Vite/knowledge-rag 检查，并建立 git 稳定基线 | ✅ 完成 | 本地 Codex 代小白执行；后续改动可用 git diff/commit 管理 |
 | 2026-07-06 | 盘口页收敛为手写判断工作区，P0/P1 收口验证完成 | ✅ 完成 | `/api/market-notes` 为主链路；不自动交易、不自动生成方向 |
+| 2026-07-07 | 运维与项目收口：磁盘降到 85% 以下，`vibe-status` 增加磁盘分级提示，`/api/health` 纳入盘口表、memory-bank、磁盘检查 | ✅ 完成 | 当前边界：健康检查只读；盘口记录仍只走 `/api/market-notes` |
+| 2026-07-07 | 队伍画像扩展为 Wiki/SKILL/数据库三层降级 | ✅ 完成 | 无手工画像时，用 teams/rosters/team_3d_data/msi_ts_seed 生成只读兜底画像；不伪造人工判断 |
+| 2026-07-07 | TK 版本理解整理为只读聚合视图 | ✅ 完成 | `/api/version-understanding/{team}` 聚合三维版本理解与 TK 条目；前端新增版本理解面板 |
 
 ## 日报管道（daily-report cron）
 
@@ -37,8 +40,14 @@
 
 | 优先级 | 内容 | 备注 |
 |--------|------|------|
-| P1 | memory-bank投入使用 | 本次建好 |
-| P1 | 模块边界声明写入 | 本次建好 |
-| P2 | 飞书bot加 im:resource + im:message scope | 发文件附件用 |
-| P2 | 前端接入更多队伍画像 | 目前24支LPL+LCK |
-| P3 | TK版本理解组织优化 | |
+| P2 | 飞书附件能力文档化到小雪工作流 | 已有 Hermes `send_message + MEDIA:` 兜底可发图片/文件；不要优先补 lark-cli 用户 OAuth scope |
+
+## 当前验收口径
+
+| 模块 | 验收 |
+|------|------|
+| 运维 | `vibe-status` 服务全 active，proxy residue 为 none，根分区低于 85% 优先；85%-92% 警告，92% 以上必须清理 |
+| 盘口页 | 新建、读取、删除只走 `/api/market-notes`；页面只保存手写草稿，不自动交易、不自动生成方向 |
+| 画像页 | 优先 Wiki，其次 SKILL.md，再用数据库只读兜底；兜底画像必须标明来源和“不替代人工画像” |
+| 版本理解 | `/api/version-understanding/{team}` 只读聚合三维字段与 TK 条目；前端只展示，不自动生成新判断 |
+| memory-bank | 新对话先读 `README.md`、改模块读 `modules.md`、汇报进度读本文件 |

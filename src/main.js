@@ -61,6 +61,7 @@ async function selectTeam(code) {
     state._3d = d3;
     renderProfile(wiki && wiki.found ? { ...wiki, source: 'wiki' } : profile);
     render3D(d3);
+    loadVersionUnderstanding(code);
     // Auto-search TK with team name
     searchTK(code);
   } catch (e) {
@@ -267,6 +268,52 @@ function renderPlayerCards(players, note) {
     const status = p.status || '资料缺口';
     return `<span class="player-card" title="${escAttr(status)}"><b>${escHtml(role)}</b>${escHtml(name)}</span>`;
   }).join('');
+}
+
+async function loadVersionUnderstanding(team = state.team) {
+  const el = document.getElementById('version-understanding-list');
+  const meta = document.getElementById('version-understanding-meta');
+  if (!el || !team) return;
+  el.innerHTML = '<div class="tk-empty">加载版本理解中…</div>';
+  if (meta) meta.textContent = '同步中…';
+  try {
+    const data = await API('/version-understanding/' + encodeURIComponent(team));
+    renderVersionUnderstanding(data);
+  } catch (e) {
+    el.innerHTML = '<div class="tk-empty" style="color:var(--red)">版本理解加载失败</div>';
+    if (meta) meta.textContent = '接口失败；不影响三维和TK主链路';
+  }
+}
+
+function renderVersionUnderstanding(data) {
+  const el = document.getElementById('version-understanding-list');
+  const meta = document.getElementById('version-understanding-meta');
+  if (!el) return;
+  const tkItems = data.tk_items || [];
+  const version = data.version_understanding || '';
+  const note = data.notes_summary || '';
+  const blocks = [];
+  blocks.push(`<div class="version-card primary">
+    <b>三维版本理解</b>
+    <span>${escHtml(version || '暂无三维版本理解；保留空值，不自动补写。')}</span>
+    ${note ? `<em>战术笔记摘要：${escHtml(note)}</em>` : ''}
+  </div>`);
+  if (tkItems.length) {
+    tkItems.forEach(item => {
+      blocks.push(`<div class="version-card">
+        <b>${escHtml(item.title || 'TK条目')}</b>
+        <span>${escHtml(item.summary || '暂无摘要')}</span>
+        <em>${escHtml([item.date, item.source, item.filename].filter(Boolean).join(' · '))}</em>
+      </div>`);
+    });
+  } else {
+    blocks.push('<div class="version-card"><b>TK版本条目</b><span>未找到该队版本理解 TK；不从搜索结果外推。</span></div>');
+  }
+  el.innerHTML = blocks.join('');
+  if (meta) {
+    const updated = data.updated_at ? ` · 三维更新 ${data.updated_at}` : '';
+    meta.textContent = `${data.team || state.team} · ${data.boundary || '只读聚合'}${updated}`;
+  }
 }
 
 function generateAnalystPrompt() {
@@ -1170,6 +1217,7 @@ window.selectTeam = selectTeam;
 window.toggleTeamDropdown = toggleTeamDropdown;
 window.setPage = setPage;
 window.loadFundamentals = loadFundamentals;
+window.loadVersionUnderstanding = loadVersionUnderstanding;
 window.toggleGraphEmbed = toggleGraphEmbed;
 window.runCommand = runCommand;
 window.quickCmd = quickCmd;

@@ -1,6 +1,7 @@
 """小雪工作台 FastAPI 后端 v2 — 对话驱动布局"""
 import sqlite3, os, re, hashlib, json, asyncio
 from datetime import datetime
+import shutil
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -366,6 +367,125 @@ def _search_tk_files(q: str, team: str, limit: int):
     return results[:limit]
 
 
+def _tk_text_matches_query(content: str, query: str) -> int:
+    kws = query.lower().split()
+    if not kws:
+        return 1
+    lowered = content.lower()
+    return sum(1 for kw in kws if kw in lowered)
+
+
+def _strict_team_marker(filename: str, content: str, team: str) -> bool:
+    """Team-specific views must not match incidental source-path mentions."""
+    code = (team or "").strip().upper()
+    if not code:
+        return False
+    upper_name = filename.upper()
+    if re.search(rf"(^|[_\-\W]){re.escape(code)}([_\-\W]|$)", upper_name):
+        return True
+    head = content[:1600].upper()
+    if f"队伍:{code}".upper() in head or f"队伍：{code}".upper() in head:
+        return True
+    if re.search(rf"(队伍|战队|简称|TEAM)\s*[:：/]\s*[^\n#|]*\b{re.escape(code)}\b", head):
+        return True
+    return False
+
+
+def _search_team_tk_files_strict(q: str, team: str, limit: int):
+    results = []
+    if not os.path.exists(TK_DIR):
+        return results
+    code = (team or "").strip().upper()
+    for fname in sorted(os.listdir(TK_DIR), reverse=True):
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(TK_DIR, fname)
+        try:
+            with open(fpath, encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            continue
+        if not _strict_team_marker(fname, content, code):
+            continue
+        score = _tk_text_matches_query(content, q)
+        if score == 0 and q.strip():
+            continue
+        parts = content.split("---", 2)
+        body = parts[2].strip() if len(parts) >= 3 else content.strip()
+        clean_body = _clean_tk_content(body)
+        if len(clean_body) < MIN_CONTENT_LEN:
+            continue
+        source = ""; date = ""; tags = []
+        for line in content[:1000].split("\n"):
+            line = line.strip()
+            if line.startswith("source:"):
+                source = line.replace("source:", "").strip()
+            elif line.startswith("created:"):
+                date = _extract_date(line.replace("created:", "").strip())
+            elif line.startswith("tags:"):
+                tags = [t.strip() for t in line.replace("tags:", "").strip().strip("[]").split(",")[:5]]
+        concept = fname
+        if "【结论】" in content:
+            concept = content[content.index("【结论】"):content.index("\n", content.index("【结论】"))][:80]
+        results.append({
+            "id": hashlib.md5(fpath.encode()).hexdigest()[:12],
+            "concept": concept.replace(".md", ""),
+            "content": clean_body[:800],
+            "date": date,
+            "source": source,
+            "source_type": "file",
+            "strength": score * 20,
+            "tags": tags,
+            "filename": fname,
+        })
+        if len(results) >= limit:
+            break
+    return results[:limit]
+
+
+@app.get("/api/version-understanding/{team}")
+def get_version_understanding(team: str, limit: int = Query(8)):
+    """只读聚合版本理解：三维字段 + TK 文件条目，不生成新判断。"""
+    code = (team or "").strip().upper()
+    if not code:
+        raise HTTPException(400, "队伍不能为空")
+
+    conn = get_db()
+    row = conn.execute("""
+        SELECT version_understanding, notes, updated_at
+        FROM team_3d_data
+        WHERE team_name = ?
+        ORDER BY updated_at DESC
+        LIMIT 1
+    """, (code,)).fetchone()
+    conn.close()
+
+    tk_results = _search_team_tk_files_strict("版本 理解", code, limit)
+    if not tk_results:
+        tk_results = _search_team_tk_files_strict("版本", code, limit)
+    items = [{
+        "id": r.get("id"),
+        "title": r.get("concept") or r.get("filename") or "TK条目",
+        "date": r.get("date") or "",
+        "source": r.get("source") or r.get("source_type") or "",
+        "summary": _text_summary(r.get("content") or "", 180),
+        "filename": r.get("filename") or "",
+    } for r in tk_results[:limit]]
+
+    d3_text = (row["version_understanding"] if row else "") or ""
+    notes = (row["notes"] if row else "") or ""
+    return {
+        "ok": True,
+        "team": code,
+        "source": "team_3d_data + tk_files",
+        "version_understanding": d3_text,
+        "notes_summary": _text_summary(notes, 160),
+        "updated_at": row["updated_at"] if row else "",
+        "tk_items": items,
+        "boundary": "只读聚合现有资料，不自动生成版本判断",
+    }
+
+
 def _safe_tk_filename(filename: str) -> str:
     """Return a basename-only TK filename under TK_DIR, or reject path traversal."""
     safe = os.path.basename(filename or "")
@@ -473,6 +593,97 @@ def _wiki_concept_path(concept: str) -> str:
     return os.path.join(WIKI_DIR, "小雪电竞", "战术概念", f"{safe}.md")
 
 
+def _team_database_profile(team: str) -> dict | None:
+    """Build a read-only profile from structured tables when no hand-written profile exists."""
+    code = (team or "").strip().upper()
+    if not code:
+        return None
+
+    conn = get_db()
+    try:
+        row = conn.execute("""
+            SELECT t.short_name, t.name, t.team_id, t.region, t.league_id, t.mu, t.sigma,
+                   seed.final_seed_mu, seed.seed_sigma, seed.seed_ts, seed.outright_odds_decimal, seed.note
+            FROM teams t
+            LEFT JOIN msi_ts_seed seed ON seed.team = t.short_name
+            WHERE UPPER(t.short_name) = ? OR UPPER(t.name) = ? OR UPPER(seed.display_name) = ?
+            LIMIT 1
+        """, (code, code, code)).fetchone()
+        if not row:
+            return None
+
+        d3 = conn.execute("""
+            SELECT dim_1_name, dim_1_value, dim_2_name, dim_2_value,
+                   dim_3_name, dim_3_value, notes, version_understanding, updated_at
+            FROM team_3d_data
+            WHERE team_name = ?
+            ORDER BY updated_at DESC
+            LIMIT 1
+        """, (row["short_name"],)).fetchone()
+        players = _team_starter_cards(conn, row["team_id"])
+        tk_count = _team_tk_count(row["short_name"])
+    finally:
+        conn.close()
+
+    def val(value, fallback="-"):
+        return fallback if value in (None, "") else str(value)
+
+    def num(value):
+        try:
+            return f"{float(value):.1f}"
+        except (TypeError, ValueError):
+            return "-"
+
+    lines = [
+        f"# {row['short_name']} 数据库只读画像",
+        "",
+        "> 这是一份从结构化数据自动拼出的兜底画像；它不是手工 SKILL.md，不会补写没有来源的判断。",
+        "",
+        "## 基础信息",
+        f"- 队伍：{val(row['name'], row['short_name'])}",
+        f"- 简称：{row['short_name']}",
+        f"- 赛区：{val(row['region'])}",
+        f"- 联赛：{val(row['league_id'])}",
+        "",
+        "## TS / 稳定性底表",
+        f"- mu：{num(row['final_seed_mu'] if row['final_seed_mu'] is not None else row['mu'])}",
+        f"- sigma：{num(row['seed_sigma'] if row['seed_sigma'] is not None else row['sigma'])}",
+        f"- TS：{num(row['seed_ts'])}",
+        f"- 赔率：{num(row['outright_odds_decimal'])}",
+    ]
+    if row["note"]:
+        lines.append(f"- 备注：{row['note']}")
+
+    lines.extend(["", "## 首发 / 关键选手"])
+    if players:
+        lines.extend(f"- {p['role']}：{p['name']}（{p['status']}）" for p in players)
+    else:
+        lines.append("- 暂无 rosters 可用记录；不推断选手。")
+
+    lines.extend(["", "## 三维数据"])
+    if d3:
+        lines.extend([
+            f"- {val(d3['dim_1_name'], '维度一')}：{val(d3['dim_1_value'])}",
+            f"- {val(d3['dim_2_name'], '维度二')}：{val(d3['dim_2_value'])}",
+            f"- {val(d3['dim_3_name'], '维度三')}：{val(d3['dim_3_value'])}",
+            f"- 战术笔记：{val(d3['notes'], '暂无')}",
+            f"- 版本理解：{val(d3['version_understanding'], '暂无')}",
+            f"- 更新时间：{val(d3['updated_at'])}",
+        ])
+    else:
+        lines.append("- 暂无 team_3d_data 记录。")
+
+    lines.extend([
+        "",
+        "## 资料覆盖",
+        f"- TK 命中数量：{tk_count}",
+        "- 画像来源：teams / rosters / team_3d_data / msi_ts_seed",
+        "- 边界：只读展示，不自动生成交易方向，不替代人工画像。",
+    ])
+    md = "\n".join(lines)
+    return {"found": True, "team": row["short_name"], "markdown": md, "html": _md_to_profile_html(md, row["short_name"])}
+
+
 @app.get("/api/wiki/team/{team}")
 def get_wiki_team(team: str):
     team_code = team.upper()
@@ -503,12 +714,17 @@ def get_profile_full(team: str):
         return {**wiki, "source": "wiki"}
 
     team_lower = team.lower()
-    skill_path = os.path.join(SKILL_DIR_MAIN, f"{team_lower}-team-profile", "SKILL.md")
-    if not os.path.exists(skill_path):
-        alt_path = os.path.expanduser(f"~/.hermes/hermes-agent/skills/{team_lower}-team-profile/SKILL.md")
-        if not os.path.exists(alt_path):
-            return {"found": False, "team": team.upper(), "html": f"<p>暂无 {team} 的完整画像（SKILL.md 不存在）</p>"}
-        skill_path = alt_path
+    skill_path = ""
+    for base in (SKILL_DIR_XIAOBAI, SKILL_DIR_MAIN, os.path.expanduser("~/.hermes/hermes-agent/skills")):
+        candidate = os.path.join(base, f"{team_lower}-team-profile", "SKILL.md")
+        if os.path.exists(candidate):
+            skill_path = candidate
+            break
+    if not skill_path:
+        generated = _team_database_profile(team)
+        if generated:
+            return {**generated, "source": "database_fallback"}
+        return {"found": False, "team": team.upper(), "html": f"<p>暂无 {team} 的完整画像（Wiki / SKILL.md / 数据库底表均未找到）</p>"}
 
     with open(skill_path, encoding="utf-8") as f:
         raw = f.read()
@@ -517,7 +733,7 @@ def get_profile_full(team: str):
     md = parts[2].strip() if len(parts) >= 3 else raw
 
     html = _md_to_profile_html(md, team.upper())
-    return {"found": True, "team": team.upper(), "html": html}
+    return {"found": True, "team": team.upper(), "html": html, "path": skill_path, "source": "skill"}
 
 
 # ─── Fundamentals aggregation ─────────────────────────────
@@ -1409,6 +1625,13 @@ def health_check():
         conn = get_db()
         team_count = conn.execute("SELECT COUNT(*) AS n FROM teams").fetchone()["n"]
         schedule_count = conn.execute("SELECT COUNT(*) AS n FROM schedules").fetchone()["n"]
+        market_notes_count = conn.execute("""
+            SELECT COUNT(*) AS n
+            FROM sqlite_master
+            WHERE type='table' AND name='market_notes'
+        """).fetchone()["n"]
+        if market_notes_count:
+            market_notes_count = conn.execute("SELECT COUNT(*) AS n FROM market_notes").fetchone()["n"]
         conn.close()
         checks["database"] = {
             "ok": True,
@@ -1416,16 +1639,37 @@ def health_check():
             "teams": team_count,
             "schedules": schedule_count,
         }
+        checks["market_notes"] = {
+            "ok": True,
+            "table": "market_notes",
+            "records": market_notes_count,
+            "boundary": "manual_notes_only",
+        }
     except Exception as exc:
         checks["database"] = {"ok": False, "path": DB_PATH, "error": str(exc)}
+        checks["market_notes"] = {"ok": False, "table": "market_notes", "error": str(exc)}
 
     dist_index = os.path.join(os.path.dirname(__file__), "dist", "index.html")
+    memory_bank = os.path.join(os.path.dirname(__file__), "memory-bank")
     checks["dist"] = {"ok": os.path.exists(dist_index), "path": dist_index}
     checks["tk_dir"] = {"ok": os.path.isdir(TK_DIR), "path": TK_DIR}
     checks["skill_dirs"] = {
         "ok": os.path.isdir(SKILL_DIR_XIAOBAI) or os.path.isdir(SKILL_DIR_MAIN),
         "xiaobai": os.path.isdir(SKILL_DIR_XIAOBAI),
         "main": os.path.isdir(SKILL_DIR_MAIN),
+    }
+    checks["memory_bank"] = {
+        "ok": all(os.path.exists(os.path.join(memory_bank, name)) for name in ("README.md", "modules.md", "progress.md")),
+        "path": memory_bank,
+        "files": ["README.md", "modules.md", "progress.md"],
+    }
+    total, used, free = shutil.disk_usage("/")
+    used_pct = round(used / total * 100, 1)
+    checks["disk"] = {
+        "ok": used_pct < 92,
+        "warn": used_pct >= 85,
+        "used_percent": used_pct,
+        "free_gb": round(free / (1024 ** 3), 1),
     }
 
     ok = all(
