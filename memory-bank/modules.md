@@ -32,11 +32,33 @@ xiaoxue-web/
 | **输出** | 飞书云文档（文件夹 FiyGfjl6ml7nIidfvhHc5LIvnod） |
 | **脚本** | `build_daily_report.py`（已重构至511行） |
 
+## 赛前交易判断日报（pre-match trading report）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 在原 LOL 日报基础上增加交易判断层：今日主方向、入场点、市场分歧、备选方向、不碰项、BP 待确认 |
+| **主链路** | `scripts/build_pre_match_trading_report.py` → `赛前交易判断日报_YYYY-MM-DD.md` → `/api/daily-content` 白名单 → 今日内容卡 `trading_report` 入口 |
+| **数据来源** | 当日 schedules + `/api/fundamentals/msi-match-context` 同源 TS 逻辑 + 队伍 TK 中 `type=trading_note` 的结构化块 |
+| **禁止** | 不新增交易 TK 实体，不恢复 `tk_library`，不接旧 `/api/trades` 统计面板，不用 RAG 搜索作为主判断 |
+| **降级** | 没有命中有效交易备注或基础面不足时写“暂不推荐”，不硬编方向 |
+
+## 队伍交易备注（team trading notes）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 记录钧钧对某支队伍的盘口/交易观察，例如“HLE 虐菜大人头” |
+| **归属** | 仍挂在现有队伍 TK / 队伍知识下；队伍是实体，交易备注只是用途标签 |
+| **结构标签** | `team`, `type=trading_note`, `market`, `scenario`, `status=active/inactive`, `source=junjun_manual` |
+| **写入入口** | `POST /api/team-trading-notes` / `POST /api/team-trading-notes/from-text` 会先标准化队伍名，失败则拒绝写入 |
+| **读取入口** | `GET /api/team-trading-notes/{team}` 只读解析 TK 文件中的结构化块 |
+| **日报使用** | 日报按今日对阵双方精确读取 active trading_note，并放在“命中队伍交易备注”段落 |
+| **日常口语** | “小雪记到 HLE：虐菜大人头”会解析为 HLE 的队伍交易备注；“这个队…”等队伍不明确时不写正式 TK |
+
 ## 盘口手写判断工作区（market-notes）
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 记录钧钧自己的盘口观察、判断链、分歧点、破相条件 |
+| **职责** | 记录钧钧自己的盘口观察、判断链、分歧点、不碰项 |
 | **主链路** | 前端盘口页 → FastAPI `/api/market-notes` → SQLite `market_notes` |
 | **允许** | 新建、读取、删除手写草稿；把草稿沉淀为 TK 手动条目 |
 | **禁止** | 不自动交易，不自动生成方向，不展示命中率/输赢统计，不把草稿当结论推送 |

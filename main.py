@@ -12,17 +12,77 @@ import httpx
 app = FastAPI(title="小雪工作台")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-DB_PATH = "/home/ubuntu/lol_data/英雄联盟数据库.db"
-WIKI_DIR = "/home/ubuntu/workspace/knowledge/wiki"
+DB_PATH = os.environ.get("XIAOXUE_DB_PATH", "/home/ubuntu/lol_data/英雄联盟数据库.db")
+WIKI_DIR = os.environ.get("XIAOXUE_WIKI_DIR", "/home/ubuntu/workspace/knowledge/wiki")
 TK_DIR = os.path.join(WIKI_DIR, "小雪电竞", "原始资料", "tk")
-SKILL_DIR_XIAOBAI = "/home/ubuntu/.hermes/profiles/xiaobai/skills"
-SKILL_DIR_MAIN = "/home/ubuntu/.hermes/skills"
-RAG_API = "http://localhost:8768/api/search"
-REINDEX_API = "http://localhost:8768/api/reindex"
+SKILL_DIR_XIAOBAI = os.environ.get("XIAOXUE_SKILL_DIR_XIAOBAI", "/home/ubuntu/.hermes/profiles/xiaobai/skills")
+SKILL_DIR_MAIN = os.environ.get("XIAOXUE_SKILL_DIR_MAIN", "/home/ubuntu/.hermes/skills")
+RAG_API = os.environ.get("XIAOXUE_RAG_API", "http://localhost:8768/api/search")
+REINDEX_API = os.environ.get("XIAOXUE_REINDEX_API", "http://localhost:8768/api/reindex")
 
-DAILY_CONTENT_ROOT = "/home/ubuntu/lol_data/scripts"
-DAILY_ANALYST_ENTRY_COPY = "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md"
+DAILY_CONTENT_ROOT = os.environ.get("XIAOXUE_DAILY_CONTENT_ROOT", "/home/ubuntu/lol_data/scripts")
+DAILY_ANALYST_ENTRY_COPY = os.environ.get(
+    "XIAOXUE_DAILY_ANALYST_ENTRY_COPY",
+    "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md",
+)
 DAILY_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+TRADING_NOTE_TYPE = "trading_note"
+TRADING_MARKET_LABELS = {
+    "winner": "独赢",
+    "handicap": "让分",
+    "kills_over": "人头大",
+    "kills_under": "人头小",
+    "time_over": "大时间",
+    "time_under": "小时间",
+    "live_entry": "赛中入场",
+    "avoid": "不碰",
+}
+TRADING_MARKET_ALIASES = {
+    "胜": "winner",
+    "胜负": "winner",
+    "独赢": "winner",
+    "让分": "handicap",
+    "人头大": "kills_over",
+    "大人头": "kills_over",
+    "kills_over": "kills_over",
+    "人头小": "kills_under",
+    "小人头": "kills_under",
+    "kills_under": "kills_under",
+    "大时间": "time_over",
+    "时间大": "time_over",
+    "time_over": "time_over",
+    "小时间": "time_under",
+    "时间小": "time_under",
+    "time_under": "time_under",
+    "赛中": "live_entry",
+    "赛中入场": "live_entry",
+    "live_entry": "live_entry",
+    "不碰": "avoid",
+    "放弃": "avoid",
+}
+TRADING_SCENARIO_ALIASES = {
+    "虐菜": "stomp_weak_team",
+    "虐菜局": "stomp_weak_team",
+    "强弱差": "stomp_weak_team",
+    "前期劣势": "early_deficit",
+    "劣势": "early_deficit",
+    "保守": "conservative_match",
+    "慢": "conservative_match",
+    "神经刀": "volatile_team",
+    "教练队": "volatile_team",
+}
+TEAM_ALIAS_MAP = {
+    "韩华": "HLE",
+    "韩华生命": "HLE",
+    "韩华生命电竞": "HLE",
+    "GEN.G": "GEN",
+    "GENG": "GEN",
+    "三星": "GEN",
+    "滔搏": "TES",
+    "京东": "JDG",
+    "微博": "WBG",
+    "哔哩哔哩": "BLG",
+}
 
 
 def _resolve_daily_content_date(value: str | None) -> str:
@@ -50,6 +110,11 @@ def _daily_content_files_for(date_str: str) -> dict:
             "title": f"MSI赛前内容卡 {date_str}",
             "kind": "pre_match_card",
             "path": os.path.join(DAILY_CONTENT_ROOT, f"MSI赛前内容卡_{date_str}.md"),
+        },
+        "trading_report": {
+            "title": f"赛前交易判断日报 {date_str}",
+            "kind": "trading_report",
+            "path": os.path.join(DAILY_CONTENT_ROOT, f"赛前交易判断日报_{date_str}.md"),
         },
         "analyst_entry_copy": {
             "title": "分析师入口说明",
@@ -102,6 +167,163 @@ def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
     return conn
+
+
+def _normalize_team_code(value: str, *, conn=None) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        raise HTTPException(400, "队伍不能为空")
+    alias = TEAM_ALIAS_MAP.get(raw, raw).strip().upper()
+    should_close = False
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    try:
+        row = conn.execute("""
+            SELECT short_name
+            FROM teams
+            WHERE UPPER(short_name)=?
+               OR UPPER(name)=?
+               OR UPPER(COALESCE(team_id, ''))=?
+            LIMIT 1
+        """, (alias, alias, alias)).fetchone()
+        if row:
+            return row["short_name"].upper()
+        if conn.execute("SELECT 1 FROM team_3d_data WHERE UPPER(team_name)=? LIMIT 1", (alias,)).fetchone():
+            return alias
+    finally:
+        if should_close:
+            conn.close()
+    raise HTTPException(404, f"队伍未找到或别名未确认：{raw}")
+
+
+def _normalize_trading_market(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    return TRADING_MARKET_ALIASES.get(raw, raw)
+
+
+def _infer_trading_market(text: str) -> str:
+    for key, market in TRADING_MARKET_ALIASES.items():
+        if key and key in text:
+            return market
+    return ""
+
+
+def _normalize_trading_scenario(value: str) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return ""
+    return TRADING_SCENARIO_ALIASES.get(raw, raw)
+
+
+def _infer_trading_scenario(text: str) -> str:
+    for key, scenario in TRADING_SCENARIO_ALIASES.items():
+        if key and key in text:
+            return scenario
+    return ""
+
+
+def _trading_note_heading(title: str, team: str) -> str:
+    clean = (title or "").strip() or f"{team} 交易观察"
+    return clean if clean.upper().startswith(team.upper()) else f"{team} {clean}"
+
+
+def _strip_team_hint_prefix(text: str, team: str) -> str:
+    clean = (text or "").strip()
+    code = (team or "").strip()
+    if not clean or not code:
+        return clean
+    patterns = [
+        rf"^{re.escape(code)}\s*[:：]\s*",
+        rf"^{re.escape(code)}\s+",
+    ]
+    changed = True
+    while changed:
+        changed = False
+        for pattern in patterns:
+            new_value = re.sub(pattern, "", clean, count=1, flags=re.I).strip()
+            if new_value != clean:
+                clean = new_value
+                changed = True
+    return clean
+
+
+def _parse_simple_yaml_block(block: str) -> dict:
+    data = {}
+    for raw in (block or "").splitlines():
+        if ":" not in raw:
+            continue
+        key, value = raw.split(":", 1)
+        data[key.strip()] = value.strip().strip('"').strip("'")
+    return data
+
+
+def _extract_trading_notes_from_content(content: str, team: str = "") -> list[dict]:
+    notes = []
+    for match in re.finditer(r"```yaml\s*(.*?)```", content or "", re.S):
+        meta = _parse_simple_yaml_block(match.group(1))
+        if meta.get("type") != TRADING_NOTE_TYPE:
+            continue
+        status = (meta.get("status") or "active").strip().lower()
+        code = (meta.get("team") or team or "").strip().upper()
+        if team and code and code != team.upper():
+            continue
+        prefix = content[:match.start()]
+        title_match = re.findall(r"^#{2,4}\s+(.+)$", prefix, re.M)
+        title = title_match[-1].strip() if title_match else f"{code} 交易观察"
+        tail = content[match.end():match.end() + 1200]
+        original = ""
+        daily_hint = ""
+        for line in tail.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                break
+            if stripped.startswith("原话：") or stripped.startswith("原话:"):
+                original = stripped.split("：", 1)[-1] if "：" in stripped else stripped.split(":", 1)[-1]
+            if stripped.startswith("日报提示：") or stripped.startswith("日报提示:"):
+                daily_hint = stripped.split("：", 1)[-1] if "：" in stripped else stripped.split(":", 1)[-1]
+        notes.append({
+            "team": code,
+            "title": title,
+            "market": meta.get("market", ""),
+            "market_label": TRADING_MARKET_LABELS.get(meta.get("market", ""), meta.get("market", "")),
+            "scenario": meta.get("scenario", ""),
+            "status": status,
+            "source": meta.get("source", ""),
+            "original": _strip_team_hint_prefix(original, code),
+            "daily_hint": _strip_team_hint_prefix(daily_hint, code),
+        })
+    return notes
+
+
+def _load_team_trading_notes(team: str, status: str = "active", limit: int = 20) -> list[dict]:
+    notes = []
+    code = (team or "").strip().upper()
+    wanted_status = (status or "").strip().lower()
+    if not code or not os.path.isdir(TK_DIR):
+        return notes
+    for fname in sorted(os.listdir(TK_DIR), reverse=True):
+        if not fname.endswith(".md"):
+            continue
+        fpath = os.path.join(TK_DIR, fname)
+        try:
+            with open(fpath, encoding="utf-8") as f:
+                content = f.read()
+        except Exception:
+            continue
+        if not _strict_team_marker(fname, content, code):
+            continue
+        for note in _extract_trading_notes_from_content(content, code):
+            if wanted_status and wanted_status != "all" and note["status"] != wanted_status:
+                continue
+            note["filename"] = fname
+            note["source_type"] = "tk_file"
+            notes.append(note)
+            if len(notes) >= limit:
+                return notes
+    return notes
 
 # ─── Teams ──────────────────────────────────────────────
 
@@ -509,7 +731,13 @@ def _tk_markdown(data: dict, *, source: str = "手动录入", created: str | Non
     if not tag_list:
         tag_list.append("通用")
     date_str = created or datetime.now().strftime("%Y-%m-%d")
-    return f"---\nsource: {source}\nsource_type: manual\ntags: [{', '.join(tag_list)}]\ncreated: {date_str}\n---\n\n{content}\n"
+    extra_lines = []
+    for key in ("type", "market", "scenario", "status", "team"):
+        value = data.get(key)
+        if value:
+            extra_lines.append(f"{key}: {value}")
+    extra = ("\n" + "\n".join(extra_lines)) if extra_lines else ""
+    return f"---\nsource: {source}\nsource_type: manual\ntags: [{', '.join(tag_list)}]\ncreated: {date_str}{extra}\n---\n\n{content}\n"
 
 
 @app.post("/api/tk")
@@ -527,6 +755,138 @@ def create_tk(data: dict):
         import requests; requests.post(REINDEX_API, json={"force": False}, timeout=3)
     except: pass
     return {"ok": True, "filename": fname, "path": fpath}
+
+
+class TradingNoteIn(BaseModel):
+    team: str
+    note: str
+    title: str = ""
+    market: str = ""
+    scenario: str = ""
+    status: str = "active"
+
+
+class TradingNoteTextIn(BaseModel):
+    text: str
+
+
+def _parse_trading_note_text(text: str) -> TradingNoteIn:
+    raw = (text or "").strip()
+    if len(raw) < 4:
+        raise HTTPException(400, "交易备注太短")
+    clean = re.sub(r"^\s*小雪\s*记到\s*", "", raw).strip()
+    clean = re.sub(r"^\s*记到\s*", "", clean).strip()
+    match = re.match(r"^([A-Za-z0-9\.\-_\u4e00-\u9fff]+)\s*[:：]\s*(.+)$", clean)
+    if not match:
+        match = re.match(r"^([A-Za-z0-9\.\-_\u4e00-\u9fff]+)\s+(.+)$", clean)
+    if not match:
+        raise HTTPException(422, "队伍不明确，未写入正式 TK；请写成“小雪记到 HLE：虐菜大人头”")
+    team_hint = match.group(1).strip()
+    note = match.group(2).strip()
+    if len(note) < 4:
+        raise HTTPException(400, "交易备注太短")
+    try:
+        team = _normalize_team_code(team_hint)
+    except HTTPException:
+        raise HTTPException(422, f"队伍未确认，未写入正式 TK：{team_hint}")
+    return TradingNoteIn(
+        team=team,
+        note=note,
+        market=_infer_trading_market(note),
+        scenario=_infer_trading_scenario(note),
+        status="active",
+    )
+
+
+def _trading_note_markdown(data: TradingNoteIn, team: str) -> dict:
+    note = (data.note or "").strip()
+    if len(note) < 4:
+        raise HTTPException(400, "交易备注太短")
+    status = (data.status or "active").strip().lower()
+    if status not in ("active", "inactive"):
+        status = "active"
+    market = _normalize_trading_market(data.market) or _infer_trading_market(note)
+    scenario = _normalize_trading_scenario(data.scenario) or _infer_trading_scenario(note)
+    title = _trading_note_heading(data.title or note.splitlines()[0][:40], team)
+    market_label = TRADING_MARKET_LABELS.get(market, market or "待判断")
+    scenario_label = scenario or "待判断"
+    daily_hint = note
+    content = f"""## 盘口 / 交易观察
+
+### {title}
+```yaml
+team: {team}
+type: {TRADING_NOTE_TYPE}
+market: {market}
+scenario: {scenario}
+status: {status}
+source: junjun_manual
+```
+
+原话：{note}
+
+日报提示：{daily_hint}
+
+用途：跟随 {team} 队伍知识，不新增交易 TK 实体；日报命中该队比赛时优先展示。
+"""
+    return {
+        "content": content,
+        "title": title,
+        "market": market,
+        "market_label": market_label,
+        "scenario": scenario_label,
+        "status": status,
+    }
+
+
+@app.post("/api/team-trading-notes")
+def create_team_trading_note(data: TradingNoteIn):
+    team = _normalize_team_code(data.team)
+    rendered = _trading_note_markdown(data, team)
+    payload = {
+        "content": rendered["content"],
+        "team": team,
+        "tags": f"盘口/交易观察,{TRADING_NOTE_TYPE},{rendered['market']},{rendered['scenario']}",
+        "source": "钧钧手动交易备注",
+        "type": TRADING_NOTE_TYPE,
+        "market": rendered["market"],
+        "scenario": rendered["scenario"],
+        "status": rendered["status"],
+    }
+    created = create_tk(payload)
+    return {
+        "ok": True,
+        "team": team,
+        "note": {
+            "title": rendered["title"],
+            "market": rendered["market"],
+            "market_label": rendered["market_label"],
+            "scenario": rendered["scenario"],
+            "status": rendered["status"],
+        },
+        "tk": created,
+        "boundary": "写入现有队伍 TK/Wiki 正源，不新增交易 TK 实体",
+    }
+
+
+@app.post("/api/team-trading-notes/from-text")
+def create_team_trading_note_from_text(data: TradingNoteTextIn):
+    parsed = _parse_trading_note_text(data.text)
+    return create_team_trading_note(parsed)
+
+
+@app.get("/api/team-trading-notes/{team}")
+def list_team_trading_notes(team: str, status: str = "active", limit: int = 20):
+    code = _normalize_team_code(team)
+    notes = _load_team_trading_notes(code, status=status, limit=limit)
+    return {
+        "ok": True,
+        "team": code,
+        "status": status,
+        "notes": notes,
+        "source": "tk_files_structured_blocks",
+        "boundary": "结构化读取 type=trading_note；RAG/搜索不作为主链路",
+    }
 
 
 @app.put("/api/tk/{filename}")
@@ -1019,6 +1379,196 @@ def _build_msi_match_context(team_a_ctx, team_b_ctx):
         "market_note": market_note,
         "risk_note": risk_note,
         "daily_summary": daily_summary,
+    }
+
+
+def _load_schedule_matches(date_str: str, limit: int = 12) -> list[dict]:
+    conn = get_db()
+    rows = conn.execute("""
+        SELECT date, time_bjt, team_a, team_b, region, format, stage
+        FROM schedules
+        WHERE date = ?
+        ORDER BY time_bjt ASC, team_a ASC
+        LIMIT ?
+    """, (date_str, limit)).fetchall()
+    conn.close()
+    return [{
+        "date": r["date"],
+        "time": r["time_bjt"] or "",
+        "team_a": r["team_a"] or "",
+        "team_b": r["team_b"] or "",
+        "region": r["region"] or "",
+        "format": r["format"] or "",
+        "stage": r["stage"] or "",
+    } for r in rows]
+
+
+def _trading_entry_point(market: str, scenario: str, team: str) -> str:
+    if market == "kills_over":
+        return f"{team} 对手偏弱、BP 有强开/滚雪球条件，或前期已拿主动但人头线未明显抬高时。"
+    if market == "time_over":
+        return "两队 BP 没有速推/强开滚雪球阵容，前期资源交换偏慢时。"
+    if market == "live_entry":
+        return f"{team} 前期小劣但经济没崩、阵容团战链仍完整时，等赛中赔率抬高。"
+    if market == "handicap":
+        return f"{team} 强弱差和 TS 下界同时支持，且让分没有过深时。"
+    if market == "winner":
+        return f"{team} 基础面和盘口方向同向，且赛前赔率没有被强队热度压得过低时。"
+    return "等 BP、首发、盘口或赛中走势补齐后再判断。"
+
+
+def _pick_primary_trading_note(notes: list[dict]) -> dict | None:
+    for note in notes:
+        if note.get("market"):
+            return note
+    return notes[0] if notes else None
+
+
+def _build_pre_match_trading_view(match: dict) -> dict:
+    raw_a = match.get("team_a") or ""
+    raw_b = match.get("team_b") or ""
+    conn = get_db()
+    try:
+        try:
+            team_a = _normalize_team_code(raw_a, conn=conn)
+        except HTTPException:
+            team_a = raw_a.strip().upper()
+        try:
+            team_b = _normalize_team_code(raw_b, conn=conn)
+        except HTTPException:
+            team_b = raw_b.strip().upper()
+        row_a = _load_ts_team(conn, team_a)
+        row_b = _load_ts_team(conn, team_b)
+    finally:
+        conn.close()
+
+    ctx_a = _ts_team_context(row_a) if row_a else None
+    ctx_b = _ts_team_context(row_b) if row_b else None
+    compare = _build_msi_match_context(ctx_a, ctx_b) if ctx_a and ctx_b else None
+    notes_a = _load_team_trading_notes(team_a, status="active", limit=8) if team_a else []
+    notes_b = _load_team_trading_notes(team_b, status="active", limit=8) if team_b else []
+    notes = (notes_a + notes_b)[:3]
+    primary = _pick_primary_trading_note(notes)
+
+    if primary and compare:
+        market = primary.get("market") or ""
+        primary_direction = primary.get("market_label") or TRADING_MARKET_LABELS.get(market, market) or "待判断"
+        entry_point = _trading_entry_point(market, primary.get("scenario") or "", primary.get("team") or "")
+        market_divergence = primary.get("daily_hint") or primary.get("original") or compare["market_note"]
+        backup = "无；先围绕主方向观察。"
+        avoid = "低赔独赢 / 过深让分 / 没有 BP 支持的人头大小"
+    elif primary:
+        primary_direction = "暂不推荐"
+        entry_point = "只有历史队伍交易备注，当前基础面/TS/盘口信息不足，先提示不下方向。"
+        market_divergence = primary.get("daily_hint") or primary.get("original") or "命中历史交易备注，但缺当前比赛支撑。"
+        backup = "无"
+        avoid = "数据不足时不硬推"
+    else:
+        primary_direction = "暂不推荐"
+        entry_point = "没有命中有效队伍交易备注，等待 BP/盘口/赛中信息。"
+        market_divergence = compare["market_note"] if compare else "基础数据不足，市场分歧不编。"
+        backup = "无"
+        avoid = "无备注、无数据时不硬推"
+
+    return {
+        "match": match,
+        "team_a": team_a,
+        "team_b": team_b,
+        "ts": {
+            "team_a": ctx_a,
+            "team_b": ctx_b,
+            "compare": compare,
+        },
+        "trading_notes": notes,
+        "trading_summary": {
+            "primary_direction": primary_direction,
+            "entry_point": entry_point,
+            "market_divergence": market_divergence,
+            "backup": backup,
+            "avoid": avoid,
+            "bp_pending": "BP 出来后只确认是否支持原方向，不重写整场。",
+        },
+    }
+
+
+def _render_pre_match_trading_report(date_str: str, matches: list[dict]) -> str:
+    views = [_build_pre_match_trading_view(m) for m in matches]
+    lines = [
+        f"# 赛前交易判断日报 {date_str}",
+        "",
+        "> 保留原日报基础面；本文件只增加赛前交易判断层。交易备注跟随队伍 TK，不新增交易 TK 实体；RAG/搜索只作补充。",
+        "",
+        "## 今日优先交易方向",
+    ]
+    priorities = []
+    for view in views:
+        summary = view["trading_summary"]
+        if summary["primary_direction"] != "暂不推荐":
+            priorities.append(f"- {view['team_a']} vs {view['team_b']}：{summary['primary_direction']}；入场点：{summary['entry_point']}")
+    if priorities:
+        lines.extend(priorities[:3])
+    else:
+        lines.append("- 暂无强方向；没有有效队伍交易备注或当前基础面不足时不硬编。")
+    lines.extend(["", "## 今日不碰", "- 过深让分", "- 没有 BP 支持的人头大小", "- 队伍不明确或数据不足的场次", ""])
+
+    for view in views:
+        match = view["match"]
+        summary = view["trading_summary"]
+        compare = view["ts"]["compare"]
+        notes = view["trading_notes"]
+        lines.extend([
+            f"## {view['team_a']} vs {view['team_b']}",
+            "",
+            "### 1. 基础面",
+        ])
+        if compare:
+            lines.extend([
+                f"- {compare['daily_summary']}",
+                f"- {compare['risk_note']}",
+            ])
+        else:
+            lines.append("- 基础面/TS 数据不足；保留赛程信息，不补编强弱判断。")
+        meta = " / ".join(x for x in [match.get("time"), match.get("region"), match.get("format"), match.get("stage")] if x)
+        if meta:
+            lines.append(f"- 赛程：{meta}")
+        lines.extend(["", "### 2. 命中队伍交易备注"])
+        if notes:
+            for note in notes[:3]:
+                hint = note.get("daily_hint") or note.get("original") or note.get("title")
+                lines.append(f"- {note.get('team') or ''}：{hint}")
+        else:
+            lines.append("- 无有效队伍交易备注命中。")
+        lines.extend([
+            "",
+            "### 3. 市场分歧",
+            f"- {summary['market_divergence']}",
+            "",
+            "### 4. 交易小结",
+            f"- 主方向：{summary['primary_direction']}",
+            f"- 入场点：{summary['entry_point']}",
+            f"- 备选方向：{summary['backup']}",
+            f"- 不碰项：{summary['avoid']}",
+            "",
+            "### 5. BP 待确认",
+            f"- {summary['bp_pending']}",
+            "",
+        ])
+    if not views:
+        lines.extend(["## 今日赛程", "", "- 未找到当日赛程；不生成交易方向。", ""])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+@app.get("/api/pre-match-trading-report")
+def get_pre_match_trading_report(date: str = "today", limit: int = 12):
+    date_str = _resolve_daily_content_date(date)
+    matches = _load_schedule_matches(date_str, limit=limit)
+    markdown = _render_pre_match_trading_report(date_str, matches)
+    return {
+        "ok": True,
+        "date": date_str,
+        "matches": len(matches),
+        "markdown": markdown,
+        "boundary": "只读预览；写文件由脚本负责；不恢复 tk_library，不接旧 /api/trades",
     }
 
 
@@ -1608,12 +2158,15 @@ def get_daily_content(date: str = Query("today")):
 # ─── Static ─────────────────────────────────────────────
 
 # TK 概念图静态文件（力导向图）
-_TK_GRAPH_DIR = os.path.expanduser("/home/ubuntu/tk_graph_serve")
-app.mount("/tk-graph", StaticFiles(directory=_TK_GRAPH_DIR, html=True), name="tk_graph")
+_TK_GRAPH_DIR = os.environ.get("XIAOXUE_TK_GRAPH_DIR", "/home/ubuntu/tk_graph_serve")
+if os.path.isdir(_TK_GRAPH_DIR):
+    app.mount("/tk-graph", StaticFiles(directory=_TK_GRAPH_DIR, html=True), name="tk_graph")
 
 # 挂载构建产物静态文件
 _STATIC_DIST = os.path.join(os.path.dirname(__file__), "dist")
-app.mount("/assets", StaticFiles(directory=os.path.join(_STATIC_DIST, "assets")), name="dist_assets")
+_STATIC_ASSETS = os.path.join(_STATIC_DIST, "assets")
+if os.path.isdir(_STATIC_ASSETS):
+    app.mount("/assets", StaticFiles(directory=_STATIC_ASSETS), name="dist_assets")
 
 
 @app.get("/api/health")

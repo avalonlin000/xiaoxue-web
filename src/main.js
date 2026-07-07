@@ -127,19 +127,19 @@ async function loadDailyContent(dateValue = 'today') {
     const missing = items.filter(item => !item.exists);
     if (status) {
       status.textContent = missing.length
-        ? `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
-        : `${dateLabel} MSI 日报、赛前卡、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}（${items.length} 个白名单文件）`;
+        ? `${dateLabel} 日报、赛前卡、交易判断日报、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}，缺 ${missing.map(missingDailyContentLabel).join('、')}，当前显示静态 fallback`
+        : `${dateLabel} 日报、赛前卡、交易判断日报、分析师入口可见层；已读取 /api/daily-content?date=${safeDate}（${items.length} 个白名单文件）`;
     }
     if (stateEl) {
       stateEl.innerHTML = missing.length
         ? `<strong>内容状态：</strong>${escHtml(dateLabel)} 已读取 /api/daily-content?date=${escHtml(safeDate)}；${missing.map(missingDailyContentLabel).join('、')} 本地文件不存在，缺失条目当前显示静态 fallback。`
-        : `<strong>内容状态：</strong>${escHtml(dateLabel)} /api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺分析师入口说明。`;
+        : `<strong>内容状态：</strong>${escHtml(dateLabel)} /api/daily-content 白名单文件均已读取；未缺日报、未缺赛前卡、未缺交易判断日报、未缺分析师入口说明。`;
     }
   } catch (e) {
     console.warn('daily content API failed, keeping static fallback:', e);
     markDailyContentApiFailed();
-    if (status) status.textContent = `${safeDate} 今日内容接口失败，缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback`;
-    if (stateEl) stateEl.innerHTML = `<strong>内容状态：</strong>${escHtml(safeDate)} /api/daily-content 接口失败；缺日报、缺赛前卡、缺分析师入口说明状态无法确认，当前显示静态 fallback。`;
+    if (status) status.textContent = `${safeDate} 今日内容接口失败，缺日报、缺赛前卡、缺交易判断日报、缺分析师入口说明状态无法确认，当前显示静态 fallback`;
+    if (stateEl) stateEl.innerHTML = `<strong>内容状态：</strong>${escHtml(safeDate)} /api/daily-content 接口失败；缺日报、缺赛前卡、缺交易判断日报、缺分析师入口说明状态无法确认，当前显示静态 fallback。`;
   }
 }
 
@@ -195,6 +195,7 @@ function missingDailyContentLabel(itemOrId) {
   return {
     daily_report: '日报',
     pre_match_card: '赛前卡',
+    trading_report: '交易判断日报',
     analyst_entry_copy: '分析师入口说明',
   }[id] || '白名单文件';
 }
@@ -629,7 +630,7 @@ function buildTodayMatchDraft(matchName, tsContext) {
   lines.push('赔率 / 比分：');
   lines.push('我的判断：');
   lines.push('市场分歧点：');
-  lines.push('破相条件：');
+  lines.push('不碰项：');
   lines.push('备注：');
   lines.push('边界：本按钮只在前端填手写草稿，不保存，不 POST/PUT/DELETE，不自动交易；最终交易判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
@@ -645,8 +646,8 @@ function prefillAnalystPromptFromToday(matchName, tsContext) {
     `今日对局：${matchName}`,
     '请按小雪单场分析框架处理：先看基本面/TS，再等 BP、首发、蓝红方、每局阵容和盘口变化。',
     tsLine,
-    'TS / TK / 盘口依据：TS = mu - 3σ，是保守实力下界；TK 正源走 Wiki / knowledge-rag；盘口只做观察顺序、市场分歧点、风险和破相条件，不自动交易。',
-    '输出只要：观察顺序、待补字段、市场分歧点、破相条件；不要给自动交易结论。',
+    'TS / TK / 盘口依据：TS = mu - 3σ，是保守实力下界；TK 正源走 Wiki / knowledge-rag；盘口只做观察顺序、市场分歧点、风险和不碰项，不自动交易。',
+    '输出只要：观察顺序、待补字段、市场分歧点、不碰项；不要给自动交易结论。',
     '明确：本提示由前端生成，不调用 LLM、不保存。',
   ].join('\n');
   if (input) input.value = prompt;
@@ -658,7 +659,7 @@ async function copyTodayBasisPrompt() {
     'TS / TK / 盘口依据',
     'TS = mu - 3σ：TS 是保守实力下界，用来和 mu、σ 一起看稳定性，不是单独的绝对实力排名。',
     'TK 正源：Wiki / knowledge-rag，只做战术、版本、队伍风格依据，不恢复旧 tk_library。',
-    '盘口边界：盘口只做观察顺序、市场位置、分歧点、风险和破相条件；不自动交易、不替钧钧下结论。',
+    '盘口边界：盘口只做观察顺序、市场位置、分歧点、风险和不碰项；不自动交易、不替钧钧下结论。',
     'D121：本按钮只复制前端提示，不保存、不 POST/PUT/DELETE。',
   ].join('\n');
   const status = document.getElementById('today-content-status');
@@ -1042,7 +1043,7 @@ function buildDailyTradeDraft(teamLine, tsContext) {
   lines.push('赔率 / 比分：');
   lines.push('我的判断：');
   lines.push('市场分歧点：');
-  lines.push('破相条件：');
+  lines.push('不碰项：');
   lines.push('备注：');
   lines.push('边界：只填手写草稿，不自动交易，最终判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
@@ -1154,6 +1155,34 @@ async function deleteTrade(id) {
   }
 }
 
+async function saveTeamTradingNote() {
+  const input = document.getElementById('team-trading-note-input');
+  const msg = document.getElementById('team-trading-note-msg');
+  const text = String(input?.value || '').trim();
+  if (!text) {
+    if (msg) msg.textContent = '先写一句，比如：小雪记到 HLE：虐菜大人头';
+    return;
+  }
+  if (msg) msg.textContent = '正在写入队伍 TK…';
+  try {
+    const resp = await fetch('/api/team-trading-notes/from-text', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || data.ok === false) {
+      const reason = data.detail || data.message || '队伍未确认，未写入正式 TK';
+      if (msg) msg.textContent = reason;
+      return;
+    }
+    if (input) input.value = '';
+    if (msg) msg.textContent = `已记到 ${data.team} 队伍 TK：${data.note?.market_label || data.note?.market || '交易备注'}`;
+  } catch (e) {
+    if (msg) msg.textContent = '写入失败，稍后重试';
+  }
+}
+
 function tradeToTK(id) {
   const r = state.trades.find(x => x.id === id);
   if (!r) return;
@@ -1246,4 +1275,5 @@ window.prefillTradeFromTeam = prefillTradeFromTeam;
 window.loadTrades = loadTrades;
 window.saveTradeRecord = saveTradeRecord;
 window.deleteTrade = deleteTrade;
+window.saveTeamTradingNote = saveTeamTradingNote;
 window.tradeToTK = tradeToTK;

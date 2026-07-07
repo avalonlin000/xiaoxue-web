@@ -9,6 +9,7 @@ __pycache__/
 *.py[cod]
 
 # Local backups made during remote maintenance
+.xiaobai-backups/
 *.bak.*
 
 # Logs and temp files

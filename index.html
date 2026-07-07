@@ -1379,7 +1379,7 @@ html, body {
             <div class="today-summary-strip" data-slice="D136">
               <div>
                 <div class="today-summary-strip-title"><span class="flag">首屏</span><span>今日内容入口</span></div>
-                <div class="today-summary-strip-copy">今日内容已接入本地只读白名单：MSI 日报、赛前卡、分析师入口说明；这里只做首屏跳转和前端提示，不保存、不自动交易。</div>
+                <div class="today-summary-strip-copy">今日内容已接入本地只读白名单：MSI 日报、赛前卡、赛前交易判断日报、分析师入口说明；这里只做首屏跳转和前端提示，不保存、不自动交易。</div>
               </div>
               <div class="today-summary-strip-actions">
                 <div class="today-date-controls" data-slice="D139">
@@ -1438,14 +1438,14 @@ html, body {
         <div class="card" id="card-today-content">
           <div class="card-head">
             <span class="badge" style="background:linear-gradient(135deg,var(--orange),var(--pink))">TODAY</span> 今日内容 / 单场分析入口
-            <span id="today-content-status" style="font-size:12px;color:var(--ink-3);font-weight:400">今日 MSI 日报、赛前卡、分析师入口可见层；后端按 date=today/YYYY-MM-DD 读取本地白名单文件，失败保留静态 fallback</span>
+            <span id="today-content-status" style="font-size:12px;color:var(--ink-3);font-weight:400">今日 MSI 日报、赛前卡、交易判断日报、分析师入口可见层；后端按 date=today/YYYY-MM-DD 读取本地白名单文件，失败保留静态 fallback</span>
             <span style="flex:1"></span>
             <button class="compare-close" onclick="document.getElementById('card-analyst')?.scrollIntoView({ behavior: 'smooth', block: 'start' })">去分析师入口</button>
             <button class="compare-close" onclick="setPage('market')">去盘口页</button>
           </div>
           <div class="card-body">
             <div class="today-content-state" id="today-content-state" data-slice="D127">
-              <strong>内容状态：</strong>等待 /api/daily-content 白名单校验；若本地文件不存在或接口失败，会明确标出缺日报、缺赛前卡、缺分析师入口说明，当前显示静态 fallback。
+              <strong>内容状态：</strong>等待 /api/daily-content 白名单校验；若本地文件不存在或接口失败，会明确标出缺日报、缺赛前卡、缺交易判断日报、缺分析师入口说明，当前显示静态 fallback。
             </div>
             <div class="today-content-grid">
               <div class="today-match-list">
@@ -1479,6 +1479,12 @@ html, body {
                   <span class="today-meta">缺赛前卡状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
                   <span class="today-path">/home/ubuntu/lol_data/scripts/MSI赛前内容卡_<date>.md</span>
                 </div>
+                <div class="today-entry" data-content-id="trading_report">
+                  <b>赛前交易判断日报路径</b>
+                  <span class="today-summary">按今日对阵双方读取 active 队伍交易备注，输出市场分歧、主方向、入场点、备选和不碰项；数据不足时明确暂不推荐。</span>
+                  <span class="today-meta">缺交易判断日报状态待确认；当前显示静态 fallback，等待 /api/daily-content 返回存在状态和更新时间。</span>
+                  <span class="today-path">/home/ubuntu/lol_data/scripts/赛前交易判断日报_<date>.md</span>
+                </div>
                 <div class="today-entry" data-content-id="analyst_entry_copy">
                   <b>分析师入口说明摘要</b>
                   <span class="today-summary">输入日期 + 对局即可开始；赛前先看基本面、TS 波动、盘口观察和 BP 待补；BP 后补蓝红方与五个英雄，拆阵容核心链、时间边界和风险点；赛后再补比分、关键资源团和转折，做复盘沉淀。</span>
@@ -1503,7 +1509,7 @@ html, body {
                 </div>
                 <div class="today-basis-item">
                   <b>盘口：观察顺序</b>
-                  <span>盘口只做市场位置、分歧点、风险和破相条件观察；不自动交易、不替钧钧下结论。</span>
+                  <span>盘口只做市场位置、分歧点、风险和不碰项观察；不自动交易、不替钧钧下结论。</span>
                 </div>
               </div>
               <div class="today-basis-note">D121 前端说明区：只展示/复制提示，不保存、不 POST/PUT/DELETE。</div>
@@ -1611,7 +1617,15 @@ html, body {
             <div class="trade-shell">
               <div class="trade-form">
                 <div class="trade-workspace-note" data-slice="D146">
-                  <strong>手写判断工作区：</strong>带入盘口草稿后只帮你铺好对象、盘口/方向、赔率/比分、我的判断、市场分歧点、破相条件和备注；不自动交易，不替你下结论。
+                  <strong>手写判断工作区：</strong>带入盘口草稿后只帮你铺好对象、盘口/方向、赔率/比分、我的判断、市场分歧点、不碰项和备注；不自动交易，不替你下结论。
+                </div>
+                <div class="trade-workspace-note">
+                  <strong>队伍交易备注：</strong>写“小雪记到 HLE：虐菜大人头”这类感悟，会挂回队伍 TK；队伍不明确时不写正式 TK。
+                  <div class="trade-actions" style="margin-top:8px">
+                    <input id="team-trading-note-input" placeholder="小雪记到 HLE：虐菜大人头" style="flex:1;min-width:260px">
+                    <button class="btn-tk-new" onclick="saveTeamTradingNote()">记到队伍</button>
+                    <span class="trade-msg" id="team-trading-note-msg"></span>
+                  </div>
                 </div>
                 <div class="trade-games" id="trade-games">
                   <button class="trade-game active" data-game="lol" onclick="setTradeGame('lol')">LOL</button>
@@ -1627,7 +1641,7 @@ html, body {
                   <div class="trade-field"><label>大小 / 总局数</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
                   <div class="trade-field full"><label>赔率 / 比分</label><input id="trade-score" placeholder="赔率 / 水位变化 / 比分判断，如 1.72→1.65、2-1"></div>
                   <div class="trade-field" style="display:none"><label>结果</label><select id="trade-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option></select></div>
-                  <div class="trade-field full"><label>我的判断 / 市场分歧点 / 破相条件</label><textarea class="trade-judgment" id="trade-reason" placeholder="我的判断：\n市场分歧点：\n破相条件：\n\n手写盘口、赔率、临场观察；这里不自动交易、不自动生成结论。"></textarea><div class="trade-help">推荐按三段手写：我的判断 → 市场分歧点 → 破相条件。</div></div>
+                  <div class="trade-field full"><label>我的判断 / 市场分歧点 / 不碰项</label><textarea class="trade-judgment" id="trade-reason" placeholder="我的判断：\n市场分歧点：\n不碰项：\n\n手写盘口、赔率、临场观察；这里不自动交易、不自动生成结论。"></textarea><div class="trade-help">推荐按三段手写：我的判断 → 市场分歧点 → 不碰项。</div></div>
                   <div class="trade-field full"><label>备注</label><textarea id="trade-review" placeholder="可选：BP、首发、临场水位、赛后复盘再补"></textarea></div>
                 </div>
                 <div class="trade-actions">

@@ -19,6 +19,7 @@
 | 2026-07-07 | 运维与项目收口：磁盘降到 85% 以下，`vibe-status` 增加磁盘分级提示，`/api/health` 纳入盘口表、memory-bank、磁盘检查 | ✅ 完成 | 当前边界：健康检查只读；盘口记录仍只走 `/api/market-notes` |
 | 2026-07-07 | 队伍画像扩展为 Wiki/SKILL/数据库三层降级 | ✅ 完成 | 无手工画像时，用 teams/rosters/team_3d_data/msi_ts_seed 生成只读兜底画像；不伪造人工判断 |
 | 2026-07-07 | TK 版本理解整理为只读聚合视图 | ✅ 完成 | `/api/version-understanding/{team}` 聚合三维版本理解与 TK 条目；前端新增版本理解面板 |
+| 2026-07-08 | 赛前交易判断日报第一阶段：接入队伍 `trading_note` 标签链路 | ✅ 完成 | 交易备注仍跟队伍 TK 走；新增 `/api/team-trading-notes`、`/api/team-trading-notes/from-text`、`/api/pre-match-trading-report`、今日内容 `trading_report` 入口和 `scripts/build_pre_match_trading_report.py`；不恢复 `tk_library`，不接旧 `/api/trades` |
 
 ## 日报管道（daily-report cron）
 
@@ -48,6 +49,7 @@
 |------|------|
 | 运维 | `vibe-status` 服务全 active，proxy residue 为 none，根分区低于 85% 优先；85%-92% 警告，92% 以上必须清理 |
 | 盘口页 | 新建、读取、删除只走 `/api/market-notes`；页面只保存手写草稿，不自动交易、不自动生成方向 |
+| 赛前交易判断日报 | 从当日赛程读取双方队伍，结构化读取 active `type=trading_note`，生成“基础面 → 命中队伍交易备注 → 市场分歧 → 交易小结 → BP待确认”；无备注或数据不足时写“暂不推荐”；“小雪记到 HLE：...”可写入队伍 TK，队伍不明确不落库 |
 | 画像页 | 优先 Wiki，其次 SKILL.md，再用数据库只读兜底；兜底画像必须标明来源和“不替代人工画像” |
 | 版本理解 | `/api/version-understanding/{team}` 只读聚合三维字段与 TK 条目；前端只展示，不自动生成新判断 |
 | memory-bank | 新对话先读 `README.md`、改模块读 `modules.md`、汇报进度读本文件 |
