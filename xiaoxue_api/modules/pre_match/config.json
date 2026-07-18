@@ -1,0 +1,14 @@
+{
+  "pre_match": {
+    "market_labels": {
+      "winner": "独赢",
+      "handicap": "让分",
+      "kills_over": "人头大",
+      "kills_under": "人头小",
+      "time_over": "大时间",
+      "time_under": "小时间",
+      "live_entry": "赛中入场",
+      "avoid": "不碰"
+    }
+  }
+}

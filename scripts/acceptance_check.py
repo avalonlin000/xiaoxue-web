@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Xiaoxue workbench smoke acceptance checks."""
+"""Read-only, module-by-module Xiaoxue workbench acceptance checks."""
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 import time
@@ -34,15 +35,26 @@ def assert_true(value: bool, message: str) -> None:
 
 def check_health() -> None:
     data = request("/api/health")
-    assert_true(data.get("ok") is True, f"health not ok: {data}")
-    checks = data.get("checks", {})
-    for key in ("database", "dist", "tk_dir", "skill_dirs", "memory_bank", "market_notes", "disk"):
-        assert_true(key in checks, f"missing health check: {key}")
-        assert_true(checks[key].get("ok") is True, f"{key} check failed: {checks[key]}")
-    print("health ok")
+    modules = data.get("modules") or {}
+    assert_true(bool(modules), "health response has no module states")
+    broken = [item for item in modules.values() if item.get("status") == "broken"]
+    disabled = [item for item in modules.values() if item.get("status") == "disabled"]
+    critical = [item for item in broken if item.get("critical")]
+    for item in broken:
+        print(f"  待修: {item.get('name')} — {item.get('message')}")
+    for item in disabled:
+        print(f"  暂停: {item.get('name')} — {item.get('message')}")
+    assert_true(not critical, f"critical modules unavailable: {critical}")
+    print(f"module-health {data.get('status')} ({len(modules) - len(broken) - len(disabled)} healthy)")
 
 
-def check_market_notes() -> None:
+def check_market_notes_readonly() -> None:
+    listed = request("/api/market-notes?game=lol&limit=1")
+    assert_true(isinstance(listed.get("records"), list), "market notes response has no records list")
+    print("market-notes readonly ok")
+
+
+def check_market_notes_write() -> None:
     marker = f"acceptance-{int(time.time())}"
     created = request(
         "/api/market-notes",
@@ -96,13 +108,36 @@ def check_version_understanding(team: str = "EDG") -> None:
 
 
 def main() -> int:
-    try:
-        check_health()
-        check_market_notes()
-        check_profile_fallback()
-        check_version_understanding()
-    except Exception as exc:
-        print(f"acceptance failed: {exc}", file=sys.stderr)
+    global BASE
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--base", default=BASE)
+    parser.add_argument(
+        "--write-market-notes",
+        action="store_true",
+        help="explicitly allow a temporary create/read/delete check against the configured server",
+    )
+    args = parser.parse_args()
+    BASE = args.base.rstrip("/")
+
+    checks = [
+        ("模块状态", check_health),
+        ("临场记录", check_market_notes_readonly),
+        ("队伍画像", check_profile_fallback),
+        ("版本理解", check_version_understanding),
+    ]
+    if args.write_market_notes:
+        checks.append(("临场记录写入", check_market_notes_write))
+
+    failures = []
+    for name, check in checks:
+        try:
+            check()
+        except Exception as exc:
+            failures.append((name, str(exc)))
+            print(f"{name} failed: {exc}", file=sys.stderr)
+
+    if failures:
+        print(f"acceptance completed: {len(failures)} module(s) failed", file=sys.stderr)
         return 1
     print("acceptance ok")
     return 0

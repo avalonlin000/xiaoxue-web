@@ -1,0 +1,10 @@
+{
+  "team_aliases": {
+    "HLE": ["HLE", "Hanwha Life Esports", "韩华", "韩华生命", "韩华生命电竞"],
+    "GEN": ["GEN", "Gen.G", "GENG", "三星"],
+    "TES": ["TES", "滔搏"],
+    "JDG": ["JDG", "京东"],
+    "WBG": ["WBG", "微博"],
+    "BLG": ["BLG", "Bilibili Gaming", "哔哩哔哩", "哔哩哔哩电竞"]
+  }
+}

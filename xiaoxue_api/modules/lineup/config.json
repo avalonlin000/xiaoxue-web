@@ -1,0 +1,17 @@
+{
+  "lineup_workflow": {
+    "positions": ["TOP", "JUNGLE", "MID", "BOT", "SUPPORT"],
+    "allowed_decisions": ["保留", "降权", "取消", "等待"],
+    "guardrails": "只修正赛前判断权重，不得直接给买卖指令；信息不足时返回等待。",
+    "steps": [
+      {"id": "input_validation", "label": "阵容与输入确认"},
+      {"id": "control_quantification", "label": "控制量化"},
+      {"id": "three_dimensional_weighting", "label": "三维加权"},
+      {"id": "lane_priority_timing", "label": "线权与时间边界"},
+      {"id": "lineup_core_chain", "label": "阵容构建核心链"},
+      {"id": "bp_control_chain", "label": "BP 控制链"},
+      {"id": "scenario_matrix_24", "label": "24 场景矩阵"},
+      {"id": "preflight_six", "label": "六条预检与原判断升降权"}
+    ]
+  }
+}

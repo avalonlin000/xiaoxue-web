@@ -1,0 +1,58 @@
+{
+  "tk_knowledge": {
+  "team_aliases": {
+    "HLE": ["HLE", "Hanwha Life Esports", "韩华", "韩华生命", "韩华生命电竞"],
+    "GEN": ["GEN", "Gen.G", "GENG", "三星"],
+    "TES": ["TES", "滔搏"],
+    "JDG": ["JDG", "京东"],
+    "WBG": ["WBG", "微博"],
+    "BLG": ["BLG", "Bilibili Gaming", "哔哩哔哩", "哔哩哔哩电竞"]
+  },
+  "market": {
+    "labels": {
+      "winner": "独赢",
+      "handicap": "让分",
+      "kills_over": "人头大",
+      "kills_under": "人头小",
+      "time_over": "大时间",
+      "time_under": "小时间",
+      "live_entry": "赛中入场",
+      "avoid": "不碰"
+    },
+    "aliases": {
+      "胜": "winner",
+      "胜负": "winner",
+      "独赢": "winner",
+      "让分": "handicap",
+      "人头大": "kills_over",
+      "大人头": "kills_over",
+      "kills_over": "kills_over",
+      "人头小": "kills_under",
+      "小人头": "kills_under",
+      "kills_under": "kills_under",
+      "大时间": "time_over",
+      "时间大": "time_over",
+      "time_over": "time_over",
+      "小时间": "time_under",
+      "时间小": "time_under",
+      "time_under": "time_under",
+      "赛中": "live_entry",
+      "赛中入场": "live_entry",
+      "live_entry": "live_entry",
+      "不碰": "avoid",
+      "放弃": "avoid"
+    },
+    "scenario_aliases": {
+      "虐菜": "stomp_weak_team",
+      "虐菜局": "stomp_weak_team",
+      "强弱差": "stomp_weak_team",
+      "前期劣势": "early_deficit",
+      "劣势": "early_deficit",
+      "保守": "conservative_match",
+      "慢": "conservative_match",
+      "神经刀": "volatile_team",
+      "教练队": "volatile_team"
+    }
+  }
+  }
+}

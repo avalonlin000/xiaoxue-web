@@ -1,0 +1,112 @@
+{
+  "schema": "xiaoxue-workflows-v1",
+  "daily_content": {
+    "allowed_roots": [
+      "/home/ubuntu/lol_data/scripts",
+      "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life"
+    ],
+    "artifacts": [
+      {
+        "id": "daily_report",
+        "title": "LOL电竞日报 {date}",
+        "kind": "daily_report",
+        "path": "/home/ubuntu/lol_data/scripts/LOL电竞日报_{date}.md"
+      },
+      {
+        "id": "pre_match_card",
+        "title": "EWC赛前内容卡 {date}",
+        "kind": "pre_match_card",
+        "path": "/home/ubuntu/lol_data/scripts/EWC赛前内容卡_{date}.md"
+      },
+      {
+        "id": "trading_report",
+        "title": "赛前交易判断日报 {date}",
+        "kind": "trading_report",
+        "path": "/home/ubuntu/lol_data/scripts/赛前交易判断日报_{date}.md"
+      },
+      {
+        "id": "analyst_entry_copy",
+        "title": "BP 后问小雪入口说明",
+        "kind": "analyst_entry_copy",
+        "path": "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md"
+      }
+    ]
+  },
+  "team_aliases": {
+    "HLE": ["HLE", "Hanwha Life Esports", "韩华", "韩华生命", "韩华生命电竞"],
+    "GEN": ["GEN", "Gen.G", "GENG", "三星"],
+    "TES": ["TES", "滔搏"],
+    "JDG": ["JDG", "京东"],
+    "WBG": ["WBG", "微博"],
+    "BLG": ["BLG", "Bilibili Gaming", "哔哩哔哩", "哔哩哔哩电竞"]
+  },
+  "market": {
+    "games": ["lol", "cs", "valorant", "football"],
+    "results": ["未结算", "赢", "输", "走水", "放弃"],
+    "labels": {
+      "winner": "独赢",
+      "handicap": "让分",
+      "kills_over": "人头大",
+      "kills_under": "人头小",
+      "time_over": "大时间",
+      "time_under": "小时间",
+      "live_entry": "赛中入场",
+      "avoid": "不碰"
+    },
+    "aliases": {
+      "胜": "winner",
+      "胜负": "winner",
+      "独赢": "winner",
+      "让分": "handicap",
+      "人头大": "kills_over",
+      "大人头": "kills_over",
+      "kills_over": "kills_over",
+      "人头小": "kills_under",
+      "小人头": "kills_under",
+      "kills_under": "kills_under",
+      "大时间": "time_over",
+      "时间大": "time_over",
+      "time_over": "time_over",
+      "小时间": "time_under",
+      "时间小": "time_under",
+      "time_under": "time_under",
+      "赛中": "live_entry",
+      "赛中入场": "live_entry",
+      "live_entry": "live_entry",
+      "不碰": "avoid",
+      "放弃": "avoid"
+    },
+    "scenario_aliases": {
+      "虐菜": "stomp_weak_team",
+      "虐菜局": "stomp_weak_team",
+      "强弱差": "stomp_weak_team",
+      "前期劣势": "early_deficit",
+      "劣势": "early_deficit",
+      "保守": "conservative_match",
+      "慢": "conservative_match",
+      "神经刀": "volatile_team",
+      "教练队": "volatile_team"
+    }
+  },
+  "lineup_workflow": {
+    "positions": ["TOP", "JUNGLE", "MID", "BOT", "SUPPORT"],
+    "allowed_decisions": ["保留", "降权", "取消", "等待"],
+    "guardrails": "只修正赛前判断权重，不得直接给买卖指令；信息不足时返回等待。",
+    "steps": [
+      {"id": "input_validation", "label": "阵容与输入确认"},
+      {"id": "control_quantification", "label": "控制量化"},
+      {"id": "three_dimensional_weighting", "label": "三维加权"},
+      {"id": "lane_priority_timing", "label": "线权与时间边界"},
+      {"id": "lineup_core_chain", "label": "阵容构建核心链"},
+      {"id": "bp_control_chain", "label": "BP 控制链"},
+      {"id": "scenario_matrix_24", "label": "24 场景矩阵"},
+      {"id": "preflight_six", "label": "六条预检与原判断升降权"}
+    ]
+  },
+  "market_review_workflow": {
+    "destinations": ["market_notes", "team_trading_note", "tk", "team_profile", "team_3d"],
+    "knowledge_write_allowed": false,
+    "managed_start": "XIAOXUE_REVIEW_START",
+    "managed_end": "XIAOXUE_REVIEW_END"
+  }
+}
