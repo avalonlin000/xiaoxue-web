@@ -30,7 +30,7 @@ def write_tk(root: Path, filename: str, created: str, body: str, *, team: str = 
 
 
 class TkLibraryTests(unittest.TestCase):
-    def test_rag_search_and_reindex_default_to_current_tk_not_archive(self) -> None:
+    def test_mempalace_search_and_reindex_default_to_current_tk_not_archive(self) -> None:
         from xiaoxue_api.modules.tk_knowledge import repository
 
         response = mock.Mock()
@@ -41,15 +41,18 @@ class TkLibraryTests(unittest.TestCase):
             repository.request_reindex()
 
         search_call, reindex_call = post.call_args_list
+        self.assertEqual(search_call.args[0], repository.MEMPALACE_API)
         self.assertEqual(search_call.kwargs["json"], {
             "query": "BLG 纪律性",
             "top": 12,
             "source": repository.CURRENT_TK_SOURCE,
         })
+        self.assertEqual(reindex_call.args[0], repository.MEMPALACE_REINDEX_API)
         self.assertEqual(reindex_call.kwargs["json"], {
             "force": False,
             "source_only": repository.CURRENT_TK_SOURCE,
         })
+
 
     def test_library_sorts_newest_first_and_paginates_without_losing_total(self) -> None:
         import main

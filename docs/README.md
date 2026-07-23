@@ -41,3 +41,26 @@ Life OS 不再作为用户侧单一产品名，而是内部工程母项目；用
 - `SPEC.md` 保留为来源基线，不直接承载新路线图。
 - 新需求、新规格、新验收项写到 `life-os-frontend-v2/docs/products/xiaoxue-esports-life/`。
 - 当前可运行主工作台仍在 `/home/ubuntu/xiaoxue-web/`。
+
+---
+
+## MemPalace TK 适配器部署
+
+仓库内的 `deploy/xiaoxue-tk-mempalace.service.example` 是脱敏的 user systemd 模板。部署时复制到 `~/.config/systemd/user/xiaoxue-tk-mempalace.service`，并创建仅保存在服务器上的 `~/.config/xiaoxue/mempalace.env`：
+
+```ini
+XIAOXUE_MEMPALACE_SITE_PACKAGES=/实际的/mempalace/site-packages
+XIAOXUE_MEMPALACE_PALACE=/实际的/palace
+XIAOXUE_TK_SOURCE_DIR=/实际的/小雪TK目录
+XIAOXUE_MEMPALACE_WING=xiaoxue-tk
+```
+
+然后执行：
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now xiaoxue-tk-mempalace.service
+curl -fsS http://127.0.0.1:8770/api/health
+```
+
+路径由环境文件提供；仓库代码不绑定服务器用户名、Python 小版本或知识库绝对路径。

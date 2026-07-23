@@ -29,18 +29,10 @@ def health() -> dict:
 
 
 def links(team: str = "") -> dict:
-    items = [
-        {"label": "TK 概念图", "url": "http://42.193.177.127:8768/tk-graph", "desc": "力导向关系图"},
-        {"label": "知识库面板", "url": "http://42.193.177.127:8768/dashboard", "desc": "TK 统计看板"},
-        {"label": "日报列表", "url": "/reports/", "desc": "历史日报"},
-    ]
-    if team:
-        items.append({"label": f"{team} 赛前分析", "url": f"http://42.193.177.127:8768/prematch?team={team}", "desc": "赛前舆论+BP预测"})
-    items.extend([
-        {"label": "版本理解", "url": "http://42.193.177.127:8768/version", "desc": "当前版本体系"},
-        {"label": "战力排行", "url": "http://42.193.177.127:8768/ranking", "desc": "ELO 实时排名"},
-    ])
-    return {"links": items}
+    # 8768 legacy RAG pages were retired with the service. TK search and
+    # reading now stay inside the workbench; only the still-live report
+    # archive remains an external link.
+    return {"links": [{"label": "日报列表", "url": "/reports/", "desc": "历史日报"}]}
 
 
 def index_path() -> str:

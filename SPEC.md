@@ -45,8 +45,8 @@
 │  (可编辑)     │  (搜索+浏览+CRUD) │  (展开/折叠)           │
 │              │                  │                       │
 │  来源：       │  来源：           │  来源：                │
-│  team_3d_data │  knowledge-rag   │  队伍 skill + 双分析师  │
-│  表           │  API (8768)      │  skill                 │
+│  team_3d_data │  MemPalace TK    │  队伍 skill + 双分析师  │
+│  表           │  API (8770)      │  skill                 │
 │              │                  │                       │
 ├──────────────┴──────────────────┴───────────────────────┤
 │  底部输入栏：指令输入 + 快捷操作按钮                       │
@@ -175,7 +175,7 @@
 **`@data: tk-panel`**
 
 数据源：`GET /api/tk/search?q=&team=AL&player=&tag=&limit=20`
-→ 调 knowledge-rag API (localhost:8768)
+→ 调 MemPalace TK API (localhost:8770；旧 8768 已停用)
 
 CRUD 操作：
 
@@ -273,7 +273,7 @@ CRUD 操作：
 | GET | `/api/team/{name}` | 单队三维数据 | `team_3d_data` 表 |
 | PUT | `/api/team/{name}` | 更新三维数据 | 写回 `team_3d_data` |
 | GET | `/api/players?team=` | 队伍选手列表 | `rosters` 表 |
-| GET | `/api/tk/search?q=&team=&player=&tag=&limit=` | 搜索 TK | knowledge-rag API (8768) |
+| GET | `/api/tk/search?q=&team=&player=&tag=&limit=` | 搜索 TK | MemPalace TK API (8770；旧 8768 已停用) |
 | POST | `/api/tk` | 新增 TK | `save_to_knowledge_base.py` |
 | PUT | `/api/tk/{id}` | 编辑 TK | 文件覆盖 + reindex |
 | DELETE | `/api/tk/{id}` | 删除 TK | 删文件 + reindex |

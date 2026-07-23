@@ -1,0 +1,17 @@
+[Unit]
+Description=Xiaoxue TK MemPalace adapter
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/xiaoxue-web
+ExecStart=%h/.hermes/hermes-agent/venv/bin/python %h/xiaoxue-web/scripts/mempalace_tk_api.py
+EnvironmentFile=%h/.config/xiaoxue/mempalace.env
+Restart=on-failure
+RestartSec=5
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

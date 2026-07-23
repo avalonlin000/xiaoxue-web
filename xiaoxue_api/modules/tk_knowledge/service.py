@@ -40,9 +40,9 @@ def _load_config() -> dict:
     try:
         payload = json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        raise ModuleUnavailable("TK 交易备注配置不可用") from exc
+        raise ModuleUnavailable("交易 TK 配置不可用") from exc
     if not isinstance(payload, dict):
-        raise ModuleUnavailable("TK 交易备注配置不可用")
+        raise ModuleUnavailable("交易 TK 配置不可用")
     return payload
 
 
@@ -69,7 +69,7 @@ def normalize_team(value: str) -> str:
     try:
         teams = list_teams()
     except Exception as exc:
-        raise ModuleUnavailable("队伍资料模块不可用，暂不能确认交易备注归属") from exc
+        raise ModuleUnavailable("队伍资料模块不可用，暂不能确认交易 TK 归属") from exc
     for team in teams:
         values = (team.get("short_name"), team.get("name"), team.get("team_id"))
         if any(str(item or "").strip().casefold() == candidate.casefold() for item in values):
@@ -340,7 +340,7 @@ def get_entry(filename: str) -> dict:
     document = repository.read_document(safe)
     record = _library_record(document) if document else None
     if not record:
-        raise EntryNotFound("TK 条目不存在或没有可读正文")
+        raise EntryNotFound("TK 不存在或没有可读正文")
     content = _clean_content(document["content"])
     return {
         "concept": record["concept"], "content": content, "date": record["date"],
@@ -383,7 +383,7 @@ def update(filename: str, data: dict) -> dict:
     safe = _safe_filename(filename)
     old = repository.read_document(safe)
     if not old:
-        raise EntryNotFound("TK 条目未找到")
+        raise EntryNotFound("TK 未找到")
     content = data.get("content", "")
     if not content or len(content.strip()) < 10:
         raise InvalidInput("内容太短")
@@ -400,7 +400,7 @@ def update(filename: str, data: dict) -> dict:
 def delete(filename: str) -> dict:
     safe = _safe_filename(filename)
     if not repository.delete_document(safe):
-        raise EntryNotFound("TK 条目未找到")
+        raise EntryNotFound("TK 未找到")
     repository.request_reindex()
     return {"ok": True}
 
@@ -420,7 +420,7 @@ def _infer(value: str, key: str) -> str:
 def parse_trading_note_text(text: str) -> TradingNoteIn:
     raw = (text or "").strip()
     if len(raw) < 4:
-        raise InvalidInput("交易备注太短")
+        raise InvalidInput("交易 TK 内容太短")
     clean = re.sub(r"^\s*小雪\s*记到\s*", "", raw).strip()
     clean = re.sub(r"^\s*记到\s*", "", clean).strip()
     match = re.match(r"^([A-Za-z0-9\.\-_\u4e00-\u9fff]+)\s*[:：]\s*(.+)$", clean)
@@ -430,7 +430,7 @@ def parse_trading_note_text(text: str) -> TradingNoteIn:
         raise TeamUnconfirmed("队伍不明确，未写入正式 TK；请写成“小雪记到 HLE：虐菜大人头”")
     team_hint, note = match.group(1).strip(), match.group(2).strip()
     if len(note) < 4:
-        raise InvalidInput("交易备注太短")
+        raise InvalidInput("交易 TK 内容太短")
     try:
         team = normalize_team(team_hint)
     except (InvalidInput, EntryNotFound):
@@ -458,17 +458,17 @@ def _strip_team_prefix(text: str, team: str) -> str:
 def _render_trading_note(data: TradingNoteIn, team: str) -> dict:
     note = (data.note or "").strip()
     if len(note) < 4:
-        raise InvalidInput("交易备注太短")
+        raise InvalidInput("交易 TK 内容太短")
     status = (data.status or "active").strip().lower()
     if status not in ("active", "inactive"):
         status = "active"
     market = _normalize_market(data.market) or _infer(note, "aliases")
     scenario = (data.scenario or "").strip()
     scenario = (_market_config().get("scenario_aliases") or {}).get(scenario, scenario) or _infer(note, "scenario_aliases")
-    clean_title = (data.title or note.splitlines()[0][:40]).strip() or f"{team} 交易观察"
+    clean_title = (data.title or note.splitlines()[0][:40]).strip() or f"{team} 交易 TK"
     title = clean_title if clean_title.upper().startswith(team.upper()) else f"{team} {clean_title}"
     label = (_market_config().get("labels") or {}).get(market, market or "待判断")
-    content = f"""## 盘口 / 交易观察
+    content = f"""## 交易 TK
 
 ### {title}
 ```yaml
@@ -484,7 +484,7 @@ source: junjun_manual
 
 日报提示：{note}
 
-用途：跟随 {team} 队伍知识，不新增交易 TK 实体；日报命中该队比赛时优先展示。
+用途：归入 {team} 队伍 TK；日报命中该队比赛时优先展示。
 """
     return {"content": content, "title": title, "market": market, "market_label": label, "scenario": scenario or "待判断", "status": status}
 
@@ -494,8 +494,8 @@ def create_team_trading_note(data: TradingNoteIn) -> dict:
     rendered = _render_trading_note(data, team)
     created = create({
         "content": rendered["content"], "team": team,
-        "tags": f"盘口/交易观察,{TRADING_NOTE_TYPE},{rendered['market']},{rendered['scenario']}",
-        "source": "钧钧手动交易备注", "type": TRADING_NOTE_TYPE,
+        "tags": f"交易 TK,{TRADING_NOTE_TYPE},{rendered['market']},{rendered['scenario']}",
+        "source": "钧钧手动交易 TK", "type": TRADING_NOTE_TYPE,
         "market": rendered["market"], "scenario": rendered["scenario"], "status": rendered["status"],
     })
     return {
@@ -539,7 +539,7 @@ def _trading_notes_from_content(content: str, team: str = "") -> list[dict]:
                 daily_hint = stripped.split("：", 1)[-1] if "：" in stripped else stripped.split(":", 1)[-1]
         market = meta.get("market", "")
         notes.append({
-            "team": code, "title": titles[-1].strip() if titles else f"{code} 交易观察",
+            "team": code, "title": titles[-1].strip() if titles else f"{code} 交易 TK",
             "market": market, "market_label": labels.get(market, market),
             "scenario": meta.get("scenario", ""), "status": (meta.get("status") or "active").strip().lower(),
             "source": meta.get("source", ""), "original": _strip_team_prefix(original, code),
@@ -586,7 +586,7 @@ def get_version_understanding(team: str, limit: int = 8) -> dict:
     if not results:
         results = search_team_entries("版本", code, limit)
     items = [{
-        "id": item.get("id"), "title": item.get("concept") or item.get("filename") or "TK条目",
+        "id": item.get("id"), "title": item.get("concept") or item.get("filename") or "TK",
         "date": item.get("date") or "", "source": item.get("source") or item.get("source_type") or "",
         "summary": _summary(item.get("content") or "", 180), "filename": item.get("filename") or "",
     } for item in results[:limit]]

@@ -1,5 +1,6 @@
 import {
-  deleteTKEntryRequest, fetchTKEntry, fetchTKLibrary, saveTKEntryRequest, searchTKEntries,
+  deleteTKEntryRequest, fetchTKEntry, fetchTKLibrary, fetchTeamTradingNotes,
+  saveTKEntryRequest, searchTKEntries,
 } from './api.js';
 import {
   applyLibraryPayload, buildEditorDraft, buildLibraryParams, buildSavePayload,
@@ -8,7 +9,8 @@ import {
 import { createTKLibraryView, renderTKReaderContent } from './view.js';
 
 export {
-  deleteTKEntryRequest, fetchTKEntry, fetchTKLibrary, saveTKEntryRequest, searchTKEntries,
+  deleteTKEntryRequest, fetchTKEntry, fetchTKLibrary, fetchTeamTradingNotes,
+  saveTKEntryRequest, searchTKEntries,
 } from './api.js';
 export { renderTKReaderContent } from './view.js';
 
@@ -18,6 +20,7 @@ export function createTKLibraryModule(options = {}) {
       library: options.api?.library || fetchTKLibrary,
       entry: options.api?.entry || fetchTKEntry,
       search: options.api?.search || searchTKEntries,
+      tradingNotes: options.api?.tradingNotes || fetchTeamTradingNotes,
       save: options.api?.save || saveTKEntryRequest,
       delete: options.api?.delete || deleteTKEntryRequest,
     },
@@ -85,8 +88,24 @@ export function createTKLibraryModule(options = {}) {
       requireView().setQuickQuery(value);
       view.renderQuickLoading();
       try {
-        const payload = await dependencies.api.search(value, quick.team, context.limit || 15);
-        quick.results = Array.isArray(payload?.results) ? payload.results : [];
+        const [payload, tradingPayload] = await Promise.all([
+          dependencies.api.search(value, quick.team, context.limit || 15),
+          quick.team
+            ? dependencies.api.tradingNotes(quick.team, 'active', 8).catch(() => ({ notes: [] }))
+            : Promise.resolve({ notes: [] }),
+        ]);
+        const priority = (tradingPayload?.notes || []).map((note) => ({
+          id: note.filename || `trading-${note.team}-${note.title}`,
+          filename: note.filename || '',
+          concept: note.title || `${note.team || quick.team} 交易 TK`,
+          content: [note.original, note.daily_hint].filter(Boolean).join('\n'),
+          date: '', source: '交易 TK', source_type: 'trading_note',
+          tags: ['交易 TK'], isTradingTK: true,
+        }));
+        const priorityFiles = new Set(priority.map((item) => item.filename).filter(Boolean));
+        const regular = (Array.isArray(payload?.results) ? payload.results : [])
+          .filter((item) => !priorityFiles.has(item.filename));
+        quick.results = [...priority, ...regular];
         view.renderQuickResults(quick.results);
         return quick.results;
       } catch (error) {
@@ -113,7 +132,7 @@ export function createTKLibraryModule(options = {}) {
     async deleteQuick(index) {
       const entry = quick.results[index];
       if (!entry?.filename) return false;
-      if (!dependencies.confirmDelete(`删除 TK 条目：${entry.concept || entry.filename}？`)) return false;
+      if (!dependencies.confirmDelete(`删除 TK：${entry.concept || entry.filename}？`)) return false;
       try {
         await dependencies.api.delete(entry.filename);
         await actions.quickSearch(quick.query, { team: quick.team });

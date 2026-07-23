@@ -9,8 +9,8 @@ import requests
 
 WIKI_DIR = os.environ.get("XIAOXUE_WIKI_DIR", "/home/ubuntu/workspace/knowledge/wiki")
 TK_DIR = os.path.join(WIKI_DIR, "小雪电竞", "原始资料", "tk")
-RAG_API = os.environ.get("XIAOXUE_RAG_API", "http://localhost:8768/api/search")
-REINDEX_API = os.environ.get("XIAOXUE_REINDEX_API", "http://localhost:8768/api/reindex")
+MEMPALACE_API = os.environ.get("XIAOXUE_TK_API", "http://localhost:8770/api/search")
+MEMPALACE_REINDEX_API = os.environ.get("XIAOXUE_TK_REINDEX_API", "http://localhost:8770/api/reindex")
 CURRENT_TK_SOURCE = "wiki/小雪电竞/原始资料/tk"
 
 
@@ -75,27 +75,21 @@ def delete_document(filename: str) -> bool:
 
 
 def search_rag(query: str, limit: int) -> list[dict]:
+    payload = {"query": query, "top": limit, "source": CURRENT_TK_SOURCE}
     try:
-        response = requests.post(
-            RAG_API,
-            json={"query": query, "top": limit, "source": CURRENT_TK_SOURCE},
-            timeout=10,
-        )
+        response = requests.post(MEMPALACE_API, json=payload, timeout=10)
         response.raise_for_status()
-        payload = response.json()
-        results = payload.get("results", []) if isinstance(payload, dict) else []
+        body = response.json()
+        results = body.get("results", []) if isinstance(body, dict) else []
         return results if isinstance(results, list) else []
     except (requests.RequestException, ValueError, TypeError):
         return []
 
 
 def request_reindex() -> bool:
+    payload = {"force": False, "source_only": CURRENT_TK_SOURCE}
     try:
-        response = requests.post(
-            REINDEX_API,
-            json={"force": False, "source_only": CURRENT_TK_SOURCE},
-            timeout=3,
-        )
+        response = requests.post(MEMPALACE_REINDEX_API, json=payload, timeout=3)
         response.raise_for_status()
         return True
     except requests.RequestException:

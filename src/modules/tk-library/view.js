@@ -80,12 +80,12 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
     },
     openReader(item) {
       readerRoot?.classList.add('open');
-      if (reader.heading) reader.heading.textContent = item.concept || 'TK完整内容';
+      if (reader.heading) reader.heading.textContent = item.concept || 'TK正文';
       if (reader.date) reader.date.textContent = item.date || '日期不明';
       if (reader.content) reader.content.innerHTML = '<div class="tk-empty">正在读取完整内容…</div>';
     },
     showReader(data, fallback) {
-      if (reader.heading) reader.heading.textContent = data.concept || fallback.concept || 'TK完整内容';
+      if (reader.heading) reader.heading.textContent = data.concept || fallback.concept || 'TK正文';
       if (reader.date) reader.date.textContent = data.date || fallback.date || '日期不明';
       if (reader.content) reader.content.innerHTML = renderTKReaderContent(data.content || '');
     },
@@ -100,18 +100,19 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
     renderQuickResults(results = []) {
       if (!quick.results) return;
       if (!results.length) {
-        quick.results.innerHTML = '<div class="tk-empty">未找到相关TK条目</div>';
+        quick.results.innerHTML = '<div class="tk-empty">未找到相关 TK</div>';
         return;
       }
       quick.results.innerHTML = results.map((raw, index) => {
         const entry = quickEntryView(raw);
         const tags = (entry.tags || []).map((tag) => `<span class="tk-tag">${escapeHtml(tag)}</span>`).join(' ');
-        return `<div class="tk-item${entry.isShell ? ' tk-empty-shell' : ''}" data-tk-index="${index}">
+        const priority = entry.isTradingTK ? '<span class="tk-tag" style="background:var(--orange);color:#fff">交易 TK 优先</span>' : '';
+        return `<div class="tk-item${entry.isShell ? ' tk-empty-shell' : ''}${entry.isTradingTK ? ' tk-trading-priority' : ''}" data-tk-index="${index}">
           <button class="tk-title" data-tk-action="toggle-quick" data-index="${index}"><span class="tk-expand-icon">▸</span><span>${escapeHtml(entry.concept || entry.id)}</span></button>
           <div class="tk-preview">${escapeHtml(entry.preview)}${entry.hasMore ? '…' : ''}</div>
           <div class="tk-full">${escapeHtml(entry.content)}</div>
           <div class="tk-meta"><span>${escapeHtml(entry.date || '')}</span><span>${escapeHtml(entry.source || '')}</span>${entry.isShell ? '<span style="color:var(--ink-3)">⚠ 内容较少</span>' : ''}</div>
-          ${tags ? `<div style="margin-top:4px">${tags}</div>` : ''}
+          ${priority || tags ? `<div style="margin-top:4px">${priority}${tags ? ` ${tags}` : ''}</div>` : ''}
           <div class="tk-actions"><button data-tk-action="edit-quick" data-index="${index}">✏️ 编辑</button><button class="danger" data-tk-action="delete-quick" data-index="${index}">🗑 删除</button></div>
         </div>`;
       }).join('');
@@ -119,7 +120,7 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
     toggleQuick(index) { quick.results?.querySelector(`[data-tk-index="${index}"]`)?.classList.toggle('expanded'); },
     openEditor(draft, message = '') {
       editorRoot?.classList.add('open');
-      if (editor.title) editor.title.textContent = draft.filename ? '编辑 TK 条目' : '新建 TK 条目';
+      if (editor.title) editor.title.textContent = draft.filename ? '编辑 TK' : '新建 TK';
       if (editor.filename) editor.filename.value = draft.filename || '';
       if (editor.content) editor.content.value = draft.content || '';
       if (editor.tags) editor.tags.value = draft.tags || '';
@@ -159,7 +160,7 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
 
 export function renderTKReaderContent(raw) {
   const normalized = String(raw || '').replace(/\s*(【[^】]{1,16}】)\s*/g, '\n$1\n').trim();
-  if (!normalized) return '<div class="tk-empty">这条TK没有可读正文。</div>';
+  if (!normalized) return '<div class="tk-empty">这条 TK 没有可读正文。</div>';
   const blocks = [];
   let sectionOpen = false;
   let skipSection = false;

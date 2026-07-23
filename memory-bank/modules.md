@@ -6,12 +6,12 @@
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 小雪电竞交易助理的长期 LOL 资料本：队伍资料看宏观总览与单队画像，当前赛事看环境与完整大周期预案，TK资料库看长期知识；临场记录是隐藏辅助 |
+| **职责** | 小雪电竞交易助理的长期 LOL 资料本：队伍资料看宏观总览与单队画像/三维/队伍 TK，当前赛事看环境与完整大周期预案，TK资料库看长期知识；盘口记录是隐藏辅助 |
 | **技术栈** | Vite(5173) + FastAPI(8880) + SQLite |
 | **数据来源** | 只通过 FastAPI `/api/*` 端点获取数据 |
 | **禁止** | 不直接读数据库文件，不调 RAG API，不写飞书文档 |
 | **对外接口** | `/api/teams`, `/api/team-3d/{team}`, `/api/tk/search`, `/api/profile-full/{team}`, `/api/market-notes`, `/api/lineup-workflow/prepare`, `/api/health` |
-| **当前边界** | 一级导航固定为“队伍资料 / 当前赛事 / TK资料库”，默认先看全部队伍；日报、BP/阵容、小雪聊天、预案生成、三层对照和复盘对话不进入工作台；临场记录仅作隐藏辅助 |
+| **当前边界** | 一级导航固定为“队伍资料 / 当前赛事 / TK资料库”，默认先看全部队伍；日报、BP/阵容、小雪聊天、预案生成、三层对照和复盘对话不进入工作台；盘口记录仅作隐藏辅助 |
 
 **文件清单：**
 ```
@@ -22,7 +22,7 @@ xiaoxue-web/
 ├── xiaoxue_api/modules/    # 后端功能模块；每个模块分 presentation/service/repository/public
 ├── index.html              # 工作台布局
 ├── src/app/                # 前端启动、模块装载与状态汇总
-├── src/modules/            # 每日、赛事、队伍、TK、临场记录、阵容交接独立目录
+├── src/modules/            # 每日、赛事、队伍、TK、盘口记录、阵容交接独立目录
 ├── src/shared/             # 共享 API 与通用模块工具
 └── memory-bank/            # 项目记忆库 ← 新对话先读这里
 ```
@@ -41,7 +41,7 @@ xiaoxue-web/
 - 后端跨模块调用只允许导入目标模块的 `public.py`，不得访问对方内部层。
 - 前端每个功能分别拥有 `view.js / service.js / api.js / public.js`；主入口只装载、导航和分发命令。
 - 前端跨模块协作只通过 `public.js` 或语义事件，不读取其他模块页面节点和内部状态。
-- 临场记录主链只使用独立模块目录和按需建表；旧交易兼容模块仅按需提供历史接口，不做启动写入。
+- 盘口记录主链只使用独立模块目录和按需建表；旧交易兼容模块仅按需提供历史接口，不做启动写入。
 - 前端模块分别装载；一个模块加载或挂载失败后继续装载后续模块。
 - 默认验收只读、逐模块继续执行；真实数据写入验收必须显式开启。
 
@@ -103,19 +103,19 @@ xiaoxue-web/
 | **日报关系** | 只作为独立今日内容产物；不得通过 `postprocess_daily_report.py` 或 `inject_pre_match_trading_layer.py` 嵌入 LOL 日报 v2 |
 | **数据来源** | 当日 schedules + `/api/fundamentals/msi-match-context` 同源 TS 逻辑 + 队伍 TK 中 `type=trading_note` 的结构化块 |
 | **禁止** | 不新增交易 TK 实体，不恢复 `tk_library`，不接旧 `/api/trades` 统计面板，不用 RAG 搜索作为主判断 |
-| **降级** | 没有命中有效交易备注或基础面不足时写“暂不推荐”，不硬编方向 |
+| **降级** | 没有命中有效交易 TK 或基础面不足时写“暂不推荐”，不硬编方向 |
 
-## 队伍交易备注（team trading notes）
+## 交易 TK（归属队伍 TK）
 
 | 属性 | 值 |
 |------|-----|
 | **职责** | 记录钧钧对某支队伍的盘口/交易观察，例如“HLE 虐菜大人头” |
-| **归属** | 仍挂在现有队伍 TK / 队伍知识下；队伍是实体，交易备注只是用途标签 |
+| **归属** | 仍挂在现有队伍 TK 下；队伍是实体，交易 TK 是优先用途标签 |
 | **结构标签** | `team`, `type=trading_note`, `market`, `scenario`, `status=active/inactive`, `source=junjun_manual` |
 | **写入入口** | `POST /api/team-trading-notes` / `POST /api/team-trading-notes/from-text` 会先标准化队伍名，失败则拒绝写入 |
 | **读取入口** | `GET /api/team-trading-notes/{team}` 只读解析 TK 文件中的结构化块 |
-| **日报使用** | 日报按今日对阵双方精确读取 active trading_note，并放在“命中队伍交易备注”段落 |
-| **日常口语** | “小雪记到 HLE：虐菜大人头”会解析为 HLE 的队伍交易备注；“这个队…”等队伍不明确时不写正式 TK |
+| **日报使用** | 日报按每场对阵双方精确读取 active trading_note，并放在“交易 TK”段落，优先于普通队伍 TK |
+| **日常口语** | “小雪记到 HLE：虐菜大人头”会解析为 HLE 的交易 TK；“这个队…”等队伍不明确时不写正式 TK |
 
 ## 盘口手写判断工作区（market-notes）
 
@@ -146,18 +146,18 @@ xiaoxue-web/
 | **职责** | 从B站UP主视频+微信公众号文章提取结构化知识入库 |
 | **数据来源** | B站API（字幕）+ 微信读书搜一搜 |
 | **禁止** | 不改数据库表结构，不碰前端 |
-| **写入目标** | knowledge-rag tk/ 目录 → RAG索引（port 8768） |
+| **写入目标** | Wiki TK 目录 → MemPalace `xiaoxue-tk` 分区（本机 `8770` 增量入口）；旧 RAG `8768` 服务已停用 |
 | **固定计划** | `xiaoxue_knowledge_import.py` 先生成 `knowledge_import_manifest_YYYY-MM-DD.json`；模型只处理 `bilibili_candidates`，不得自行扩大范围 |
 
-## TK搜索（RAG API）
+## TK搜索（MemPalace 入口）
 
 | 属性 | 值 |
 |------|-----|
 | **职责** | 语义搜索TK知识库，返回相关条目 |
-| **数据来源** | knowledge-rag 向量索引（ollama qwen3-embedding） |
-| **对外接口** | `POST localhost:8768/api/search` |
+| **数据来源** | MemPalace `xiaoxue-tk` wing（714 份 Wiki TK 条目） |
+| **对外接口** | `POST localhost:8770/api/search`；小雪工作台通过 `/api/tk/search` 使用 |
 | **禁止** | 不直接读SQLite |
-| **依赖** | knowledge-rag.service + ollama |
+| **依赖** | `xiaoxue-tk-mempalace.service`；旧 `knowledge-rag.service` unit、索引、日志和专属环境已删除，仅留离线代码归档 |
 
 ## TK资料库（按时间阅读）
 
@@ -170,16 +170,14 @@ xiaoxue-web/
 | **完整性** | 有实际正文的短条目也保留；只过滤空白或失败导入指针；全文不得截断为 800 字 |
 | **排序** | 按 `created` 日期降序，缺日期时用文件更新时间；每次 30 条，可继续加载更早内容 |
 
-## 版本理解聚合视图
+## 旧版本字段迁移兼容
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 按当前队伍聚合三维版本理解与 TK 版本条目，方便快速阅读 |
-| **主接口** | `/api/version-understanding/{team}` |
-| **数据来源** | `team_3d_data.version_understanding` + TK 文件搜索结果 |
-| **禁止** | 不生成新版本判断，不写 TK，不改三维数据 |
-| **前端位置** | “队伍资料”页的版本理解面板 |
-| **排序边界** | TK 文件必须按 `created` / mtime 日期排序，不能按文件名倒序提前截断；否则 `wechat_` 旧文件会压住当月 `bilibili_` 新 TK |
+| **职责** | 记录旧 `team_3d_data.version_understanding` 字段已完成迁移 |
+| **迁移结果** | 30 条有效内容进入对应队伍 TK；1 条测试内容跳过；原字段清空并保留内部兼容 |
+| **用户可见** | 不再有队伍版本栏目；全局版本统一叫版本理解 |
+| **保留接口** | `/api/version-understanding/{team}` 仅作旧客户端兼容，不接入工作台主路径 |
 
 ## 数据库（SQLite）
 
