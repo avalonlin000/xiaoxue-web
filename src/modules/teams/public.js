@@ -1,6 +1,6 @@
 import * as api from './api.js';
 import { createTeamsService } from './service.js';
-import { createTeamsView, markTeamsModule, renderFundamentalsTable, renderVersionUnderstanding } from './view.js';
+import { createTeamsView, markTeamsModule, renderFundamentalsTable } from './view.js';
 
 
 let active = null;
@@ -33,7 +33,6 @@ function invoke(method, ...args) {
 export const actions = Object.freeze({
   selectTeam: (...args) => invoke('selectTeam', ...args),
   loadFundamentals: (...args) => invoke('loadFundamentals', ...args),
-  loadVersionUnderstanding: (...args) => invoke('loadVersionUnderstanding', ...args),
   markDirty: (...args) => invoke('markDirty', ...args),
   save3D: (...args) => invoke('save3D', ...args),
   getTeamInfo: (code = '') => active?.getTeamInfo(code)
@@ -47,9 +46,9 @@ export const actions = Object.freeze({
 
 export const {
   fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, fetchVersionUnderstanding, saveTeam3D,
+  fetchUpcomingSchedule, saveTeam3D,
 } = api;
 
-export { createTeamsService, createTeamsView, markTeamsModule, renderFundamentalsTable, renderVersionUnderstanding };
+export { createTeamsService, createTeamsView, markTeamsModule, renderFundamentalsTable };
 
 export default { id: 'teams', name: '队伍资料', mount, unmount, actions };

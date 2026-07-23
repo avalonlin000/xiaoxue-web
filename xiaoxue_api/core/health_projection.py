@@ -15,31 +15,31 @@ def project_module_health(checks: dict, boot_status: dict | None = None) -> dict
 
     _record(registry, "platform", "应用外壳", shell_ok, "dist_missing", critical=True)
     _record(registry, "team_data", "队伍资料", database_ok, "database_unavailable")
-    _record(registry, "tk_knowledge", "TK知识", tk_ok, "tk_directory_unavailable")
+    _record(registry, "tk_knowledge", "TK资料库", tk_ok, "tk_directory_unavailable")
     if skills_ok or database_ok:
-        registry.healthy("profiles", "队伍画像", message="画像正源或数据库兜底可用")
+        registry.healthy("profiles", "画像", message="画像正源或数据库兜底可用")
     else:
         registry.broken(
             "profiles",
-            "队伍画像",
+            "画像",
             reason_code="profile_sources_unavailable",
             message="画像正源和数据库兜底均不可用",
         )
-    _record(registry, "fundamentals", "横向基本面", database_ok, "database_unavailable")
-    _record(registry, "market_notes", "临场记录", market_ok, "market_notes_unavailable")
+    _record(registry, "fundamentals", "队伍资料", database_ok, "database_unavailable")
+    _record(registry, "market_notes", "盘口记录", market_ok, "market_notes_unavailable")
     daily_operation = checks.get("daily_operation") or {}
     if daily_operation.get("state") == "paused_by_user":
         registry.disabled(
             "daily_content",
-            "每日日报",
+            "日报",
             message=daily_operation.get("message") or "钧钧已主动暂停，待确认后恢复",
         )
     else:
-        _record(registry, "daily_content", "每日日报", daily_ok, "readiness_missing")
+        _record(registry, "daily_content", "日报", daily_ok, "readiness_missing")
 
-    registry.healthy("lineup", "阵容交接", message="本地输入契约可用")
-    registry.disabled("pre_match", "旧赛前判断", message="保留兼容，等待新版赛前判断替换")
-    registry.disabled("analyst", "双分析师", message="非核心能力，失败不影响其他模块")
+    registry.healthy("lineup", "阵容", message="本地输入契约可用")
+    registry.disabled("pre_match", "赛前交易判断日报", message="由日报统一展示，保留兼容接口")
+    registry.disabled("analyst", "分析", message="非核心能力，失败不影响其他模块")
     registry.disabled("legacy_trades", "旧交易记录兼容", message="仅保留历史接口")
     registry.disabled("weread_bridge", "知识导入登录", message="按需启用")
     _apply_boot_status(registry, boot_status or {})
@@ -69,10 +69,10 @@ def _record(
 
 def _apply_boot_status(registry: ModuleRegistry, boot_status: dict) -> None:
     names = {
-        "lineup": "阵容交接",
-        "market_notes": "临场记录",
+        "lineup": "阵容",
+        "market_notes": "盘口记录",
         "team_data": "队伍资料",
-        "daily_content": "每日准备",
+        "daily_content": "日报",
     }
     for module_id, status in boot_status.items():
         if status.get("status") != "broken":

@@ -93,13 +93,8 @@ class WorkflowConfigTests(unittest.TestCase):
         artifact_ids = [item["id"] for item in config["daily_content"]["artifacts"]]
         self.assertEqual(
             artifact_ids,
-            ["daily_report", "pre_match_card", "trading_report", "analyst_entry_copy"],
+            ["daily_report", "trading_report", "analyst_entry_copy"],
         )
-        pre_match = next(
-            item for item in config["daily_content"]["artifacts"] if item["id"] == "pre_match_card"
-        )
-        self.assertIn("EWC赛前内容卡", pre_match["path"])
-        self.assertNotIn("MSI", pre_match["title"])
         self.assertEqual(config["market"]["results"], ["未结算", "赢", "输", "走水", "放弃"])
 
 

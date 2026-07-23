@@ -1,1 +1,1 @@
-MODULE = {"id": "market_notes", "name": "临场记录"}
+MODULE = {"id": "market_notes", "name": "盘口记录"}

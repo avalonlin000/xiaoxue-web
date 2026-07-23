@@ -47,9 +47,8 @@ def build_snapshot(team: str) -> str:
     tk_items = search_team_entries("", team, 5)
     tk_samples = "\n".join(f"{item.get('filename', '')}: {(item.get('content') or '')[:400]}" for item in tk_items) or "（无相关TK）"
     return f"""队伍：{info.get('name') or team} ({info.get('region') or ''}-{info.get('short_name') or team})
-三维数据：{d3.get('dim_1_name', 'N/A')}: {d3.get('dim_1_value', 'N/A')} | {d3.get('dim_2_name', 'N/A')}: {d3.get('dim_2_value', 'N/A')} | {d3.get('dim_3_name', 'N/A')}: {d3.get('dim_3_value', 'N/A')}
+三维：{d3.get('dim_1_name', 'N/A')}: {d3.get('dim_1_value', 'N/A')} | {d3.get('dim_2_name', 'N/A')}: {d3.get('dim_2_value', 'N/A')} | {d3.get('dim_3_name', 'N/A')}: {d3.get('dim_3_value', 'N/A')}
 战术笔记：{d3.get('notes') or '无'}
-版本理解：{d3.get('version_understanding') or '无'}
 近期TK：
 {tk_samples}
 画像摘要：{repository.read_team_profile(team) or '无'}"""

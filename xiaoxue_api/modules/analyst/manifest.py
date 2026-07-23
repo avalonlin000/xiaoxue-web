@@ -1,1 +1,1 @@
-MODULE = {"id": "analyst", "name": "双分析师"}
+MODULE = {"id": "analyst", "name": "分析"}

@@ -1,1 +1,1 @@
-MODULE = {"id": "lineup", "name": "阵容交接"}
+MODULE = {"id": "lineup", "name": "阵容"}

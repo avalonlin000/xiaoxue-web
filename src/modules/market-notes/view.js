@@ -1,7 +1,7 @@
 import { buildFilterSummary, gameLabel, getMarketNoteResult, stripResultLine } from './service.js';
 
 export function createMarketNotesView(root) {
-  if (!root) throw new Error('临场记录入口不存在');
+  if (!root) throw new Error('盘口记录入口不存在');
   const byId = (id) => root.querySelector(`#${id}`);
   const elements = {
     list: byId('trade-list'), message: byId('trade-msg'), summary: byId('trade-filter-summary'),
@@ -44,9 +44,9 @@ export function createMarketNotesView(root) {
       });
     },
     renderLoading() {
-      if (elements.list) elements.list.innerHTML = '<div class="tk-empty">加载盘口草稿 / 交易时手写记录中…</div>';
+      if (elements.list) elements.list.innerHTML = '<div class="tk-empty">加载盘口记录中…</div>';
     },
-    renderError(message = '盘口草稿加载失败') {
+    renderError(message = '盘口记录加载失败') {
       if (elements.list) elements.list.innerHTML = `<div class="tk-empty" style="color:var(--red)">${escapeHtml(message)}</div>`;
     },
     renderRecords(records, total, filters) {
@@ -54,8 +54,8 @@ export function createMarketNotesView(root) {
       if (!elements.list) return;
       if (!records.length) {
         elements.list.innerHTML = total
-          ? '<div class="tk-empty">没有符合筛选的盘口草稿 / 交易时手写记录</div>'
-          : '<div class="tk-empty">暂无盘口草稿 / 交易时手写记录</div>';
+          ? '<div class="tk-empty">没有符合筛选的盘口记录</div>'
+          : '<div class="tk-empty">暂无盘口记录</div>';
         return;
       }
       elements.list.innerHTML = records.map(renderRecord).join('');
@@ -105,7 +105,7 @@ function renderRecord(record) {
   return `<div class="trade-item" id="trade-${Number(record.id)}">
     <div class="trade-item-head">
       <div><div class="trade-match">${escapeHtml(record.match_name)}</div><div class="trade-meta">${escapeHtml(gameLabel(record.game))} · ${escapeHtml(time)}</div></div>
-      <span class="trade-pill gray">交易时记录</span>
+      <span class="trade-pill gray">盘口记录</span>
     </div>
     <div class="trade-picks">
       <span class="trade-pill">方向：${escapeHtml(record.direction || '未写')}</span>

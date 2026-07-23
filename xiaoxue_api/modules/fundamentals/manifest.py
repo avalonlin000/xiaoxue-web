@@ -1,1 +1,1 @@
-MODULE = {"id": "fundamentals", "name": "横向基本面"}
+MODULE = {"id": "fundamentals", "name": "队伍资料"}

@@ -32,9 +32,8 @@ export function createTeamsView(doc = document) {
         handlers.onSave?.();
       });
       listen(doc.getElementById('profile-toggle'), 'click', () => handlers.onToggleProfile?.());
-      listen(doc.querySelector('[data-teams-action="refresh-fundamentals"]'), 'click', () => handlers.onScope?.('all'));
-      listen(doc.querySelector('[data-teams-action="refresh-version"]'), 'click', () => handlers.onRefreshVersion?.());
-      ['d1-val', 'd2-val', 'd3-val', 'notes-area', 'version-area'].forEach((id) => {
+      listen(doc.querySelector('[data-teams-action="refresh-fundamentals"]'), 'click', () => handlers.onScope?.('lpl'));
+      ['d1-val', 'd2-val', 'd3-val', 'notes-area'].forEach((id) => {
         const input = doc.getElementById(id);
         removeLegacyHandler(input, 'onchange');
         listen(input, 'change', () => handlers.onDirty?.());
@@ -127,31 +126,17 @@ export function createTeamsView(doc = document) {
     loadingFundamentals(scope) {
       doc.querySelectorAll('.scope-btn').forEach((button) => button.classList.toggle('active', button.dataset.scope === scope));
       const table = doc.getElementById('fundamentals-table');
-      if (table) table.innerHTML = '<div class="tk-empty">加载横向基本面中…</div>';
+      if (table) table.innerHTML = '<div class="tk-empty">加载队伍资料中…</div>';
     },
     renderFundamentals(rows, onSelectTeam) { renderFundamentalsTable(rows, onSelectTeam, doc); },
     errorFundamentals() {
       const table = doc.getElementById('fundamentals-table');
-      if (table) table.innerHTML = '<div class="tk-empty" style="color:var(--red)">横向基本面加载失败</div>';
-    },
-    loadingVersion() {
-      const list = doc.getElementById('version-understanding-list');
-      const meta = doc.getElementById('version-understanding-meta');
-      if (list) list.innerHTML = '<div class="tk-empty">加载版本理解中…</div>';
-      if (meta) meta.textContent = '同步中…';
-    },
-    renderVersion(data, team) { renderVersionUnderstanding(data, team, doc); },
-    errorVersion() {
-      const list = doc.getElementById('version-understanding-list');
-      const meta = doc.getElementById('version-understanding-meta');
-      if (list) list.innerHTML = '<div class="tk-empty" style="color:var(--red)">版本理解加载失败</div>';
-      if (meta) meta.textContent = '接口失败；不影响三维和TK主链路';
+      if (table) table.innerHTML = '<div class="tk-empty" style="color:var(--red)">队伍资料加载失败</div>';
     },
     read3D() {
       return {
         dim_1_value: valueOf(doc, 'd1-val'), dim_2_value: valueOf(doc, 'd2-val'),
         dim_3_value: valueOf(doc, 'd3-val'), notes: valueOf(doc, 'notes-area'),
-        version_understanding: valueOf(doc, 'version-area'),
       };
     },
     setDirty(dirty) {
@@ -184,13 +169,13 @@ export function renderFundamentalsTable(rows, onSelectTeam, doc = document) {
   const element = doc.getElementById('fundamentals-table');
   if (!element) return;
   if (!rows.length) {
-    element.innerHTML = '<div class="tk-empty">暂无横向基本面数据</div>';
+    element.innerHTML = '<div class="tk-empty">暂无队伍资料</div>';
     return;
   }
-  const head = '<div class="fund-row fund-head"><span>队伍</span><span>赛区</span><span>赔率</span><span>mu</span><span>σ</span><span>TS</span><span>版本/风格摘要</span><span>首发/关键选手</span><span>资料</span></div>';
+  const head = '<div class="fund-row fund-head"><span>队伍</span><span>赛区</span><span>赔率</span><span>实力均值</span><span>波动</span><span>TS</span><span>风格摘要</span><span>首发</span><span>资料</span></div>';
   element.innerHTML = head + rows.map((team) => {
     const quality = team.data_quality === '完整' ? 'good' : (team.data_quality === '部分' ? 'mid' : 'low');
-    const summary = team.version_summary || team.notes_summary || '暂无摘要，待补画像/TK';
+    const summary = team.notes_summary || '暂无摘要，待补画像/TK';
     const number = (value) => Number(value ?? 0).toFixed(1);
     const odds = team.odds ? Number(team.odds).toFixed(1) : '-';
     return `<div class="fund-row" data-team="${escapeAttr(team.short_name)}">
@@ -205,25 +190,11 @@ export function renderFundamentalsTable(rows, onSelectTeam, doc = document) {
   });
 }
 
-export function renderVersionUnderstanding(data, fallbackTeam = '', doc = document) {
-  const element = doc.getElementById('version-understanding-list');
-  const meta = doc.getElementById('version-understanding-meta');
-  if (!element) return;
-  const blocks = [`<div class="version-card primary"><b>三维版本理解</b><span>${escapeHtml(data.version_understanding || '暂无三维版本理解；保留空值，不自动补写。')}</span>${data.notes_summary ? `<em>战术笔记摘要：${escapeHtml(data.notes_summary)}</em>` : ''}</div>`];
-  if (data.tk_items?.length) {
-    data.tk_items.forEach((item) => blocks.push(`<div class="version-card"><b>${escapeHtml(item.title || 'TK条目')}</b><span>${escapeHtml(item.summary || '暂无摘要')}</span><em>${escapeHtml([item.date, item.source, item.filename].filter(Boolean).join(' · '))}</em></div>`));
-  } else {
-    blocks.push('<div class="version-card"><b>TK版本条目</b><span>未找到该队版本理解 TK；不从搜索结果外推。</span></div>');
-  }
-  element.innerHTML = blocks.join('');
-  if (meta) meta.textContent = `${data.team || fallbackTeam} · ${data.boundary || '只读聚合'}${data.updated_at ? ` · 三维更新 ${data.updated_at}` : ''}`;
-}
-
 function renderProfile(profile, team, doc) {
   const element = doc.getElementById('profile-content');
   if (!element) return;
   element.innerHTML = profile?.found ? profile.html : `<div style="padding:20px;color:var(--ink-3);text-align:center">
-    <div style="font-size:32px;margin-bottom:8px">📄</div>暂无 ${escapeHtml(team)} 的完整画像<br>
+    <div style="font-size:32px;margin-bottom:8px">📄</div>暂无 ${escapeHtml(team)} 的画像<br>
     <span style="font-size:12px">（SKILL.md 不存在）</span></div>`;
 }
 
@@ -236,7 +207,6 @@ function render3D(data, doc) {
   setText(doc, 'd3-label', values.dim_3_name || '---');
   setValue(doc, 'd3-val', data ? values.dim_3_value || '-' : '-');
   setValue(doc, 'notes-area', values.notes || '');
-  setValue(doc, 'version-area', values.version_understanding || '');
   setText(doc, 'dim-updated', values.updated_at ? ` · 更新于 ${values.updated_at}` : '');
 }
 

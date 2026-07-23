@@ -65,13 +65,13 @@ def build_view(match: dict) -> dict:
         avoid = "低赔独赢 / 过深让分 / 没有 BP 支持的人头大小"
     elif primary:
         direction = "暂不推荐"
-        entry_point = "只有历史队伍交易备注，当前基础面/TS/盘口信息不足，先提示不下方向。"
-        divergence = primary.get("daily_hint") or primary.get("original") or "命中历史交易备注，但缺当前比赛支撑。"
+        entry_point = "只有历史交易 TK，当前基础面/TS/盘口信息不足，先提示不下方向。"
+        divergence = primary.get("daily_hint") or primary.get("original") or "命中历史交易 TK，但缺当前比赛支撑。"
         backup = "无"
         avoid = "数据不足时不硬推"
     else:
         direction = "暂不推荐"
-        entry_point = "没有命中有效队伍交易备注，等待 BP/盘口/赛中信息。"
+        entry_point = "没有命中有效交易 TK，等待 BP/盘口/赛中信息。"
         divergence = comparison["market_note"] if comparison else "基础数据不足，市场分歧不编。"
         backup = "无"
         avoid = "无备注、无数据时不硬推"
@@ -97,7 +97,7 @@ def render_report(date_str: str, matches: list[dict]) -> str:
     lines = [
         f"# 赛前交易判断日报 {date_str}",
         "",
-        "> 保留原日报基础面；本文件只增加赛前交易判断层。交易备注跟随队伍 TK，不新增交易 TK 实体；RAG/搜索只作补充。",
+        "> 保留原日报基础面；本文件只增加赛前交易判断层。交易 TK 跟随队伍 TK，按比赛优先展示；RAG/搜索只作补充。",
         "",
         "## 今日优先交易方向",
     ]
@@ -111,7 +111,7 @@ def render_report(date_str: str, matches: list[dict]) -> str:
     if priorities:
         lines.extend(priorities[:3])
     else:
-        lines.append("- 暂无强方向；没有有效队伍交易备注或当前基础面不足时不硬编。")
+        lines.append("- 暂无强方向；没有有效交易 TK 或当前基础面不足时不硬编。")
     lines.extend([
         "", "## 今日不碰", "- 过深让分", "- 没有 BP 支持的人头大小",
         "- 队伍不明确或数据不足的场次", "",
@@ -133,13 +133,13 @@ def render_report(date_str: str, matches: list[dict]) -> str:
         )
         if metadata:
             lines.append(f"- 赛程：{metadata}")
-        lines.extend(["", "### 2. 命中队伍交易备注"])
+        lines.extend(["", "### 2. 交易 TK"])
         if notes:
             for note in notes[:3]:
                 hint = note.get("daily_hint") or note.get("original") or note.get("title")
                 lines.append(f"- {note.get('team') or ''}：{hint}")
         else:
-            lines.append("- 无有效队伍交易备注命中。")
+            lines.append("- 无有效交易 TK 命中。")
         lines.extend([
             "", "### 3. 市场分歧", f"- {summary['market_divergence']}", "",
             "### 4. 交易小结", f"- 主方向：{summary['primary_direction']}",

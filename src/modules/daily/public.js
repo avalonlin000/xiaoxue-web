@@ -4,10 +4,10 @@ import { createDailyView } from './view.js';
 
 export default {
   id: 'daily',
-  name: '每日准备',
+  name: '日报',
   async mount() {
     const root = document.getElementById('card-today-content');
-    if (!root) throw moduleError('每日准备入口不存在');
+    if (!root) throw moduleError('日报入口不存在');
     const view = createDailyView(root);
     const load = async () => {
       view.loading();
@@ -16,7 +16,7 @@ export default {
         root.dataset.moduleStatus = 'healthy';
       } catch (error) {
         view.error(error);
-        error.userMessage = '每日准备暂时不可用，其他模块可以继续使用';
+        error.userMessage = '日报暂时不可用，其他模块可以继续使用';
         throw error;
       }
     };

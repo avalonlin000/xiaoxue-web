@@ -3,7 +3,7 @@ export function createCurrentEventView(root) {
   const results = root.querySelector('#event-knowledge-results');
   const plan = root.querySelector('#event-plan-status');
   return {
-    loading() { if (results) results.innerHTML = '<div class="tk-empty">正在读取 EWC 资料…</div>'; },
+    loading() { if (results) results.innerHTML = '<div class="tk-empty">正在读取 LPL 资料…</div>'; },
     render(payload) {
       const { context = {}, items = [] } = payload || {};
       setText(root, '#event-name', context.event || '当前赛事');
@@ -17,7 +17,7 @@ export function createCurrentEventView(root) {
       if (!results) return;
       results.innerHTML = items.length
         ? items.map((item) => `<article class="today-entry exists"><b>${escapeHtml(item.title)}</b><span class="today-summary">${escapeHtml(item.summary.slice(0, 240))}</span><em>${escapeHtml(item.date)}</em></article>`).join('')
-        : '<div class="tk-empty">暂未找到 EWC 资料，不影响其他窗口使用。</div>';
+        : '<div class="tk-empty">暂未找到 LPL 资料，不影响其他窗口使用。</div>';
     },
     error() {
       if (results) results.innerHTML = '<div class="tk-empty" style="color:var(--red)">当前赛事资料暂时不可用，其他窗口可以继续使用。</div>';

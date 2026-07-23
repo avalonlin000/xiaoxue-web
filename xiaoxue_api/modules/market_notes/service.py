@@ -46,14 +46,14 @@ def load_config() -> dict:
     try:
         return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
     except (OSError, ValueError, json.JSONDecodeError) as exc:
-        raise MarketNotesUnavailable(f"临场记录模块配置不可用：{exc}") from exc
+        raise MarketNotesUnavailable(f"盘口记录模块配置不可用：{exc}") from exc
 
 
 def get_note(note_id: int) -> dict:
     try:
         row = repository.get(note_id)
     except sqlite3.Error as exc:
-        raise MarketNotesUnavailable("临场记录数据暂时不可用") from exc
+        raise MarketNotesUnavailable("盘口记录数据暂时不可用") from exc
     if not row:
         raise MarketNoteNotFound("记录不存在")
     return row_payload(row)
@@ -63,7 +63,7 @@ def list_notes(game: str = "", limit: int = 30) -> dict:
     try:
         rows = repository.list_rows(normalize_game(game) if game else "", limit)
     except sqlite3.Error as exc:
-        raise MarketNotesUnavailable("临场记录数据暂时不可用") from exc
+        raise MarketNotesUnavailable("盘口记录数据暂时不可用") from exc
     return {"records": [row_payload(row) for row in rows]}
 
 
@@ -76,7 +76,7 @@ def create_note(values: dict) -> dict:
     try:
         row = repository.create(values)
     except sqlite3.Error as exc:
-        raise MarketNotesUnavailable("临场记录数据暂时不可用") from exc
+        raise MarketNotesUnavailable("盘口记录数据暂时不可用") from exc
     return {"ok": True, "record": row_payload(row)}
 
 
@@ -84,7 +84,7 @@ def delete_note(note_id: int) -> bool:
     try:
         return repository.delete(note_id)
     except sqlite3.Error as exc:
-        raise MarketNotesUnavailable("临场记录数据暂时不可用") from exc
+        raise MarketNotesUnavailable("盘口记录数据暂时不可用") from exc
 
 
 def review(note_id: int, payload: dict, *, commit: bool) -> dict:
@@ -99,5 +99,5 @@ def review(note_id: int, payload: dict, *, commit: bool) -> dict:
     try:
         row = repository.update_review(note_id, result["review_text"])
     except sqlite3.Error as exc:
-        raise MarketNotesUnavailable("临场记录数据暂时不可用") from exc
+        raise MarketNotesUnavailable("盘口记录数据暂时不可用") from exc
     return {"ok": True, "record": row_payload(row), **result}

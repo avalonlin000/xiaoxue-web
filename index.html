@@ -1235,7 +1235,6 @@ html, body {
 .page-market #col-profile,
 .page-tk #col-profile { display:none; }
 .page-event #card-fundamentals,
-.page-event #card-version-understanding,
 .page-event #card-trades,
 .page-event #card-3d,
 .page-event #card-tk-library { display:none; }
@@ -1243,19 +1242,16 @@ html, body {
 .page-teams #card-trades,
 .page-teams #card-tk-library { display:none; }
 .page-market #card-fundamentals,
-.page-market #card-version-understanding,
 .page-market #card-current-event,
 .page-market #card-3d,
 .page-market #card-tk,
 .page-market #card-tk-library { display:none; }
 .page-tk #card-fundamentals,
-.page-tk #card-version-understanding,
 .page-tk #card-current-event,
 .page-tk #card-trades,
 .page-tk #card-3d,
 .page-tk #card-tk { display:none; }
 .page-teams:not(.team-selected) #col-profile,
-.page-teams:not(.team-selected) #card-version-understanding,
 .page-teams:not(.team-selected) #card-3d,
 .page-teams:not(.team-selected) #card-tk { display:none; }
 .page-teams:not(.team-selected) #card-fundamentals { flex:1; }
@@ -1472,11 +1468,11 @@ html, body {
       <span style="font-size:10px">▾</span>
     </button>
 
-    <a class="btn-tool" id="btn-graph" href="/tk-graph/index.html?q=EWC" target="_blank" style="display:none;text-decoration:none">
-      EWC 知识图
+    <a class="btn-tool" id="btn-graph" href="/tk-graph/index.html?q=LPL" target="_blank" style="display:none;text-decoration:none">
+      LPL 知识图
     </a>
 
-    <button class="btn-tool" data-shell-action="open-market-helper">临场记录</button>
+    <button class="btn-tool" data-shell-action="open-market-helper">盘口记录</button>
 
     <div class="status">
       <span class="dot"></span>
@@ -1514,36 +1510,17 @@ html, body {
         <div class="card" id="card-fundamentals">
           <div class="card-head">
             <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">TEAM</span> 队伍资料
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">画像、实力底表、版本理解和战术知识</span>
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">画像、TS 表、三维和队伍 TK</span>
             <span style="flex:1"></span>
             <button class="compare-close" data-teams-action="refresh-fundamentals">刷新</button>
           </div>
           <div class="card-body">
             <div class="scope-row">
-              <button class="scope-btn" data-scope="lpl">LPL</button>
-              <button class="scope-btn" data-scope="lck">LCK</button>
-              <button class="scope-btn" data-scope="intl">INTL</button>
-              <button class="scope-btn active" data-scope="all">ALL</button>
+              <button class="scope-btn active" data-scope="lpl">LPL 第三赛段</button>
             </div>
-            <div id="fundamentals-table" class="fund-table"><div class="tk-empty">加载横向基本面中…</div></div>
+            <div id="fundamentals-table" class="fund-table"><div class="tk-empty">加载队伍资料中…</div></div>
             <div class="event-actions">
               <button class="compare-close" data-shell-page="tk">去 TK 资料库</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- Version understanding card -->
-        <div class="card" id="card-version-understanding">
-          <div class="card-head">
-            <span class="badge" style="background:var(--blue)">VER</span> 版本理解
-            <span id="version-understanding-meta" style="font-size:12px;color:var(--ink-3);font-weight:400">按当前队伍聚合三维版本理解与 TK 条目</span>
-            <span style="flex:1"></span>
-            <button class="compare-close" data-teams-action="refresh-version">刷新</button>
-            <button class="compare-close" data-shell-page="tk">去 TK 资料库</button>
-          </div>
-          <div class="card-body">
-            <div id="version-understanding-list" class="version-panel-list">
-              <div class="tk-empty">选择队伍后显示版本理解</div>
             </div>
           </div>
         </div>
@@ -1551,7 +1528,7 @@ html, body {
         <!-- Current event card -->
         <div class="card" id="card-current-event">
           <div class="card-head">
-            <span class="badge" style="background:var(--orange)">EVENT</span> <span id="event-name">EWC 2026</span>
+            <span class="badge" style="background:var(--orange)">EVENT</span> <span id="event-name">LPL 2026 第三赛段</span>
             <span id="event-phase" style="font-size:12px;color:var(--ink-3);font-weight:400">当前赛事阶段</span>
           </div>
           <div class="card-body">
@@ -1562,24 +1539,24 @@ html, body {
               <div class="event-panel">
                 <div class="event-panel-title">现在重点看什么</div>
                 <div class="event-compare">
-                  <div><strong>版本环境</strong><span>哪些打法和英雄优先级正在变化</span></div>
-                  <div><strong>跨赛区强弱</strong><span>不同赛区的节奏与团战差异</span></div>
+                  <div><strong>版本理解</strong><span>当前哪些体系、打法和英雄优先级正在变化</span></div>
+                  <div><strong>赛区强弱</strong><span>LPL 第三赛段各队实力分布与风格对抗</span></div>
                   <div><strong>队伍波动</strong><span>近期状态、稳定性和不确定点</span></div>
                 </div>
               </div>
               <div class="event-panel">
                 <div class="event-panel-title">怎么用</div>
                 <div class="event-compare">
-                  <div><strong>赛事知识</strong><span>下方自动汇总 EWC 相关资料</span></div>
-                  <div><strong>具体队伍</strong><span>切到“队伍资料”查看画像和版本理解</span></div>
+                  <div><strong>赛事知识</strong><span>下方自动汇总 LPL 相关资料</span></div>
+                  <div><strong>具体队伍</strong><span>切到“队伍资料”查看画像、三维和队伍 TK</span></div>
                   <div><strong>具体对局</strong><span>等 BP 出来后直接跟小雪讨论</span></div>
                 </div>
               </div>
             </div>
             <div class="event-actions">
-              <button class="btn-tk-new" data-event-action="refresh">刷新 EWC 知识</button>
+              <button class="btn-tk-new" data-event-action="refresh">刷新 LPL 知识</button>
               <button class="compare-close" data-shell-page="teams">去队伍资料</button>
-              <a class="compare-close" href="/tk-graph/index.html?q=EWC" target="_blank">打开 EWC 知识图</a>
+              <a class="compare-close" href="/tk-graph/index.html?q=LPL" target="_blank">打开 LPL 知识图</a>
             </div>
             <div id="event-knowledge-results" class="today-content-grid"></div>
           </div>
@@ -1589,7 +1566,7 @@ html, body {
         <!-- Market notes card -->
         <div class="card" id="card-trades">
           <div class="card-head">
-            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">MARKET</span> 盘口草稿 / 交易时手写记录
+            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">MARKET</span> 盘口记录
             <span style="font-size:12px;color:var(--ink-3);font-weight:400">交易时自由记录区；保存原始判断，赛后由你和小雪在对话里复盘</span>
             <span style="flex:1"></span>
             <button class="compare-close" data-market-action="refresh">刷新</button>
@@ -1598,10 +1575,10 @@ html, body {
             <div class="trade-shell">
               <div class="trade-form">
                 <div class="trade-workspace-note" data-slice="D146">
-                  <strong>交易时手写记录：</strong>这里保留你的原始判断、盘口/方向、赔率/比分、市场分歧点、不碰项和备注；保存到 market_notes，后续 7 天 / 30 天复盘从这里回溯。
+                  <strong>盘口记录：</strong>这里保留你的原始判断、盘口/方向、赔率/比分、市场分歧点、不碰项和备注；后续 7 天 / 30 天复盘从这里回溯。
                 </div>
                 <div class="trade-workspace-note">
-                  <strong>队伍交易备注：</strong>写“小雪记到 HLE：虐菜大人头”这类感悟，会挂回队伍 TK；队伍不明确时不写正式 TK。
+                  <strong>交易 TK：</strong>写“小雪记到 HLE：虐菜大人头”这类精华感悟，会挂回该队队伍 TK，并在日报相关比赛下优先显示；队伍不明确时不写正式 TK。
                   <div class="trade-actions" style="margin-top:8px">
                     <input id="team-trading-note-input" placeholder="小雪记到 HLE：虐菜大人头" style="flex:1;min-width:260px">
                     <button class="btn-tk-new" data-market-action="save-team-note">记到队伍</button>
@@ -1650,7 +1627,7 @@ html, body {
                   </div>
                   <div class="trade-help" id="trade-filter-summary">当前筛选：全部最近记录 / 全部结果。</div>
                 </div>
-                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无盘口草稿 / 交易时手写记录</div></div>
+                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无盘口记录</div></div>
               </div>
             </div>
           </div>
@@ -1660,7 +1637,7 @@ html, body {
         <div class="card" id="card-tk-library">
           <div class="card-head">
             <span class="badge" style="background:var(--blue)">TK</span> TK资料库
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">按时间确认新鲜度，围绕队伍、选手和比赛研究完整内容</span>
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">按时间确认新鲜度，围绕队伍、选手和比赛研究完整 TK</span>
             <span style="flex:1"></span>
             <button class="btn-tk-new" data-tk-action="new-entry">+ 新建TK</button>
           </div>
@@ -1679,7 +1656,7 @@ html, body {
               </div>
             </div>
             <div class="tk-library-freshness">
-              <span id="tk-library-summary">正在读取TK内容…</span>
+              <span id="tk-library-summary">正在读取 TK…</span>
               <span>最近TK日期：<strong id="tk-library-latest">--</strong></span>
             </div>
             <div class="tk-library-results" id="tk-library-results"><div class="tk-empty">读取中…</div></div>
@@ -1690,7 +1667,7 @@ html, body {
         <!-- 3D card -->
         <div class="card" id="card-3d">
           <div class="card-head">
-            <span class="badge">3D</span> 三维数据
+            <span class="badge">3D</span> 三维
             <span style="font-size:12px;color:var(--ink-3);font-weight:400" id="dim-updated"></span>
           </div>
           <div class="card-body">
@@ -1702,10 +1679,6 @@ html, body {
             <div style="margin-top:16px">
               <div style="font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px">📝 战术笔记</div>
               <textarea class="notes-area" id="notes-area" placeholder="战术要点…"></textarea>
-            </div>
-            <div style="margin-top:12px">
-              <div style="font-size:12px;font-weight:600;color:var(--ink-2);margin-bottom:6px">📖 版本理解</div>
-              <textarea class="version-text" id="version-area" placeholder="版本理解…"></textarea>
             </div>
             <div class="save-row">
               <button class="btn-save" id="btn-save">
@@ -1720,13 +1693,13 @@ html, body {
         <!-- TK card -->
         <div class="card" id="card-tk">
           <div class="card-head">
-            <span class="badge" style="background:var(--blue)">TK</span> 战术知识
+            <span class="badge" style="background:var(--blue)">TK</span> 队伍 TK
             <span style="flex:1"></span>
             <button class="btn-tk-new" data-tk-action="new-entry">+ 新建</button>
           </div>
           <div class="card-body">
             <div class="tk-search-inner">
-              <input class="tk-search-input" id="tk-search" placeholder="搜索 TK 概念…">
+              <input class="tk-search-input" id="tk-search" placeholder="搜索队伍 TK…">
               <button class="btn-save" data-tk-action="quick-search" style="background:var(--blue);padding:10px 18px;font-size:14px">搜索</button>
             </div>
             <div id="tk-results">
@@ -1747,7 +1720,7 @@ html, body {
       <div class="tk-reader-head">
         <div class="tk-reader-title">
           <small id="tk-reader-date">--</small>
-          <h2 id="tk-reader-heading">TK完整内容</h2>
+          <h2 id="tk-reader-heading">TK正文</h2>
         </div>
         <button class="compare-close" data-tk-action="close-reader" aria-label="关闭全文">关闭全文</button>
       </div>
@@ -1759,7 +1732,7 @@ html, body {
   <div class="tk-editor-overlay" id="tk-editor-overlay">
     <div class="tk-editor">
       <div class="tk-editor-head">
-        <span id="tk-editor-title">新建 TK 条目</span>
+        <span id="tk-editor-title">新建 TK</span>
         <button class="compare-close" data-tk-action="close-editor">✕</button>
       </div>
       <div class="tk-editor-body">
@@ -1767,8 +1740,8 @@ html, body {
         <input id="tk-editor-team" placeholder="如 AL（可选）">
         <label>标签（逗号分隔）</label>
         <input id="tk-editor-tags" placeholder="如 版本理解,BP,打野">
-        <label>内容</label>
-        <textarea id="tk-editor-content" placeholder="TK 条目内容…&#10;&#10;推荐格式：&#10;【结论】一句话总结&#10;【因果】为什么&#10;【推演】后续影响"></textarea>
+        <label>TK正文</label>
+        <textarea id="tk-editor-content" placeholder="TK正文…&#10;&#10;推荐格式：&#10;【结论】一句话总结&#10;【因果】为什么&#10;【推演】后续影响"></textarea>
       </div>
       <div class="tk-editor-foot">
         <span id="tk-editor-msg" style="font-size:12px;color:var(--ink-3);margin-right:auto"></span>

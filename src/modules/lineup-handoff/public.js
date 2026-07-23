@@ -31,7 +31,7 @@ export const actions = {
       else view?.show(Object.entries(data.content || {}).map(([name, text]) => `【${name}】\n${text}`).join('\n\n'));
       return data;
     } catch {
-      view?.show('分析师接口调用失败；基本面、TK、临场记录不受影响。');
+      view?.show('分析师接口调用失败；队伍资料、TK、盘口记录不受影响。');
       return null;
     }
   },
@@ -46,7 +46,7 @@ async function copy(text) {
 }
 
 export default {
-  id: 'lineup-handoff', name: '阵容交接',
+  id: 'lineup-handoff', name: '阵容',
   async mount(context = {}) {
     const root = document.getElementById('card-analyst');
     view = createLineupView(root);

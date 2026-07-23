@@ -1,10 +1,10 @@
 import {
   fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, fetchVersionUnderstanding, saveTeam3D,
+  fetchUpcomingSchedule, saveTeam3D,
 } from './api.js';
 
 export function createTeamsService({ view, appContext, events } = {}) {
-  const state = { team: '', teams: [], threeDimensional: null, dirty: false, fundScope: 'all' };
+  const state = { team: '', teams: [], threeDimensional: null, dirty: false, fundScope: 'lpl' };
   const disposers = [];
   let mounted = false;
 
@@ -17,7 +17,6 @@ export function createTeamsService({ view, appContext, events } = {}) {
       onDirty: markDirty,
       onEscape: () => view.closeTeamDropdown(),
       onToggleProfile: () => view.toggleProfile(),
-      onRefreshVersion: () => loadVersionUnderstanding(),
     });
     if (events?.on) {
       disposers.push(events.on('page:changed', ({ page }) => {
@@ -31,7 +30,7 @@ export function createTeamsService({ view, appContext, events } = {}) {
       state.teams = await fetchTeams();
       view.setTeams(state.teams, selectTeam);
       view.showOverview();
-      await loadFundamentals('all');
+      await loadFundamentals('lpl');
       view.markStatus('healthy');
     } catch (error) {
       state.teams = [];
@@ -57,7 +56,6 @@ export function createTeamsService({ view, appContext, events } = {}) {
     state.threeDimensional = threeDimensional;
     view.renderProfile(wiki?.found ? { ...wiki, source: 'wiki' } : profile, team);
     view.render3D(threeDimensional);
-    await loadVersionUnderstanding(team);
     events?.emit?.('teams:loaded', { team, teamInfo: getTeamInfo(team) });
     return snapshot();
   }
@@ -72,19 +70,6 @@ export function createTeamsService({ view, appContext, events } = {}) {
     } catch (error) {
       view.errorFundamentals();
       throw error;
-    }
-  }
-
-  async function loadVersionUnderstanding(team = state.team) {
-    if (!team) return null;
-    view.loadingVersion();
-    try {
-      const payload = await fetchVersionUnderstanding(team);
-      if (mounted && state.team === team) view.renderVersion(payload, team);
-      return payload;
-    } catch (error) {
-      if (mounted && state.team === team) view.errorVersion();
-      return null;
     }
   }
 
@@ -144,12 +129,12 @@ export function createTeamsService({ view, appContext, events } = {}) {
   }
 
   return {
-    mount, unmount, selectTeam, loadFundamentals, loadVersionUnderstanding,
+    mount, unmount, selectTeam, loadFundamentals,
     markDirty, save3D, toggleTeamDropdown, closeTeamDropdown, applyEditCommand, getTeamInfo, snapshot,
   };
 }
 
 export {
   fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, fetchVersionUnderstanding, saveTeam3D,
+  fetchUpcomingSchedule, saveTeam3D,
 };

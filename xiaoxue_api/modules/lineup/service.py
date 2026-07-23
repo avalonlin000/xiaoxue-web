@@ -13,5 +13,5 @@ def prepare(payload: dict) -> dict:
     try:
         config = load_config()
     except (OSError, ValueError) as exc:
-        raise ConfigurationUnavailable(f"阵容交接模块配置不可用：{exc}") from exc
+        raise ConfigurationUnavailable(f"阵容模块配置不可用：{exc}") from exc
     return prepare_lineup_workflow(payload, config)

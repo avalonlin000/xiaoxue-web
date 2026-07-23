@@ -32,7 +32,7 @@ def list_players(team: str) -> list[dict]:
 def get_team_3d(team: str) -> dict:
     row = repository.get_team_3d(team)
     if not row:
-        raise TeamNotFound(f"队伍 {team} 无三维数据")
+        raise TeamNotFound(f"队伍 {team} 无三维")
     return {
         "team_name": row["team_name"],
         "dim_1_name": row["dim_1_name"], "dim_1_value": row["dim_1_value"],

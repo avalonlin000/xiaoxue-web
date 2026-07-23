@@ -13,12 +13,6 @@
         "path": "/home/ubuntu/lol_data/scripts/LOL电竞日报_{date}.md"
       },
       {
-        "id": "pre_match_card",
-        "title": "EWC赛前内容卡 {date}",
-        "kind": "pre_match_card",
-        "path": "/home/ubuntu/lol_data/scripts/EWC赛前内容卡_{date}.md"
-      },
-      {
         "id": "trading_report",
         "title": "赛前交易判断日报 {date}",
         "kind": "trading_report",

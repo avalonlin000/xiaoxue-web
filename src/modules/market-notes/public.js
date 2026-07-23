@@ -42,7 +42,7 @@ export function createMarketNotesModule(options = {}) {
         render();
         return state.records;
       } catch (error) {
-        view?.renderError(error.message || '盘口草稿加载失败');
+        view?.renderError(error.message || '盘口记录加载失败');
         throw error;
       }
     },
@@ -76,7 +76,7 @@ export function createMarketNotesModule(options = {}) {
       }
     },
     async deleteRecord(id) {
-      if (!dependencies.confirmDelete('删除这条盘口草稿？')) return false;
+      if (!dependencies.confirmDelete('删除这条盘口记录？')) return false;
       requireView().setMessage('删除中…');
       try {
         await dependencies.api.delete(id);
@@ -112,12 +112,12 @@ export function createMarketNotesModule(options = {}) {
     async saveTeamNote() {
       const text = requireView().readTeamNote();
       if (!text) { view.setTeamNoteMessage('先写一句，比如：小雪记到 HLE：虐菜大人头', 'error'); return null; }
-      view.setTeamNoteMessage('正在写入队伍 TK…');
+      view.setTeamNoteMessage('正在写入交易 TK…');
       try {
         const data = await dependencies.api.createTeamNote({ text });
         if (data?.ok === false) throw new Error(data.detail || data.message || '队伍未确认，未写入正式 TK');
         view.clearTeamNote();
-        view.setTeamNoteMessage(`已记到 ${data.team} 队伍 TK：${data.note?.market_label || data.note?.market || '交易备注'}`, 'success');
+        view.setTeamNoteMessage(`已记到 ${data.team} 队伍 TK，并标为交易 TK：${data.note?.market_label || data.note?.market || '待判断'}`, 'success');
         return data;
       } catch (error) {
         view.setTeamNoteMessage(error.message || '写入失败，稍后重试', 'error');
@@ -140,12 +140,12 @@ export function createMarketNotesModule(options = {}) {
   }
 
   function requireView() {
-    if (!view) throw new Error('临场记录模块尚未挂载');
+    if (!view) throw new Error('盘口记录模块尚未挂载');
     return view;
   }
 
   return {
-    id: 'market-notes', name: '临场记录', actions,
+    id: 'market-notes', name: '盘口记录', actions,
     async mount(context = {}) {
       const injected = context.marketNotes || {};
       dependencies.api = { ...dependencies.api, ...(injected.api || {}) };

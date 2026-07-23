@@ -10,7 +10,7 @@ from . import repository
 
 
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
-MATCH_CONTENT_KINDS = {"daily_report", "pre_match_card", "trading_report"}
+MATCH_CONTENT_KINDS = {"daily_report", "trading_report"}
 
 
 class ConfigurationUnavailable(RuntimeError):
@@ -47,7 +47,7 @@ def get_daily_content(date: str = "today") -> dict:
         config = repository.load_config()
         files = build_daily_content_files(config, date_str)
     except (OSError, ValueError) as exc:
-        raise ConfigurationUnavailable(f"每日准备模块配置不可用：{exc}") from exc
+        raise ConfigurationUnavailable(f"日报模块配置不可用：{exc}") from exc
     matches = list_schedules({"date_from": date_str, "date_to": date_str}, 12)
     items = []
     for key, meta in files.items():

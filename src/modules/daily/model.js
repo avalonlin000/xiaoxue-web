@@ -1,4 +1,4 @@
-const MATCH_CONTENT_KINDS = new Set(['daily_report', 'pre_match_card', 'trading_report']);
+const MATCH_CONTENT_KINDS = new Set(['daily_report', 'trading_report']);
 
 export function buildPreMatchContentView(data = {}) {
   const date = data.date || 'today';
@@ -60,7 +60,7 @@ export function buildDailyContentView(data = {}) {
     return {
       kind: 'content_missing', date,
       title: `${date} 有 ${matches.length} 场已确认比赛，但赛前内容尚未齐全`,
-      detail: '先不要把旧内容当作今天依据；等待真实日报、赛前卡和交易判断内容生成。',
+      detail: '先不要把旧内容当作今天依据；等待真实日报和交易判断日报生成。',
       matches, missingRequired,
     };
   }

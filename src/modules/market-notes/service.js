@@ -89,7 +89,7 @@ export function buildDailyTradeDraft(teamLine, context) {
     lines.push('TS底表：待补对手后自动带入 mu / σ / TS 对比');
   }
   lines.push('盘口 / 方向：', '赔率 / 比分：', '我的判断：', '市场分歧点：', '不碰项：', '备注 / 复盘原始记录：');
-  lines.push('边界：只填交易时手写记录，保存到 market_notes；不自动交易，最终判断由钧钧自己定。');
+  lines.push('边界：只填盘口记录，保存到 market_notes；不自动交易，最终判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
 }
 
@@ -115,14 +115,14 @@ export function buildTkDraft(record, selectedTeam = '') {
   const review = stripResultLine(record.review || '');
   return {
     source: 'market-notes', sourceId: record.id, team,
-    tags: ['盘口草稿', gameLabel(record.game), team].filter(Boolean),
+    tags: ['盘口记录', gameLabel(record.game), team].filter(Boolean),
     content: [
       `【结论】${gameLabel(record.game)} ${record.match_name}：盘口方向 ${record.direction || '未写'}，大小 ${record.total_lean || '放弃'}，比分判断 ${record.score_note || '-'}`,
       `【结果】${getMarketNoteResult(record)}`,
-      `【队伍】${team || '未关联'}${team ? '（盘口草稿队伍标签）' : ''}`,
+      `【队伍】${team || '未关联'}${team ? '（盘口记录队伍标签）' : ''}`,
       `【因果】${record.reason || '待补'}`,
       `【备注】${review || '未补'}`,
-      `【来源】盘口草稿 #${record.id}`,
+      `【来源】盘口记录 #${record.id}`,
     ].join('\n'),
   };
 }

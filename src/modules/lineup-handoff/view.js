@@ -15,7 +15,7 @@ export function showLineupFallback(text) {
 }
 
 export function createLineupView(root) {
-  if (!root) throw new Error('阵容交接入口不存在');
+  if (!root) throw new Error('阵容入口不存在');
   const input = root.querySelector('#analyst-bp-input');
   const output = root.querySelector('#analyst-output');
   return {

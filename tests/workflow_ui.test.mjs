@@ -28,24 +28,30 @@ test('the frontend never renders schedule or matchup lists', () => {
   assert.doesNotMatch(source, /renderDailyContentMatches|loadMsiSchedules|renderMsiSchedules/);
 });
 
-test('the current event workspace is EWC rather than MSI', () => {
+test('the current event workspace follows the configured LPL stage rather than stale tournaments', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const eventCard = html.match(/<div class="card" id="card-current-event">([\s\S]*?)<\/div>\s*<\/div>/)?.[1] || '';
 
-  assert.match(eventCard, /EWC 2026/);
+  assert.match(eventCard, /LPL 2026 第三赛段/);
   assert.match(html, /id="event-plan-status"/);
   assert.match(html, /大周期交易预案/);
   assert.doesNotMatch(eventCard, /MSI|季中赛/);
 });
 
-test('the today view is driven only by processed artifacts, not schedule state', () => {
+test('refreshing team fundamentals keeps the active LPL scope', () => {
+  const source = readFileSync(new URL('../src/modules/teams/view.js', import.meta.url), 'utf8');
+
+  assert.match(source, /refresh-fundamentals[\s\S]*?onScope\?\.\('lpl'\)/);
+  assert.doesNotMatch(source, /refresh-fundamentals[\s\S]*?onScope\?\.\('all'\)/);
+});
+
+test('the daily view is driven only by processed artifacts, not schedule state', () => {
   const view = buildPreMatchContentView({
     date: '2026-07-14',
     day_state: 'no_matches',
     matches: [{ team_a: 'A', team_b: 'B' }],
     items: [
       { id: 'daily_report', kind: 'daily_report', exists: true, summary: '今天的赛前判断' },
-      { id: 'pre_match_card', kind: 'pre_match_card', exists: false },
       { id: 'analyst_entry_copy', kind: 'analyst_entry_copy', exists: true },
     ],
   });

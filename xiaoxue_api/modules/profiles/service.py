@@ -39,7 +39,7 @@ def get_full_profile(team: str) -> dict:
     generated = database_fallback_profile(team)
     if generated:
         return {**generated, "source": "database_fallback"}
-    return {"found": False, "team": team.upper(), "html": f"<p>暂无 {team} 的完整画像（Wiki / SKILL.md / 数据库底表均未找到）</p>"}
+    return {"found": False, "team": team.upper(), "html": f"<p>暂无 {team} 的画像（Wiki / SKILL.md / 数据库底表均未找到）</p>"}
 
 
 def database_fallback_profile(team: str) -> dict | None:
@@ -70,13 +70,13 @@ def database_fallback_profile(team: str) -> dict | None:
     lines.extend(f"- {player['role']}：{player['name']}（{player['status']}）" for player in players)
     if not players:
         lines.append("- 暂无 rosters 可用记录；不推断选手。")
-    lines.extend(["", "## 三维数据"])
+    lines.extend(["", "## 三维"])
     if d3:
         lines.extend([
             f"- {value(d3['dim_1_name'], '维度一')}：{value(d3['dim_1_value'])}",
             f"- {value(d3['dim_2_name'], '维度二')}：{value(d3['dim_2_value'])}",
             f"- {value(d3['dim_3_name'], '维度三')}：{value(d3['dim_3_value'])}",
-            f"- 战术笔记：{value(d3['notes'], '暂无')}", f"- 版本理解：{value(d3['version_understanding'], '暂无')}",
+            f"- 战术笔记：{value(d3['notes'], '暂无')}",
             f"- 更新时间：{value(d3['updated_at'])}",
         ])
     else:

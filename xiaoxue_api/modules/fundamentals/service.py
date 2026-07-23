@@ -55,7 +55,7 @@ def list_teams(scope: str = "all", limit: int = 80) -> dict:
             "dim_3_name": row["dim_3_name"] or "胜负手",
             "dim_3_value": row["dim_3_value"] or "-",
             "notes_summary": _text_summary(row["notes"] or profile_markdown, 110),
-            "version_summary": _text_summary(row["version_understanding"] or "", 90),
+            "version_summary": "",
             "updated_at": row["updated_at"] or "",
             "data_quality": quality,
         })
