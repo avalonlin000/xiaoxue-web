@@ -1,13 +1,18 @@
 import {
-  createMarketNote, createTeamTradingNote, deleteMarketNote, fetchMarketNotes,
+  commitMarketReview, createMarketNote, createTeamTradingNote, deleteMarketNote, fetchMarketNotes,
+  previewMarketReview,
 } from './api.js';
 import {
   buildMarketNotePayload, buildTeamPrefill, buildTkDraft,
   filterMarketNotes,
 } from './service.js';
+import { buildMarketReviewPayload } from './review-model.js';
 import { createMarketNotesView } from './view.js';
 
-export { createMarketNote, createTeamTradingNote, deleteMarketNote, fetchMarketNotes } from './api.js';
+export {
+  commitMarketReview, createMarketNote, createTeamTradingNote, deleteMarketNote, fetchMarketNotes,
+  previewMarketReview,
+} from './api.js';
 export {
   buildDailyTradeDraft, filterMarketNotes, getMarketNoteResult, stripResultLine, withResultLine,
 } from './service.js';
@@ -19,6 +24,8 @@ export function createMarketNotesModule(options = {}) {
       create: options.api?.create || createMarketNote,
       delete: options.api?.delete || deleteMarketNote,
       createTeamNote: options.api?.createTeamNote || createTeamTradingNote,
+      previewReview: options.api?.previewReview || previewMarketReview,
+      commitReview: options.api?.commitReview || commitMarketReview,
     },
     getSelectedTeam: options.getSelectedTeam || (() => ''),
     getTeamInfo: options.getTeamInfo || ((code) => ({ short_name: code, name: code, region: '' })),
@@ -31,6 +38,7 @@ export function createMarketNotesModule(options = {}) {
   let dispose = () => {};
   const state = {
     game: 'lol', records: [], filters: { range: 'all', result: 'all', keyword: '' },
+    reviewId: null, reviewPreview: null,
   };
 
   const actions = {
@@ -129,8 +137,56 @@ export function createMarketNotesModule(options = {}) {
       if (draft) dependencies.onTkDraft(draft);
       return draft;
     },
+    openReview(id) {
+      const record = state.records.find((item) => Number(item.id) === Number(id));
+      if (!record) return null;
+      state.reviewId = Number(record.id);
+      state.reviewPreview = null;
+      view.openReview(record);
+      return record;
+    },
+    closeReview() {
+      state.reviewId = null;
+      state.reviewPreview = null;
+      view.closeReview();
+    },
+    async previewReview() {
+      if (!state.reviewId) return null;
+      const body = buildMarketReviewPayload(requireView().readReview());
+      view.setReviewMessage('正在生成复盘预览…');
+      try {
+        const payload = await dependencies.api.previewReview(state.reviewId, body);
+        state.reviewPreview = payload;
+        view.renderReviewPreview(payload.review_text || '');
+        view.setReviewMessage('已生成预览；确认后只写回这条盘口记录。', 'success');
+        return payload;
+      } catch (error) {
+        view.setReviewMessage(error.message || '复盘预览失败', 'error');
+        return null;
+      }
+    },
+    async commitReview() {
+      if (!state.reviewId) return null;
+      if (!state.reviewPreview) {
+        view.setReviewMessage('先生成复盘预览', 'error');
+        return null;
+      }
+      const body = { ...buildMarketReviewPayload(requireView().readReview()), confirmed: true };
+      view.setReviewMessage('正在写回原记录…');
+      try {
+        const payload = await dependencies.api.commitReview(state.reviewId, body);
+        view.setReviewMessage('已写回这条盘口记录', 'success');
+        await actions.load();
+        return payload;
+      } catch (error) {
+        view.setReviewMessage(error.message || '写回失败', 'error');
+        return null;
+      }
+    },
     getState() {
-      return { game: state.game, records: [...state.records], filters: { ...state.filters } };
+      return {
+        game: state.game, records: [...state.records], filters: { ...state.filters }, reviewId: state.reviewId,
+      };
     },
   };
 

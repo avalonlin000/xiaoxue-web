@@ -10,6 +10,11 @@ export function createMarketNotesView(root) {
     result: byId('trade-result'), reason: byId('trade-reason'), review: byId('trade-review'),
     resultFilter: byId('trade-result-filter'), keywordFilter: byId('trade-keyword-filter'),
     teamNote: byId('team-trading-note-input'), teamNoteMessage: byId('team-trading-note-msg'),
+    reviewPanel: byId('market-review-panel'), reviewTitle: byId('market-review-title'),
+    reviewResult: byId('market-review-result'), reviewActual: byId('market-review-actual'),
+    reviewCorrect: byId('market-review-correct'), reviewWrong: byId('market-review-wrong'),
+    reviewCalibration: byId('market-review-calibration'), reviewPreview: byId('market-review-preview'),
+    reviewMessage: byId('market-review-message'),
   };
 
   return {
@@ -60,6 +65,33 @@ export function createMarketNotesView(root) {
       }
       elements.list.innerHTML = records.map(renderRecord).join('');
     },
+    openReview(record) {
+      if (!elements.reviewPanel) return;
+      elements.reviewPanel.hidden = false;
+      if (elements.reviewTitle) elements.reviewTitle.textContent = `复盘：${record.match_name || '这场比赛'}`;
+      if (elements.reviewResult) elements.reviewResult.value = getMarketNoteResult(record);
+      [elements.reviewActual, elements.reviewCorrect, elements.reviewWrong, elements.reviewCalibration]
+        .forEach((element) => { if (element) element.value = ''; });
+      if (elements.reviewPreview) elements.reviewPreview.textContent = '';
+      setText(elements.reviewMessage, '', '');
+      elements.reviewPanel.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+    },
+    closeReview() {
+      if (elements.reviewPanel) elements.reviewPanel.hidden = true;
+    },
+    readReview() {
+      return {
+        result: elements.reviewResult?.value || '未结算',
+        actualScore: elements.reviewActual?.value || '',
+        correctPoints: elements.reviewCorrect?.value || '',
+        wrongPoints: elements.reviewWrong?.value || '',
+        calibration: elements.reviewCalibration?.value || '',
+      };
+    },
+    renderReviewPreview(text) {
+      if (elements.reviewPreview) elements.reviewPreview.textContent = text || '';
+    },
+    setReviewMessage(message, kind = '') { setText(elements.reviewMessage, message, kind); },
     bind(actions) {
       const disposers = [];
       const on = (element, type, handler) => {
@@ -74,6 +106,9 @@ export function createMarketNotesView(root) {
       bindAction(root, disposers, 'save', 'saveTradeRecord()', () => actions.save());
       bindAction(root, disposers, 'prefill', 'prefillTradeFromTeam()', () => actions.prefill());
       bindAction(root, disposers, 'save-team-note', 'saveTeamTradingNote()', () => actions.saveTeamNote());
+      bindAction(root, disposers, 'preview-review', '', () => actions.previewReview());
+      bindAction(root, disposers, 'commit-review', '', () => actions.commitReview());
+      bindAction(root, disposers, 'close-review', '', () => actions.closeReview());
       ['7d', '30d', 'all'].forEach((range) => {
         bindAction(root, disposers, `range-${range}`, `setTradeRange('${range}')`, () => actions.setRange(range));
       });
@@ -83,6 +118,7 @@ export function createMarketNotesView(root) {
         const id = Number(button.dataset.id);
         if (button.dataset.marketAction === 'delete') actions.deleteRecord(id);
         if (button.dataset.marketAction === 'tk-draft') actions.requestTkDraft(id);
+        if (button.dataset.marketAction === 'review') actions.openReview(id);
       });
       return () => disposers.splice(0).forEach((dispose) => dispose());
     },
@@ -116,6 +152,7 @@ function renderRecord(record) {
     </div>
     <div class="trade-reason">${escapeHtml(reason || '无备注')}</div>
     <div class="trade-item-actions">
+      <button data-market-action="review" data-id="${Number(record.id)}">复盘</button>
       <button data-market-action="tk-draft" data-id="${Number(record.id)}">沉淀TK</button>
       <button class="danger" data-market-action="delete" data-id="${Number(record.id)}">删除</button>
     </div>

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from .models import TradingNoteIn, TradingNoteTextIn
+from .models import GeneralTradingTKIn, GeneralTradingTKStatusIn, TradingNoteIn, TradingNoteTextIn
 from . import service
 
 
@@ -80,6 +80,35 @@ def list_team_trading_notes(team: str, status: str = "active", limit: int = 20):
     try:
         return service.list_team_trading_notes(team, status, limit)
     except (service.InvalidInput, service.EntryNotFound, service.ModuleUnavailable) as exc:
+        _raise_http(exc)
+
+
+@router.get("/trading-tk")
+def list_general_trading_tk(
+    q: str = Query(""), status: str = Query("all"), scope: str = Query("all"), region: str = Query(""),
+    subject: str = Query(""), version_context: str = Query(""), limit: int = Query(100),
+):
+    try:
+        return service.list_general_trading_tk(
+            q, status, limit, scope=scope, region=region, subject=subject, version_context=version_context,
+        )
+    except service.InvalidInput as exc:
+        _raise_http(exc)
+
+
+@router.post("/trading-tk")
+def create_general_trading_tk(data: GeneralTradingTKIn):
+    try:
+        return service.create_general_trading_tk(data.model_dump())
+    except service.InvalidInput as exc:
+        _raise_http(exc)
+
+
+@router.patch("/trading-tk/{filename}")
+def update_general_trading_tk(filename: str, data: GeneralTradingTKStatusIn):
+    try:
+        return service.update_general_trading_tk_status(filename, data.status, data.review_note)
+    except (service.InvalidInput, service.EntryNotFound) as exc:
         _raise_http(exc)
 
 

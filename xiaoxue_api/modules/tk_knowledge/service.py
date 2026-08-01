@@ -15,6 +15,20 @@ from . import repository
 
 MIN_CONTENT_LEN = 80
 TRADING_NOTE_TYPE = "trading_note"
+GENERAL_TRADING_TK_PREFIX = "trading_tk_general_"  # 已有通用词条文件名前缀，继续兼容。
+TRADING_TK_PREFIX = "trading_tk_"
+TRADING_TK_SCOPES = {"global", "region", "team", "player"}
+GENERAL_TRADING_TK_CATEGORIES = {
+    "version", "regional_style", "team_style", "player_style",
+    "roster", "lineup", "market", "execution", "general", "team",
+}
+GENERAL_TRADING_TK_STATUSES = {"candidate", "confirmed", "invalid"}
+TRADING_TK_SCOPE_LABELS = {"global": "全局", "region": "赛区", "team": "队伍", "player": "选手"}
+TRADING_TK_CATEGORY_LABELS = {
+    "version": "版本", "regional_style": "赛区风格", "team_style": "队伍特点",
+    "player_style": "选手特点", "roster": "换人", "lineup": "阵容",
+    "market": "盘口", "execution": "执行", "general": "其他", "team": "队伍特点",
+}
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 COMPACT_DATE_PATTERN = re.compile(r"(\d{4})(\d{2})(\d{2})")
 CONFIG_PATH = Path(__file__).with_name("config.json")
@@ -506,6 +520,275 @@ def create_team_trading_note(data: TradingNoteIn) -> dict:
     }
 
 
+def _single_line(value: str, limit: int) -> str:
+    return re.sub(r"\s+", " ", str(value or "")).strip()[:limit]
+
+
+def _normalize_trading_scope(value: str) -> str:
+    scope = _single_line(value or "global", 20).lower()
+    if scope == "general":
+        return "global"
+    if scope not in TRADING_TK_SCOPES:
+        raise InvalidInput("交易 TK 范围不支持")
+    return scope
+
+
+def _normalize_trading_region(value: str) -> str:
+    return _single_line(value, 40).upper()
+
+
+def _normalize_trading_subject(value: str) -> str:
+    return _single_line(value, 80)
+
+
+def _general_trading_tk_filename(statement: str, scope: str, region: str = "", subject: str = "", version_context: str = "") -> str:
+    key = "|".join((scope, region.casefold(), subject.casefold(), version_context.casefold(), statement.casefold()))
+    digest = hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
+    return f"{TRADING_TK_PREFIX}{scope}_{digest}.md"
+
+
+def _legacy_general_trading_tk_filename(statement: str) -> str:
+    digest = hashlib.sha256(statement.casefold().encode("utf-8")).hexdigest()[:16]
+    return f"{GENERAL_TRADING_TK_PREFIX}{digest}.md"
+
+
+def _general_trading_tk_meta(content: str) -> dict:
+    if not (content or "").startswith("---"):
+        return {}
+    parts = content.split("---", 2)
+    return _parse_simple_yaml(parts[1]) if len(parts) >= 3 else {}
+
+
+def _line_value(content: str, label: str) -> str:
+    match = re.search(rf"^{re.escape(label)}\s*[:：]\s*(.+)$", content or "", re.M)
+    return match.group(1).strip() if match else ""
+
+
+def _general_trading_tk_payload(document: dict) -> dict | None:
+    content = document.get("content") or ""
+    meta = _general_trading_tk_meta(content)
+    filename = document.get("filename") or ""
+    if meta.get("type") != TRADING_NOTE_TYPE or not filename.startswith(TRADING_TK_PREFIX):
+        return None
+    statement = _line_value(content, "规律")
+    if not statement:
+        return None
+    raw_scope = (meta.get("scope") or "global").lower()
+    scope = "global" if raw_scope == "general" else raw_scope
+    if scope not in TRADING_TK_SCOPES:
+        return None
+    category = meta.get("category") or "general"
+    return {
+        "id": document["filename"], "filename": document["filename"],
+        "scope": scope, "scope_label": TRADING_TK_SCOPE_LABELS[scope],
+        "region": meta.get("region") or "", "subject": meta.get("subject") or "",
+        "version_context": meta.get("version_context") or "",
+        "category": category, "category_label": TRADING_TK_CATEGORY_LABELS.get(category, category), "statement": statement,
+        "context": _line_value(content, "适用范围"), "status": meta.get("status") or "candidate",
+        "review_note": _line_value(content, "复查记录"),
+        "created_at": meta.get("created") or "", "updated_at": datetime.fromtimestamp(document["mtime"]).strftime("%Y-%m-%d %H:%M:%S"),
+        "source_type": "scoped_trading_tk", "editable": True,
+    }
+
+
+def _render_general_trading_tk(values: dict) -> str:
+    status_labels = {"candidate": "待验证", "confirmed": "已确认", "invalid": "已失效"}
+    status = values["status"]
+    scope = values["scope"]
+    scope_label = TRADING_TK_SCOPE_LABELS[scope]
+    category = values["category"]
+    category_label = TRADING_TK_CATEGORY_LABELS.get(category, category)
+    context = values.get("context") or "未限定，按具体比赛验证"
+    review_note = values.get("review_note") or "尚未复查"
+    tags = ["交易 TK", f"{scope_label}交易 TK", status_labels[status], category]
+    if scope == "global":
+        tags.insert(2, "通用交易 TK")
+    if values.get("region"):
+        tags.append(values["region"])
+    if values.get("subject"):
+        tags.append(values["subject"])
+    return f"""---
+source: 钧钧手动交易 TK
+source_type: manual
+tags: [{', '.join(tags)}]
+created: {values['created_at']}
+type: {TRADING_NOTE_TYPE}
+scope: {scope}
+region: {values.get('region') or ''}
+subject: {values.get('subject') or ''}
+version_context: {values.get('version_context') or ''}
+category: {category}
+status: {status}
+---
+
+## 交易 TK
+
+【结论】{values['statement']}
+
+层级：{scope_label}
+
+主题：{category_label}
+
+适用赛区：{values.get('region') or '全部'}
+
+对象：{values.get('subject') or '未限定'}
+
+适用版本：{values.get('version_context') or '未限定'}
+
+规律：{values['statement']}
+
+适用范围：{context}
+
+状态：{status_labels[status]}
+
+复查记录：{review_note}
+
+原话：{values['source_command']}
+
+用途：统一保存在 TK 资料库；单场按“全局 → 赛区 → 队伍/选手”调用，是否采用由钧钧确认。
+"""
+
+
+def create_general_trading_tk(values: dict) -> dict:
+    category = _single_line(values.get("category") or "general", 30).lower()
+    if category not in GENERAL_TRADING_TK_CATEGORIES:
+        raise InvalidInput("交易 TK 分类不支持")
+    scope = _normalize_trading_scope(values.get("scope") or "global")
+    region = _normalize_trading_region(values.get("region"))
+    subject = _normalize_trading_subject(values.get("subject"))
+    version_context = _single_line(values.get("version_context"), 80)
+    if scope == "region" and not region:
+        raise InvalidInput("赛区交易 TK 必须写明赛区")
+    if scope in {"team", "player"} and not subject:
+        raise InvalidInput("队伍或选手交易 TK 必须写明对象")
+    statement = _single_line(values.get("statement"), 500)
+    source_command = _single_line(values.get("source_command"), 1000)
+    if len(statement) < 4:
+        raise InvalidInput("交易 TK 内容太短")
+    if not source_command:
+        raise InvalidInput("用户原始指令不能为空")
+    context = _single_line(values.get("context"), 500)
+    filename = _general_trading_tk_filename(statement, scope, region, subject, version_context)
+    existing_document = repository.read_document(filename)
+    if not existing_document and scope == "global" and not region and not subject and not version_context:
+        legacy_filename = _legacy_general_trading_tk_filename(statement)
+        existing_document = repository.read_document(legacy_filename)
+        if existing_document:
+            filename = legacy_filename
+    existing = _general_trading_tk_payload(existing_document) if existing_document else None
+    now = datetime.now().strftime("%Y-%m-%d")
+    rendered = _render_general_trading_tk({
+        "category": category,
+        "scope": scope, "region": region, "subject": subject, "version_context": version_context,
+        "statement": statement,
+        "context": context or (existing or {}).get("context", ""),
+        "status": (existing or {}).get("status", "candidate"),
+        "review_note": (existing or {}).get("review_note", ""),
+        "source_command": source_command,
+        "created_at": (existing or {}).get("created_at") or now,
+    })
+    repository.write_document(filename, rendered)
+    indexed = repository.request_reindex()
+    document = repository.read_document(filename)
+    return {
+        "ok": True, "item": _general_trading_tk_payload(document), "indexed": indexed,
+        "boundary": "写入现有 TK/Wiki 正源，作为统一交易 TK，不建立第二套规律库",
+    }
+
+
+def list_general_trading_tk(
+    query: str = "", status: str = "all", limit: int = 100, *, scope: str = "all",
+    region: str = "", subject: str = "", version_context: str = "",
+) -> dict:
+    clean_query = _single_line(query, 100).casefold()
+    clean_status = _single_line(status or "all", 20).lower()
+    if clean_status not in GENERAL_TRADING_TK_STATUSES | {"all"}:
+        raise InvalidInput("交易 TK 状态不支持")
+    clean_scope = _single_line(scope or "all", 20).lower()
+    if clean_scope == "general":
+        clean_scope = "global"
+    if clean_scope not in TRADING_TK_SCOPES | {"all"}:
+        raise InvalidInput("交易 TK 范围不支持")
+    clean_region = _normalize_trading_region(region)
+    clean_subject = _normalize_trading_subject(subject)
+    clean_version = _single_line(version_context, 80)
+    bounded = max(1, min(int(limit or 100), 200))
+    items = []
+    for document in sorted(repository.list_documents(), key=lambda item: item["mtime"], reverse=True):
+        for item in _unified_trading_tk_payloads(document):
+            if clean_status != "all" and item["status"] != clean_status:
+                continue
+            if clean_scope != "all" and item["scope"] != clean_scope:
+                continue
+            if clean_region and item["region"].casefold() != clean_region.casefold():
+                continue
+            if clean_subject and item["subject"].casefold() != clean_subject.casefold():
+                continue
+            if clean_version and item["version_context"].casefold() != clean_version.casefold():
+                continue
+            haystack = " ".join((item["statement"], item["context"], item["category"], item["scope"], item["region"], item["subject"], item["version_context"])).casefold()
+            if clean_query and clean_query not in haystack:
+                continue
+            items.append(item)
+            if len(items) >= bounded:
+                break
+        if len(items) >= bounded:
+            break
+    return {
+        "query": query, "status": clean_status, "scope": clean_scope, "region": clean_region,
+        "subject": clean_subject, "version_context": clean_version, "items": items, "source": "existing_tk_library",
+    }
+
+
+def list_match_trading_tk(region: str, teams: list[str], players: list[str], limit: int = 12) -> dict:
+    clean_region = _normalize_trading_region(region)
+    team_set = {str(item or "").strip().casefold() for item in teams if str(item or "").strip()}
+    player_set = {str(item or "").strip().casefold() for item in players if str(item or "").strip()}
+    rank = {"global": 0, "region": 1, "team": 2, "player": 3}
+    items = []
+    for document in repository.list_documents():
+        for item in _unified_trading_tk_payloads(document):
+            if item["status"] == "invalid":
+                continue
+            if item["scope"] == "region" and item["region"].casefold() != clean_region.casefold():
+                continue
+            if item["scope"] == "team" and item["subject"].casefold() not in team_set:
+                continue
+            if item["scope"] == "player" and item["subject"].casefold() not in player_set:
+                continue
+            items.append(item)
+    items.sort(key=lambda item: (rank[item["scope"]], item.get("updated_at") or "", item["filename"]), reverse=False)
+    return {
+        "region": clean_region, "teams": sorted(team_set), "players": sorted(player_set),
+        "call_order": ["全局", "赛区", "队伍/选手"], "items": items[:max(1, min(int(limit or 12), 30))],
+        "boundary": "只找与本场有关的交易 TK；待验证只作提醒，是否采用由钧钧确认。",
+    }
+
+
+def update_general_trading_tk_status(filename: str, status: str, review_note: str = "") -> dict:
+    safe = _safe_filename(filename)
+    if not safe.startswith(TRADING_TK_PREFIX):
+        raise InvalidInput("不是交易 TK 词条")
+    clean_status = _single_line(status, 20).lower()
+    if clean_status not in GENERAL_TRADING_TK_STATUSES:
+        raise InvalidInput("交易 TK 状态不支持")
+    document = repository.read_document(safe)
+    item = _general_trading_tk_payload(document) if document else None
+    if not item:
+        raise EntryNotFound("交易 TK 不存在")
+    source_command = _line_value(document["content"], "原话") or item["statement"]
+    rendered = _render_general_trading_tk({
+        **item, "status": clean_status, "review_note": _single_line(review_note, 500),
+        "source_command": source_command,
+    })
+    repository.write_document(safe, rendered)
+    indexed = repository.request_reindex()
+    return {
+        "ok": True, "item": _general_trading_tk_payload(repository.read_document(safe)), "indexed": indexed,
+        "boundary": "只更新原交易 TK 词条，不复制新记录",
+    }
+
+
 def _parse_simple_yaml(block: str) -> dict:
     data = {}
     for raw in (block or "").splitlines():
@@ -548,11 +831,61 @@ def _trading_notes_from_content(content: str, team: str = "") -> list[dict]:
     return notes
 
 
+def _legacy_team_trading_tk_payloads(document: dict) -> list[dict]:
+    """Expose old team trading notes in the unified view without rewriting them."""
+    content = document.get("content") or ""
+    meta = _general_trading_tk_meta(content)
+    status_map = {"active": "confirmed", "inactive": "invalid", "invalid": "invalid"}
+    updated_at = datetime.fromtimestamp(document["mtime"]).strftime("%Y-%m-%d %H:%M:%S")
+    items = []
+    for note in _trading_notes_from_content(content):
+        team = note.get("team") or ""
+        original = note.get("original") or note.get("title") or ""
+        if not team or not original:
+            continue
+        items.append({
+            "id": document["filename"], "filename": document["filename"],
+            "scope": "team", "scope_label": TRADING_TK_SCOPE_LABELS["team"],
+            "region": "", "subject": team, "version_context": "",
+            "category": "market", "category_label": TRADING_TK_CATEGORY_LABELS["market"],
+            "statement": f"{team}：{original}", "context": note.get("daily_hint") or "原有队伍交易备注",
+            "status": status_map.get(note.get("status"), "candidate"), "review_note": "原有队伍交易备注",
+            "created_at": meta.get("created") or "", "updated_at": updated_at,
+            "source_type": "legacy_team_trading_note", "editable": False,
+        })
+    return items
+
+
+def _unified_trading_tk_payloads(document: dict) -> list[dict]:
+    scoped = _general_trading_tk_payload(document)
+    return [scoped] if scoped else _legacy_team_trading_tk_payloads(document)
+
+
+def _scoped_team_trading_note(item: dict, team: str) -> dict | None:
+    if item.get("scope") != "team" or item.get("subject", "").casefold() != team.casefold():
+        return None
+    status = {"candidate": "candidate", "confirmed": "active", "invalid": "inactive"}.get(item.get("status"), "candidate")
+    return {
+        "team": team, "title": f"{team} 交易 TK · {item.get('statement', '')}",
+        "market": "", "market_label": "", "scenario": item.get("category_label") or item.get("category") or "",
+        "status": status, "source": "junjun_manual", "original": item.get("statement") or "",
+        "daily_hint": item.get("context") or "", "filename": item.get("filename") or "",
+        "source_type": "scoped_trading_tk",
+    }
+
+
 def list_team_trading_notes(team: str, status: str = "active", limit: int = 20) -> dict:
     code = normalize_team(team)
     wanted = (status or "").strip().lower()
     notes = []
     for document in sorted(repository.list_documents(), key=lambda item: item["mtime"], reverse=True):
+        scoped = _scoped_team_trading_note(_general_trading_tk_payload(document) or {}, code)
+        if scoped:
+            if not wanted or wanted == "all" or scoped["status"] == wanted:
+                notes.append(scoped)
+            if len(notes) >= limit:
+                break
+            continue
         if not _strict_team_marker(document["filename"], document["content"], code):
             continue
         for note in _trading_notes_from_content(document["content"], code):

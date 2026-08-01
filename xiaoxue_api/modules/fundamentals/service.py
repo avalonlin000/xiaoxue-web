@@ -85,16 +85,17 @@ def get_msi() -> dict:
     }
 
 
-def get_match_context(team_a: str, team_b: str) -> dict:
+def get_match_context(team_a: str, team_b: str, *, event: str = "") -> dict:
     row_a = repository.get_ts_team(team_a)
     row_b = repository.get_ts_team(team_b)
     if not row_a or not row_b:
         missing = [name for name, row in ((team_a, row_a), (team_b, row_b)) if not row]
-        raise TeamsNotFound(f"MSI TS 队伍未找到：{', '.join(missing)}")
-    context_a = _ts_team_context(row_a)
-    context_b = _ts_team_context(row_b)
+        raise TeamsNotFound(f"TS 底表未找到队伍：{', '.join(missing)}")
+    prefer_msi_seed = _prefers_msi_seed(event)
+    context_a = _ts_team_context(row_a, prefer_msi_seed=prefer_msi_seed)
+    context_b = _ts_team_context(row_b, prefer_msi_seed=prefer_msi_seed)
     return {
-        "event": "MSI",
+        "event": "MSI" if prefer_msi_seed else (event or "当前队伍 TS"),
         "team_a": context_a,
         "team_b": context_b,
         "compare": _build_match_context(context_a, context_b),
@@ -141,12 +142,19 @@ def _formatted(value, digits: int = 1) -> str:
     return f"{_number(value):.{digits}f}"
 
 
-def _ts_team_context(row) -> dict | None:
+def _prefers_msi_seed(event: str) -> bool:
+    normalized = str(event or "").strip().upper()
+    return normalized == "MSI" or "季中赛" in normalized
+
+
+def _ts_team_context(row, *, prefer_msi_seed: bool = False) -> dict | None:
     if not row:
         return None
-    mu = _number(row["final_seed_mu"], _number(row["mu"], 25))
-    sigma = _number(row["seed_sigma"], _number(row["sigma"], 8.333))
-    ts = _number(row["seed_ts"], mu - 3 * sigma)
+    has_seed = row["final_seed_mu"] is not None and row["seed_sigma"] is not None
+    use_seed = prefer_msi_seed and has_seed
+    mu = _number(row["final_seed_mu"] if use_seed else row["mu"], 25)
+    sigma = _number(row["seed_sigma"] if use_seed else row["sigma"], 8.333)
+    ts = _number(row["seed_ts"] if use_seed else None, mu - 3 * sigma)
     if sigma <= 1.2:
         volatility = "低波动"
     elif sigma <= 3.5:
@@ -172,6 +180,7 @@ def _ts_team_context(row) -> dict | None:
         "volatility_tier": volatility,
         "sample_confidence": confidence,
         "note": row["note"] or "",
+        "source": "msi_seed" if use_seed else "team_ts",
     }
 
 

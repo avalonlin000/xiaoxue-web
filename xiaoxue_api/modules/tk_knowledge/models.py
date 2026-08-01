@@ -12,3 +12,19 @@ class TradingNoteIn(BaseModel):
 
 class TradingNoteTextIn(BaseModel):
     text: str
+
+
+class GeneralTradingTKIn(BaseModel):
+    category: str = "general"
+    statement: str
+    context: str = ""
+    scope: str = "global"
+    region: str = ""
+    subject: str = ""
+    version_context: str = ""
+    source_command: str
+
+
+class GeneralTradingTKStatusIn(BaseModel):
+    status: str
+    review_note: str = ""

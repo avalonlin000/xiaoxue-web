@@ -11,6 +11,18 @@ export function createMarketNote(body) {
   });
 }
 
+export function previewMarketReview(id, body) {
+  return apiRequest(`/market-notes/${encodeURIComponent(id)}/review-preview`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+
+export function commitMarketReview(id, body) {
+  return apiRequest(`/market-notes/${encodeURIComponent(id)}/review`, {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  });
+}
+
 export function createTeamTradingNote(body) {
   return apiRequest('/team-trading-notes/from-text', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),

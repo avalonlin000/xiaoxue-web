@@ -10,12 +10,12 @@ import {
 } from '../src/workflow-ui.js';
 
 
-test('the workbench navigation contains only long-term knowledge windows', () => {
+test('the workbench navigation includes match work and periodic organization', () => {
   const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
   const tabs = [...html.matchAll(/<button class="workspace-tab[^>]*>([^<]+)<\/button>/g)]
     .map((match) => match[1].trim());
 
-  assert.deepEqual(tabs, ['队伍资料', '当前赛事', 'TK资料库']);
+  assert.deepEqual(tabs, ['队伍资料', '当前赛事', '阶段整理', 'TK资料库']);
   assert.doesNotMatch(html, /id="card-today-content"|id="card-analyst"|BP 问小雪/);
   assert.match(html, /data-shell-action="open-market-helper"/);
 });

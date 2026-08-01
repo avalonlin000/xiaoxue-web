@@ -6,12 +6,12 @@
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 小雪电竞交易助理的长期 LOL 资料本：队伍资料看宏观总览与单队画像/三维/队伍 TK，当前赛事看环境与完整大周期预案，TK资料库看长期知识；盘口记录是隐藏辅助 |
+| **职责** | 小雪电竞交易助理的深度整理台：队伍资料看宏观总览与单队画像/三维/队伍 TK；当前赛事从当天具体对局进入单场底稿与持续判断；阶段整理由钧钧复查长期候选和交易 TK；TK资料库看全部长期知识；盘口记录是隐藏辅助。日常时间紧时直接在 HarmonyOS/飞书和小雪对话，前端用于有时间时的横向对比、定性/定量资料整理和确认后留存 |
 | **技术栈** | Vite(5173) + FastAPI(8880) + SQLite |
 | **数据来源** | 只通过 FastAPI `/api/*` 端点获取数据 |
 | **禁止** | 不直接读数据库文件，不调 RAG API，不写飞书文档 |
-| **对外接口** | `/api/teams`, `/api/team-3d/{team}`, `/api/tk/search`, `/api/profile-full/{team}`, `/api/market-notes`, `/api/lineup-workflow/prepare`, `/api/health` |
-| **当前边界** | 一级导航固定为“队伍资料 / 当前赛事 / TK资料库”，默认先看全部队伍；日报、BP/阵容、小雪聊天、预案生成、三层对照和复盘对话不进入工作台；盘口记录仅作隐藏辅助 |
+| **对外接口** | `/api/teams`, `/api/team-3d/{team}`, `/api/tk/search`, `/api/tk/library`, `/api/trading-tk`, `/api/stage-review/candidates`, `/api/profile-full/{team}`, `/api/current-event/dashboard`, `/api/current-event/match-desk`, `/api/current-event/match-run*`, `/api/current-event/score-evidence`, `/api/current-event/match-workspace`, `/api/market-notes`, `/api/lineup-workflow/prepare`, `/api/health` |
+| **当前边界** | 一级导航为“队伍资料 / 当前赛事 / 阶段整理 / TK资料库”，默认先看全部队伍；前端承担深度整理和查证，不承担日常对话引导；单场默认停在单场底稿，也可直接切到钧钧点名模块，需要时才按全局、赛区、队伍/选手找相关交易 TK，是否采用仍由钧钧确认；切换、暂停和恢复不写判断，当前判断与具体变化仍独立留存；只有钧钧明确说“帮我记着”才新增待验证交易 TK，复查后才改状态；BP/阵容仍在小雪对话；盘口记录仅作隐藏辅助 |
 
 **文件清单：**
 ```
@@ -42,6 +42,7 @@ xiaoxue-web/
 - 前端每个功能分别拥有 `view.js / service.js / api.js / public.js`；主入口只装载、导航和分发命令。
 - 前端跨模块协作只通过 `public.js` 或语义事件，不读取其他模块页面节点和内部状态。
 - 盘口记录主链只使用独立模块目录和按需建表；旧交易兼容模块仅按需提供历史接口，不做启动写入。
+- 单场工作台只在 `match_workspaces` 保存“方向 / 理由 / 处理 / 变化条件”，`match_observations` 只追加具体变化；`match_runs` / `match_run_facts` / `match_run_revisions` 保存可暂停、切换和恢复的临时比赛状态、依据账本和修订。`focus` 只是当前位置，不规定下一步。它们不写 TK、画像、三维、盘口记录，也不自动改写当前判断。
 - 前端模块分别装载；一个模块加载或挂载失败后继续装载后续模块。
 - 默认验收只读、逐模块继续执行；真实数据写入验收必须显式开启。
 
@@ -102,20 +103,22 @@ xiaoxue-web/
 | **主链路** | `scripts/build_pre_match_trading_report.py` → `赛前交易判断日报_YYYY-MM-DD.md` → `/api/daily-content` 白名单 → 今日内容卡 `trading_report` 入口 |
 | **日报关系** | 只作为独立今日内容产物；不得通过 `postprocess_daily_report.py` 或 `inject_pre_match_trading_layer.py` 嵌入 LOL 日报 v2 |
 | **数据来源** | 当日 schedules + `/api/fundamentals/msi-match-context` 同源 TS 逻辑 + 队伍 TK 中 `type=trading_note` 的结构化块 |
-| **禁止** | 不新增交易 TK 实体，不恢复 `tk_library`，不接旧 `/api/trades` 统计面板，不用 RAG 搜索作为主判断 |
+| **禁止** | 不建立平行交易规律库或独立 SQLite 表，不恢复 `tk_library`，不接旧 `/api/trades` 统计面板，不用 RAG 搜索作为主判断 |
 | **降级** | 没有命中有效交易 TK 或基础面不足时写“暂不推荐”，不硬编方向 |
 
-## 交易 TK（归属队伍 TK）
+## 交易 TK（同一资料库，按一般到特殊归类）
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 记录钧钧对某支队伍的盘口/交易观察，例如“HLE 虐菜大人头” |
-| **归属** | 仍挂在现有队伍 TK 下；队伍是实体，交易 TK 是优先用途标签 |
-| **结构标签** | `team`, `type=trading_note`, `market`, `scenario`, `status=active/inactive`, `source=junjun_manual` |
+| **职责** | 记录钧钧点名要留下的交易规律；版本共性、赛区环境、队伍特点、选手特点都进入同一套 TK |
+| **归属** | 全局 → 赛区 → 队伍 → 选手。版本共性归全局，LPL/LCK 等环境归赛区，换人/打法/阵容习惯归队伍，个人打法归选手；原有队伍交易 TK 不迁移、不丢失 |
+| **结构标签** | 新交易 TK 使用 `scope=global/region/team/player`、`region`、`subject`、`version_context`、`category`、`status=candidate/confirmed/invalid`；原有队伍 `type=trading_note` 继续兼容读取 |
 | **写入入口** | `POST /api/team-trading-notes` / `POST /api/team-trading-notes/from-text` 会先标准化队伍名，失败则拒绝写入 |
 | **读取入口** | `GET /api/team-trading-notes/{team}` 只读解析 TK 文件中的结构化块 |
-| **日报使用** | 日报按每场对阵双方精确读取 active trading_note，并放在“交易 TK”段落，优先于普通队伍 TK |
-| **日常口语** | “小雪记到 HLE：虐菜大人头”会解析为 HLE 的交易 TK；“这个队…”等队伍不明确时不写正式 TK |
+| **统一入口** | `POST/GET/PATCH /api/trading-tk` 创建、搜索和复查同一交易 TK；原有队伍 `type=trading_note` 同时以只读兼容项出现在统一列表与单场调用中，不复制原文；阶段整理页直接展示层级、主题和状态 |
+| **单场调用** | 打开一场比赛时，只取该场的全局、所属赛区、双方队伍和当前首发选手交易 TK，再进入阵容；待验证只作提醒，不自动当趋势采用 |
+| **日报使用** | 日报按每场对阵双方精确读取 active 队伍交易 TK，并放在“交易 TK”段落，优先于普通队伍 TK |
+| **日常口语** | “LCK 这版本偏运营，帮我记着”归赛区；“AL 团战易翻盘，帮我记着”归队伍；旧式“小雪记到 HLE：虐菜大人头”继续写原队伍交易 TK |
 
 ## 盘口手写判断工作区（market-notes）
 
@@ -163,7 +166,7 @@ xiaoxue-web/
 
 | 属性 | 值 |
 |------|-----|
-| **职责** | 给钧钧按时间浏览可读 TK 正文，研究队伍、选手、战术与比赛判断 |
+| **职责** | 给钧钧按时间浏览可读 TK 正文，研究队伍、选手、战术、队伍交易 TK 与通用交易 TK |
 | **主接口** | `/api/tk/library`（时间/关键词/队伍筛选与分页）、`/api/tk/entry/{filename}`（完整正文） |
 | **前端位置** | 顶部独立“TK资料库”页面 |
 | **阅读口径** | 正文与结论优先；明确显示 TK 日期；来源、文件名和导入字段不进入阅读界面 |
@@ -184,7 +187,7 @@ xiaoxue-web/
 | 属性 | 值 |
 |------|-----|
 | **位置** | `/home/ubuntu/lol_data/英雄联盟数据库.db` |
-| **核心表** | teams, rosters, schedules, matches, team_3d_data |
+| **核心表** | teams, rosters, schedules, matches, team_3d_data, market_notes, match_workspaces, match_observations, match_runs, match_run_entries |
 | **禁止** | 不在 scripts/ 下创建同名影子文件（会遮蔽真实DB） |
 | **访问方式** | 必须通过 `config.DB_PATH` 或 `db_util.get_db()` |
 

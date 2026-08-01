@@ -1,4 +1,35 @@
-from xiaoxue_api.modules.current_event.service import build_current_event, get_current_event
+from xiaoxue_api.modules.current_event.service import (
+    build_current_event,
+    get_current_event,
+    get_current_event_dashboard,
+    get_match_desk,
+    get_match_run,
+    get_match_run_review,
+    get_match_workspace,
+    get_score_match_evidence,
+    advance_match_run,
+    record_match_change,
+    save_virtual_judgment,
+    save_match_workspace,
+    start_match_run,
+    focus_match_run,
+    unlock_match_run_result,
+    update_match_run_fact,
+    get_active_match_run,
+    list_recent_match_runs,
+    pause_match_run,
+    save_match_trade_entry,
+    create_knowledge_candidate,
+    list_knowledge_candidates,
+    update_knowledge_candidate_status,
+)
 
 
-__all__ = ["build_current_event", "get_current_event"]
+__all__ = [
+    "build_current_event", "get_current_event", "get_current_event_dashboard", "get_match_desk",
+    "get_match_workspace", "save_match_workspace", "record_match_change",
+    "start_match_run", "focus_match_run", "get_match_run", "update_match_run_fact", "advance_match_run",
+    "save_virtual_judgment", "unlock_match_run_result", "get_score_match_evidence", "get_match_run_review",
+    "get_active_match_run", "list_recent_match_runs", "pause_match_run", "save_match_trade_entry",
+    "create_knowledge_candidate", "list_knowledge_candidates", "update_knowledge_candidate_status",
+]

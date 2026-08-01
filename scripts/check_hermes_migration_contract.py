@@ -29,10 +29,36 @@ REQUIRED_API_PATHS = {
     "/api/team-trading-notes",
     "/api/team-trading-notes/{team}",
     "/api/market-notes",
+    "/api/current-event/match-run/active",
+    "/api/current-event/match-run/pause",
+    "/api/current-event/match-run/entry",
+    "/api/current-event/match-run/candidates",
+    "/api/stage-review/candidates",
+    "/api/stage-review/candidates/{candidate_id}",
+    "/api/trading-tk",
+    "/api/trading-tk/{filename}",
 }
 REQUIRED_MCP_TOOLS = {
     "xiaoxue_get_today",
     "xiaoxue_find_schedules",
+    "xiaoxue_start_match_run",
+    "xiaoxue_get_match_run",
+    "xiaoxue_get_active_match_trade",
+    "xiaoxue_pause_match_trade",
+    "xiaoxue_save_match_trade_entry",
+    "xiaoxue_update_match_run_fact",
+    "xiaoxue_get_score_evidence",
+    "xiaoxue_debug_reveal_match_result",
+    "xiaoxue_get_match_run_review",
+    "xiaoxue_add_stage_candidate",
+    "xiaoxue_list_stage_candidates",
+    "xiaoxue_update_stage_candidate",
+    "xiaoxue_remember_trading_tk",
+    "xiaoxue_search_trading_tk",
+    "xiaoxue_update_trading_tk",
+    "xiaoxue_get_match_workspace",
+    "xiaoxue_save_match_workspace",
+    "xiaoxue_record_match_change",
     "xiaoxue_get_team",
     "xiaoxue_search_tk",
     "xiaoxue_get_tk_entry",
@@ -90,10 +116,12 @@ def _load_package(package: Path | None) -> tuple[dict[str, Path], list[Path]]:
     artifacts = {item["id"]: Path(item["staged"]) for item in manifest.get("artifacts", [])}
     targets = dict(LIVE_TARGETS)
     targets.update(artifacts)
+    if "xiaoxue-skill" in artifacts:
+        targets["xiaoxue-root"] = artifacts["xiaoxue-skill"]
     staged_runtime_docs = [
         path for artifact_id, path in artifacts.items()
         if artifact_id in {
-            "xiaoxue-root", "xiaoxue-toolkit", "xiaoxue-workflow", "lol-knowledge-engine",
+            "xiaoxue-root", "xiaoxue-skill", "xiaoxue-toolkit", "xiaoxue-workflow", "lol-knowledge-engine",
             "xiaoxue-reference", "daily-inspection", "xiaoxue-legacy", "infra-services",
             "operations-manual", "repair-pipeline", "skills-audit", "workbench-api",
             "knowledge-engine-ref", "knowledge-import-audit", "restart-blueprint",

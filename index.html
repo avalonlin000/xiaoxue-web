@@ -860,6 +860,64 @@ html, body {
   color: var(--ink-1);
   margin-bottom: calc(var(--s)*1.5);
 }
+.event-match-list { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:8px; margin-top:10px; }
+.event-match-button { text-align:left; border:1px solid var(--line); border-radius:9px; background:var(--bg-1); padding:10px; cursor:pointer; color:var(--ink-1); font:inherit; }
+.event-match-button:hover, .event-match-button.active { border-color:var(--blue); background:var(--blue-light); }
+.event-match-button b, .event-match-button span, .event-match-button em { display:block; }
+.event-match-button b { color:var(--ink-0); font-size:13px; }
+.event-match-button span { margin-top:4px; color:var(--ink-3); font-size:11px; }
+.event-match-button em { margin-top:5px; color:var(--blue); font-size:11px; font-style:normal; }
+.match-desk { margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1); }
+.match-desk-head { display:flex; gap:8px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }
+.match-desk-head b { color:var(--ink-0); }
+.match-desk-head span, .match-desk-line, .match-desk-team span { color:var(--ink-2); font-size:12px; }
+.match-desk-line { margin-top:8px; line-height:1.55; }
+.match-desk-evidence { display:grid; gap:7px; margin-top:10px; }
+.match-desk-team { display:grid; gap:3px; padding:8px 0; border-top:1px solid var(--line); }
+.match-desk-team b { color:var(--pink-deep); font-size:12px; }
+.match-desk-notes { display:grid; gap:5px; margin-top:10px; padding-top:10px; border-top:1px solid var(--line); }
+.match-desk-notes b { color:var(--orange); font-size:12px; }
+.match-desk-notes span { color:var(--ink-2); font-size:12px; line-height:1.5; }
+.match-desk-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:12px; }
+.match-desk-actions span { color:var(--ink-3); font-size:11px; }
+.match-run { display:grid; gap:8px; margin-top:12px; padding:12px 0; border-top:1px solid var(--line); }
+.match-run-next, .match-run-empty { padding:8px; border-radius:8px; background:var(--bg-0); color:var(--ink-2); font-size:12px; line-height:1.5; }
+.match-run-next b { color:var(--ink-1); }
+.match-run-facts { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.match-run-fact { display:grid; grid-template-columns:minmax(130px, .8fr) minmax(180px, 1.6fr); gap:4px 8px; padding:8px; border-left:3px solid var(--line); border-radius:7px; background:var(--bg-0); }
+.match-run-fact b { color:var(--ink-1); font-size:12px; }
+.match-run-fact span { color:var(--ink-2); font-size:12px; line-height:1.45; }
+.match-run-fact em, .match-run-fact small { grid-column:1 / -1; color:var(--ink-3); font-size:10px; font-style:normal; line-height:1.4; }
+.match-run-fact small { color:var(--ink-2); }
+.match-run-fact.status-active { border-left-color:var(--green); }
+.match-run-fact.status-stale, .match-run-fact.status-needs_review { border-left-color:var(--orange); }
+.match-run-fact.status-excluded, .match-run-fact.status-missing { border-left-color:var(--red); }
+.match-workspace { display:grid; gap:8px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line); }
+.match-workspace-head { display:flex; gap:8px; align-items:baseline; justify-content:space-between; flex-wrap:wrap; }
+.match-workspace-head b { color:var(--blue); font-size:12px; }
+.match-workspace-head span, .match-workspace-actions span { color:var(--ink-3); font-size:11px; }
+.match-current-lines { display:grid; gap:4px; padding:8px; border-radius:8px; background:var(--bg-0); }
+.match-current-lines span { color:var(--ink-2); font-size:12px; line-height:1.5; white-space:pre-wrap; }
+.match-current-lines b { color:var(--ink-1); }
+.match-workspace-input { width:100%; min-height:88px; resize:vertical; padding:8px; border:1px solid var(--line); border-radius:8px; background:var(--bg-0); color:var(--ink-1); font:12px/1.5 var(--sans); }
+.match-workspace-actions { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.match-change-head { margin-top:4px; }
+.match-change-list { display:grid; gap:6px; margin:0; padding:0; list-style:none; }
+.match-change-list li { display:grid; grid-template-columns:auto 1fr auto; gap:7px; align-items:baseline; padding:7px 8px; border-radius:8px; background:var(--bg-0); }
+.match-change-list b { color:var(--pink-deep); font-size:11px; }
+.match-change-list span { color:var(--ink-2); font-size:12px; }
+.match-change-list em { color:var(--ink-3); font-size:10px; font-style:normal; }
+.match-change-form { display:grid; grid-template-columns:auto auto minmax(160px,1fr) auto; gap:6px; }
+.match-change-form select, .match-change-form input, .match-change-form textarea { min-width:0; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:var(--bg-0); color:var(--ink-1); font:12px/1.5 var(--sans); }
+.match-trade-entry-form { grid-template-columns:160px minmax(260px,1fr) auto; align-items:start; }
+.match-trade-entry-form textarea { min-height:72px; resize:vertical; }
+.stage-review-list { display:grid; gap:10px; }
+.stage-review-group { display:grid; gap:7px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1); }
+.stage-review-group h3 { margin:0; color:var(--ink-0); font-size:13px; }
+.stage-candidate { display:grid; grid-template-columns:minmax(120px,.7fr) minmax(220px,1.8fr) auto; gap:8px; align-items:start; padding:9px; border-radius:8px; background:var(--bg-0); }
+.stage-candidate b { color:var(--pink-deep); font-size:12px; }
+.stage-candidate span { color:var(--ink-2); font-size:12px; line-height:1.5; }
+.stage-candidate em { display:block; color:var(--ink-3); font-size:10px; font-style:normal; margin-top:3px; }
 .event-list {
   display: flex;
   flex-direction: column;
@@ -1048,6 +1106,11 @@ html, body {
 .trade-item-actions button { padding: 4px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg-1); color: var(--ink-2); font: 700 12px var(--font); cursor:pointer; }
 .trade-item-actions button:hover { border-color: var(--blue); color: var(--blue); }
 .trade-item-actions button.danger:hover { border-color: var(--red); color: var(--red); background: var(--red-bg); }
+.market-review-panel { margin-top:12px; padding:12px; border:1px solid var(--blue); border-radius:10px; background:var(--blue-light); }
+.market-review-panel[hidden] { display:none; }
+.market-review-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.market-review-head b { color:var(--ink-0); }
+.market-review-preview { margin-top:10px; white-space:pre-wrap; color:var(--ink-2); font-size:12px; line-height:1.6; }
 
 /* Fundamentals workspace */
 .workspace-tabs {
@@ -1233,7 +1296,8 @@ html, body {
 }
 .page-event #col-profile,
 .page-market #col-profile,
-.page-tk #col-profile { display:none; }
+.page-tk #col-profile,
+.page-stage #col-profile { display:none; }
 .page-event #card-fundamentals,
 .page-event #card-trades,
 .page-event #card-3d,
@@ -1251,6 +1315,18 @@ html, body {
 .page-tk #card-trades,
 .page-tk #card-3d,
 .page-tk #card-tk { display:none; }
+.page-stage #card-fundamentals,
+.page-stage #card-current-event,
+.page-stage #card-trades,
+.page-stage #card-3d,
+.page-stage #card-tk,
+.page-stage #card-tk-library { display:none; }
+.page-teams #card-stage-review,
+.page-event #card-stage-review,
+.page-market #card-stage-review,
+.page-tk #card-stage-review { display:none; }
+.page-stage #card-stage-review { display:flex; flex:1; flex-direction:column; min-height:0; }
+.page-stage #card-stage-review .card-body { overflow-y:auto; }
 .page-teams:not(.team-selected) #col-profile,
 .page-teams:not(.team-selected) #card-3d,
 .page-teams:not(.team-selected) #card-tk { display:none; }
@@ -1457,6 +1533,7 @@ html, body {
     <div class="workspace-tabs">
       <button class="workspace-tab active" id="tab-teams" data-shell-page="teams">队伍资料</button>
       <button class="workspace-tab" id="tab-event" data-shell-page="event">当前赛事</button>
+      <button class="workspace-tab" id="tab-stage" data-shell-page="stage">阶段整理</button>
       <button class="workspace-tab" id="tab-tk" data-shell-page="tk">TK资料库</button>
     </div>
 
@@ -1535,30 +1612,46 @@ html, body {
             <div class="today-content-state" id="event-plan-status">
               <b>大周期交易预案：读取中</b>
             </div>
-            <div class="event-grid">
-              <div class="event-panel">
-                <div class="event-panel-title">现在重点看什么</div>
-                <div class="event-compare">
-                  <div><strong>版本理解</strong><span>当前哪些体系、打法和英雄优先级正在变化</span></div>
-                  <div><strong>赛区强弱</strong><span>LPL 第三赛段各队实力分布与风格对抗</span></div>
-                  <div><strong>队伍波动</strong><span>近期状态、稳定性和不确定点</span></div>
-                </div>
-              </div>
-              <div class="event-panel">
-                <div class="event-panel-title">怎么用</div>
-                <div class="event-compare">
-                  <div><strong>赛事知识</strong><span>下方自动汇总 LPL 相关资料</span></div>
-                  <div><strong>具体队伍</strong><span>切到“队伍资料”查看画像、三维和队伍 TK</span></div>
-                  <div><strong>具体对局</strong><span>等 BP 出来后直接跟小雪讨论</span></div>
-                </div>
-              </div>
+            <div class="event-panel">
+              <div class="event-panel-title">今天的比赛 · 深度整理</div>
+              <div class="tk-empty" style="margin:4px 0 8px">时间少时直接和小雪聊；这里用于有时间时横向对比队伍、TS、定性资料、定量表和 TK，确认后再留存。</div>
+              <div id="event-match-list" class="event-match-list"></div>
             </div>
+            <div class="event-panel" style="margin-top:10px">
+              <div class="event-panel-title">最近打开的单场推演</div>
+              <div class="tk-empty" style="margin:4px 0 8px">这里只保存临时交易判断；长期认识仍归队伍、选手、版本和交易方法。</div>
+              <div id="event-recent-runs" class="event-match-list"></div>
+            </div>
+            <div id="event-match-desk" class="match-desk"><div class="tk-empty">选择一场比赛后汇总单场底稿。</div></div>
+            <div id="event-match-message" class="trade-msg"></div>
             <div class="event-actions">
               <button class="btn-tk-new" data-event-action="refresh">刷新 LPL 知识</button>
               <button class="compare-close" data-shell-page="teams">去队伍资料</button>
               <a class="compare-close" href="/tk-graph/index.html?q=LPL" target="_blank">打开 LPL 知识图</a>
             </div>
+            <div class="event-panel-title" style="margin-top:14px">相关 TK</div>
             <div id="event-knowledge-results" class="today-content-grid"></div>
+          </div>
+        </div>
+
+        <!-- Stage review card -->
+        <div class="card" id="card-stage-review">
+          <div class="card-head">
+            <span class="badge" style="background:var(--orange)">STAGE</span> 阶段整理
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">把近期比赛观察整理回队伍、选手、版本和交易方法</span>
+            <span style="flex:1"></span>
+            <button class="compare-close" data-stage-action="refresh">刷新</button>
+          </div>
+          <div class="card-body">
+            <div class="trade-workspace-note">
+              小雪先汇总真正改变旧认识的候选；TS 等数字作为依据，不强行换算成分数。这里不直接改长期资料，最终仍由你和小雪确认。
+              <div class="trade-actions" style="margin-top:8px">
+                <button class="btn-tk-new" data-stage-action="copy-prompt">复制阶段整理入口</button>
+                <span class="trade-msg" id="stage-review-message"></span>
+              </div>
+            </div>
+            <div id="stage-review-summary" class="tk-library-freshness">正在读取待整理内容…</div>
+            <div id="stage-review-list" class="stage-review-list"><div class="tk-empty">读取中…</div></div>
           </div>
         </div>
 
@@ -1626,6 +1719,25 @@ html, body {
                     <input id="trade-keyword-filter" placeholder="队伍/比赛关键词" style="min-width:180px">
                   </div>
                   <div class="trade-help" id="trade-filter-summary">当前筛选：全部最近记录 / 全部结果。</div>
+                </div>
+                <div class="market-review-panel" id="market-review-panel" hidden>
+                  <div class="market-review-head">
+                    <b id="market-review-title">单场复盘</b>
+                    <button class="compare-close" data-market-action="close-review">关闭</button>
+                  </div>
+                  <div class="trade-grid">
+                    <div class="trade-field"><label>结果</label><select id="market-review-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option><option>放弃</option></select></div>
+                    <div class="trade-field full"><label>实际发生</label><textarea id="market-review-actual" placeholder="比分、关键转折或BP兑现情况"></textarea></div>
+                    <div class="trade-field full"><label>判断对在哪里</label><textarea id="market-review-correct" placeholder="只写真正兑现的判断"></textarea></div>
+                    <div class="trade-field full"><label>判断错/漏在哪里</label><textarea id="market-review-wrong" placeholder="具体哪条逻辑、条件或执行出了问题"></textarea></div>
+                    <div class="trade-field full"><label>下次调整</label><textarea id="market-review-calibration" placeholder="下次遇到什么情况，判断应怎样改"></textarea></div>
+                  </div>
+                  <div class="trade-actions">
+                    <button class="compare-close" data-market-action="preview-review">生成预览</button>
+                    <button class="btn-save" data-market-action="commit-review">确认写回本条记录</button>
+                    <span class="trade-msg" id="market-review-message"></span>
+                  </div>
+                  <div class="market-review-preview" id="market-review-preview"></div>
                 </div>
                 <div class="trade-list" id="trade-list"><div class="tk-empty">暂无盘口记录</div></div>
               </div>

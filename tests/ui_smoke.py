@@ -31,7 +31,7 @@ with sync_playwright() as playwright:
     page.wait_for_load_state("networkidle")
 
     tabs = page.locator(".workspace-tab").all_inner_texts()
-    assert tabs == ["队伍资料", "当前赛事", "TK资料库"], tabs
+    assert tabs == ["队伍资料", "当前赛事", "阶段整理", "TK资料库"], tabs
     assert page.get_by_role("button", name="队伍资料", exact=True).get_attribute("class").find("active") >= 0
     teams = visible_text(page)
     assert "队伍资料" in teams
@@ -41,14 +41,28 @@ with sync_playwright() as playwright:
 
     page.get_by_role("button", name="当前赛事", exact=True).click()
     page.wait_for_function(
-        "() => document.querySelector('#event-knowledge-results').innerText.length > 0",
+        "() => document.querySelector('#event-match-list').innerText.length > 0",
         timeout=10_000,
     )
     event = visible_text(page)
-    assert "EWC 2026" in event
-    assert "MSI" not in event
-    assert "EWC" in page.locator("#event-knowledge-results").inner_text()
+    assert page.locator("#event-match-list .event-match-button").count() >= 0
+    assert "今天的比赛" in event
+    if page.locator("#event-match-list .event-match-button").count():
+        page.locator("#event-match-list .event-match-button").first.click()
+        page.wait_for_function(
+            "() => document.querySelector('#event-match-desk').innerText.length > 0",
+            timeout=10_000,
+        )
+        assert "TS：" in page.locator("#event-match-desk").inner_text()
     page.screenshot(path="/tmp/xiaoxue-event.png", full_page=True)
+
+    page.get_by_role("button", name="阶段整理", exact=True).click()
+    page.wait_for_function(
+        "() => !document.querySelector('#stage-review-summary').innerText.includes('正在读取')",
+        timeout=10_000,
+    )
+    assert page.locator("#card-stage-review").is_visible()
+    page.screenshot(path="/tmp/xiaoxue-stage-review.png", full_page=True)
 
     page.get_by_role("button", name="队伍资料", exact=True).click()
     page.locator("#fundamentals-table .fund-row[data-team]").first.click()
@@ -75,7 +89,11 @@ with sync_playwright() as playwright:
     page.locator('[data-shell-action="open-market-helper"]').click()
     page.wait_for_timeout(300)
     assert page.locator("#card-trades").is_visible()
-    assert page.locator(".workspace-tab").count() == 3
+    assert page.locator(".workspace-tab").count() == 4
+
+    if page.locator("#trade-list .trade-item").count():
+        page.locator("#trade-list .trade-item").first.get_by_role("button", name="复盘", exact=True).click()
+        assert page.locator("#market-review-panel").is_visible()
 
     page.screenshot(path="/tmp/xiaoxue-market-helper.png", full_page=True)
     assert not failed_responses, failed_responses

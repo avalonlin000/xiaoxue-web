@@ -12,7 +12,7 @@ import { actions as tkLibraryActions } from './modules/tk-library/public.js';
 import { actions as marketNotesActions } from './modules/market-notes/public.js';
 
 const appContext = createAppContext();
-const primaryPages = new Set(['teams', 'event', 'tk']);
+const primaryPages = new Set(['teams', 'event', 'stage', 'tk']);
 const pages = new Set([...primaryPages, 'market']);
 let page = 'teams';
 

@@ -19,6 +19,16 @@ def fundamentals_msi():
 @router.get("/msi-match-context")
 def fundamentals_msi_match_context(team_a: str = Query(...), team_b: str = Query(...)):
     try:
-        return service.get_match_context(team_a, team_b)
+        return service.get_match_context(team_a, team_b, event="MSI")
+    except service.TeamsNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.get("/match-context")
+def fundamentals_match_context(
+    team_a: str = Query(...), team_b: str = Query(...), event: str = Query(""),
+):
+    try:
+        return service.get_match_context(team_a, team_b, event=event)
     except service.TeamsNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
