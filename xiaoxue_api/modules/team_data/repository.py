@@ -5,6 +5,26 @@ from datetime import date
 from xiaoxue_api.core.database import connect
 
 
+TEAM_PROFILE_TABLE_SQL = """
+CREATE TABLE IF NOT EXISTS team_profiles (
+    team_name TEXT PRIMARY KEY NOT NULL,
+    region TEXT NOT NULL,
+    positioning TEXT NOT NULL DEFAULT '',
+    win_path TEXT NOT NULL DEFAULT '',
+    lose_path TEXT NOT NULL DEFAULT '',
+    key_points TEXT NOT NULL DEFAULT '',
+    bp_tendency TEXT NOT NULL DEFAULT '',
+    evidence_json TEXT NOT NULL DEFAULT '[]',
+    format_version TEXT NOT NULL DEFAULT '1.0',
+    updated_at TEXT NOT NULL
+)
+"""
+
+
+def _ensure_team_profile_table(conn) -> None:
+    conn.execute(TEAM_PROFILE_TABLE_SQL)
+
+
 def list_teams():
     with connect() as conn:
         return conn.execute("""
@@ -80,20 +100,40 @@ def get_team_3d(team: str):
 
 def update_team_3d(team: str, values: dict, updated_at: str) -> bool:
     with connect() as conn:
+        team_code = team.upper()
         row = conn.execute(
             "SELECT id FROM team_3d_data WHERE team_name=? ORDER BY updated_at DESC LIMIT 1",
-            (team.upper(),),
+            (team_code,),
         ).fetchone()
         if not row:
-            return False
+            team_row = conn.execute("SELECT region FROM teams WHERE short_name=? LIMIT 1", (team_code,)).fetchone()
+            if not team_row:
+                return False
+            conn.execute("""INSERT INTO team_3d_data
+                (team_name, region, dim_1_name, dim_1_value, dim_2_name, dim_2_value,
+                 dim_3_name, dim_3_value, season, updated_at, notes, version_understanding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (team_code, team_row['region'], values.get('dim_1_name', '优势局习惯'), values.get('dim_1_value', ''),
+                 values.get('dim_2_name', '劣势局习惯'), values.get('dim_2_value', ''),
+                 values.get('dim_3_name', '胜负手位置'), values.get('dim_3_value', ''),
+                 values.get('season', '2026 Spring'), updated_at, values.get('notes', ''),
+                 values.get('version_understanding', '')),
+            )
+            return True
         conn.execute("""UPDATE team_3d_data
-            SET dim_1_value=?, dim_2_value=?, dim_3_value=?, notes=?,
-                version_understanding=?, updated_at=? WHERE id=?""",
-            (
-                values.get("dim_1_value", ""), values.get("dim_2_value", ""),
-                values.get("dim_3_value", ""), values.get("notes", ""),
-                values.get("version_understanding", ""), updated_at, row["id"],
-            ),
+            SET dim_1_name=COALESCE(NULLIF(?, ''), dim_1_name),
+                dim_1_value=COALESCE(NULLIF(?, ''), dim_1_value),
+                dim_2_name=COALESCE(NULLIF(?, ''), dim_2_name),
+                dim_2_value=COALESCE(NULLIF(?, ''), dim_2_value),
+                dim_3_name=COALESCE(NULLIF(?, ''), dim_3_name),
+                dim_3_value=COALESCE(NULLIF(?, ''), dim_3_value),
+                notes=COALESCE(NULLIF(?, ''), notes),
+                version_understanding=COALESCE(NULLIF(?, ''), version_understanding),
+                updated_at=? WHERE id=?""",
+            (values.get('dim_1_name', ''), values.get('dim_1_value', ''),
+             values.get('dim_2_name', ''), values.get('dim_2_value', ''),
+             values.get('dim_3_name', ''), values.get('dim_3_value', ''),
+             values.get('notes', ''), values.get('version_understanding', ''), updated_at, row['id']),
         )
         return True
 
@@ -103,10 +143,9 @@ def get_profile_bundle(team: str):
     with connect() as conn:
         row = conn.execute("""
             SELECT t.short_name, t.name, t.team_id, t.region, t.league_id, t.mu, t.sigma,
-                   seed.final_seed_mu, seed.seed_sigma, seed.seed_ts,
-                   seed.outright_odds_decimal, seed.note
+                   seed.final_seed_mu, seed.seed_sigma, seed.seed_ts, seed.note
             FROM teams t LEFT JOIN msi_ts_seed seed ON seed.team=t.short_name
-            WHERE UPPER(t.short_name)=? OR UPPER(t.name)=? OR UPPER(seed.display_name)=?
+            WHERE t.short_name=? OR UPPER(t.name)=? OR UPPER(seed.display_name)=?
             LIMIT 1
         """, (code, code, code)).fetchone()
         if not row:
@@ -121,4 +160,52 @@ def get_profile_bundle(team: str):
             WHERE team_id=? AND status='active'
             ORDER BY is_starter DESC, player_name LIMIT 8
         """, (row["team_id"],)).fetchall()
-    return row, d3, players
+        has_profile_table = conn.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='team_profiles'").fetchone()
+        profile = conn.execute(
+            "SELECT * FROM team_profiles WHERE team_name=?",
+            (row["short_name"],),
+        ).fetchone() if has_profile_table else None
+    return row, d3, players, profile
+
+
+def upsert_team_profile(team: str, values: dict, updated_at: str) -> bool:
+    code = (team or "").strip().upper()
+    fields = ("positioning", "win_path", "lose_path", "key_points", "bp_tendency")
+    with connect() as conn:
+        _ensure_team_profile_table(conn)
+        team_row = conn.execute(
+            "SELECT short_name, region FROM teams WHERE short_name=? LIMIT 1",
+            (code,),
+        ).fetchone()
+        if not team_row:
+            return False
+        current = conn.execute(
+            "SELECT * FROM team_profiles WHERE team_name=?",
+            (team_row["short_name"],),
+        ).fetchone()
+        merged = {
+            field: values.get(field) if values.get(field) is not None
+            else (current[field] if current else "")
+            for field in fields
+        }
+        evidence_json = values.get("evidence_json")
+        if evidence_json is None:
+            evidence_json = current["evidence_json"] if current else "[]"
+        conn.execute(
+            """INSERT INTO team_profiles
+               (team_name, region, positioning, win_path, lose_path, key_points,
+                bp_tendency, evidence_json, format_version, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '1.0', ?)
+               ON CONFLICT(team_name) DO UPDATE SET
+                 region=excluded.region, positioning=excluded.positioning,
+                 win_path=excluded.win_path, lose_path=excluded.lose_path,
+                 key_points=excluded.key_points, bp_tendency=excluded.bp_tendency,
+                 evidence_json=excluded.evidence_json,
+                 format_version=excluded.format_version, updated_at=excluded.updated_at""",
+            (
+                team_row["short_name"], team_row["region"],
+                *(str(merged[field] or "").strip() for field in fields),
+                str(evidence_json), updated_at,
+            ),
+        )
+        return True

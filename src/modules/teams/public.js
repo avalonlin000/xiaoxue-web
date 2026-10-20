@@ -33,20 +33,17 @@ function invoke(method, ...args) {
 export const actions = Object.freeze({
   selectTeam: (...args) => invoke('selectTeam', ...args),
   loadFundamentals: (...args) => invoke('loadFundamentals', ...args),
-  markDirty: (...args) => invoke('markDirty', ...args),
-  save3D: (...args) => invoke('save3D', ...args),
   getTeamInfo: (code = '') => active?.getTeamInfo(code)
     || { short_name: code, name: code, region: '' },
   snapshot: () => active?.snapshot()
-    || { team: '', teams: [], threeDimensional: null, dirty: false, fundScope: 'all' },
+    || { team: '', teams: [], fundScope: 'all' },
   toggleTeamDropdown: (...args) => invoke('toggleTeamDropdown', ...args),
   closeTeamDropdown: (...args) => invoke('closeTeamDropdown', ...args),
-  applyEditCommand: (...args) => invoke('applyEditCommand', ...args),
 });
 
 export const {
   fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, saveTeam3D,
+  fetchUpcomingSchedule,
 } = api;
 
 export { createTeamsService, createTeamsView, markTeamsModule, renderFundamentalsTable };

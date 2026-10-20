@@ -1,12 +1,17 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Response
 from pydantic import BaseModel
 
 from . import service
 
 
 router = APIRouter(prefix="/api/trades", tags=["legacy-trades"])
+SUNSET_MESSAGE = "旧交易记录接口已退役；请使用 /api/trading-tk 保存和读取交易 TK。"
+
+
+def _deprecated_headers() -> dict[str, str]:
+    return {"Deprecation": "true", "Link": "</api/trading-tk>; rel=successor-version"}
 
 
 class TradeRecordIn(BaseModel):
@@ -37,31 +42,33 @@ class TradeRecordUpdate(BaseModel):
     linked_team: str | None = None
 
 
-@router.get("")
+@router.get("", deprecated=True)
 def list_trades(
-    game: str = Query(""), result: str = Query(""), limit: int = Query(30)
+    response: Response, game: str = Query(""), result: str = Query(""), limit: int = Query(30)
 ):
+    response.headers.update(_deprecated_headers())
     return _present(service.list_trades, game, result, limit)
 
 
-@router.post("")
+@router.post("", include_in_schema=False)
 def create_trade(data: TradeRecordIn):
-    return _present(service.create_trade, data.model_dump())
+    raise HTTPException(410, SUNSET_MESSAGE, headers=_deprecated_headers())
 
 
-@router.get("/stats")
-def trade_stats(game: str = Query("")):
+@router.get("/stats", deprecated=True)
+def trade_stats(response: Response, game: str = Query("")):
+    response.headers.update(_deprecated_headers())
     return _present(service.trade_stats, game)
 
 
-@router.put("/{trade_id}")
+@router.put("/{trade_id}", include_in_schema=False)
 def update_trade(trade_id: int, data: TradeRecordUpdate):
-    return _present(service.update_trade, trade_id, data.model_dump(exclude_unset=True))
+    raise HTTPException(410, SUNSET_MESSAGE, headers=_deprecated_headers())
 
 
-@router.delete("/{trade_id}")
+@router.delete("/{trade_id}", include_in_schema=False)
 def delete_trade(trade_id: int):
-    return _present(service.delete_trade, trade_id)
+    raise HTTPException(410, SUNSET_MESSAGE, headers=_deprecated_headers())
 
 
 def _present(operation, *args, **kwargs):

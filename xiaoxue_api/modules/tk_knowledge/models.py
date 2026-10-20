@@ -14,6 +14,11 @@ class TradingNoteTextIn(BaseModel):
     text: str
 
 
+class PersonalNoteIn(BaseModel):
+    text: str
+    tags: list[str] = []
+
+
 class GeneralTradingTKIn(BaseModel):
     category: str = "general"
     statement: str

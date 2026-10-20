@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
 
-from .models import Team3DUpdate
+from .models import Team3DUpdate, TeamProfileUpdate
 from . import service
 
 
@@ -43,3 +43,22 @@ def update_team_3d(team: str, data: Team3DUpdate):
         return service.update_team_3d(team, data.model_dump())
     except service.TeamNotFound as exc:
         raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(409, str(exc)) from exc
+
+@router.get("/team-profile/{team}")
+def get_team_profile(team: str):
+    try:
+        return service.get_team_profile(team)
+    except service.TeamNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@router.put("/team-profile/{team}")
+def update_team_profile(team: str, data: TeamProfileUpdate):
+    try:
+        return service.update_team_profile(team, data.model_dump(exclude_unset=True))
+    except service.TeamNotFound as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc

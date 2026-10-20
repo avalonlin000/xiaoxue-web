@@ -17,3 +17,12 @@ __pycache__/
 .DS_Store
 tmp/
 .tmp/
+
+# Local runtime research stores and point-in-time recovery copies
+data/*.sqlite3
+data/*.db
+data/.backups/
+data/current_event_materials/
+
+# Generated ClawBench media artifacts
+.clawbench/

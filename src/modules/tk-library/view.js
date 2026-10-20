@@ -1,6 +1,8 @@
-import { groupLibraryItems, libraryPreview, quickEntryView } from './service.js';
+import { groupLibraryItems, libraryPreview, libraryTitle, quickEntryView } from './service.js';
 
-export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchRoot }) {
+const QUICK_VIEW_LIMIT = 2;
+
+export function createTKLibraryView({ root, readerRoot, quickReaderRoot, editorRoot, quickSearchRoot }) {
   if (!root) throw new Error('TK资料库入口不存在');
   const library = elements(root, {
     query: 'tk-library-query', team: 'tk-library-team', month: 'tk-library-month',
@@ -10,14 +12,18 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
   const reader = elements(readerRoot, {
     heading: 'tk-reader-heading', date: 'tk-reader-date', content: 'tk-reader-content',
   });
+  const quickReader = elements(quickReaderRoot, {
+    heading: 'tk-quick-reader-heading', date: 'tk-quick-reader-date', content: 'tk-quick-reader-content',
+  });
+  const quickList = quickSearchRoot?.querySelector('#tk-quick-list') || null;
   const editor = elements(editorRoot, {
     title: 'tk-editor-title', filename: 'tk-editor-filename', content: 'tk-editor-content',
     tags: 'tk-editor-tags', team: 'tk-editor-team', message: 'tk-editor-msg', save: 'tk-editor-save',
   });
-  const quick = elements(quickSearchRoot, { query: 'tk-search', results: 'tk-results' });
+  const quick = elements(quickSearchRoot, { query: 'tk-search', results: 'tk-results', count: 'tk-quick-count', toggle: 'tk-quick-toggle' });
 
   return {
-    roots: { root, readerRoot, editorRoot, quickSearchRoot },
+    roots: { root, readerRoot, quickReaderRoot, editorRoot, quickSearchRoot },
     populateTeams(teams = []) {
       if (!library.team || library.team.options.length > 1) return;
       teams.forEach((team) => {
@@ -42,8 +48,8 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
       }
     },
     renderLibraryLoading(reset) {
-      if (reset && library.results) library.results.innerHTML = '<div class="tk-empty">读取中…</div>';
-      if (library.summary) library.summary.textContent = '正在整理TK内容…';
+      if (reset && library.results) library.results.innerHTML = '<div class="tk-empty">正在读取资料…</div>';
+      if (library.summary) library.summary.textContent = '正在读取资料…';
       if (library.more) library.more.disabled = true;
     },
     renderLibrary(state, latestDate, summary) {
@@ -55,72 +61,128 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
       }
       if (!library.results) return;
       if (!state.results.length) {
-        library.results.innerHTML = '<div class="tk-empty">这个时间段没有找到TK内容，可以切换时间、队伍或关键词。</div>';
+        library.results.innerHTML = '<div class="tk-empty">这个筛选下还没有资料。试试调整时间、队伍或关键词。</div>';
         return;
       }
       library.results.innerHTML = groupLibraryItems(state.results).map(({ date, entries }) => {
         const cards = entries.map(({ item, index }) => {
-          const chips = [item.team, item.player, ...(item.tags || [])]
+          const metadata = [item.team, item.player, ...(item.tags || [])]
             .filter(Boolean).filter((value, position, values) => values.indexOf(value) === position)
-            .slice(0, 4).map((value) => `<span class="tk-context-chip">${escapeHtml(value)}</span>`).join('');
+            .slice(0, 4).map((value) => escapeHtml(value)).join(' · ');
           return `<article class="tk-library-card">
-            <time class="tk-library-date" datetime="${escapeAttr(item.date || '')}">${escapeHtml(item.date || '日期不明')}</time>
-            <div class="tk-library-main"><h3>${escapeHtml(item.concept || '未命名TK')}</h3>
-              <p>${escapeHtml(libraryPreview(item))}</p>${chips ? `<div class="tk-library-context">${chips}</div>` : ''}</div>
-            <button class="tk-library-open" data-tk-action="open-reader" data-index="${index}">阅读全文</button>
+            <button class="tk-library-note" data-tk-action="open-reader" data-index="${index}">
+              <time class="tk-library-date" datetime="${escapeAttr(item.date || '')}">${escapeHtml(item.date || '日期不明')}</time>
+              <span class="tk-library-note-body"><strong class="tk-library-note-title">${escapeHtml(libraryTitle(item))}</strong>
+                <span class="tk-library-note-preview">${escapeHtml(libraryPreview(item))}</span>${metadata ? `<span class="tk-library-note-meta">${metadata}</span>` : ''}</span>
+              <span class="tk-library-note-arrow" aria-hidden="true">阅读</span>
+            </button>
           </article>`;
         }).join('');
         return `<section class="tk-date-group"><h2 class="tk-date-heading">${escapeHtml(date)} <span>${entries.length} 条</span></h2>${cards}</section>`;
       }).join('');
     },
     renderLibraryError() {
-      if (library.results) library.results.innerHTML = '<div class="tk-empty" style="color:var(--red)">TK内容读取失败，请稍后刷新</div>';
-      if (library.summary) library.summary.textContent = '读取失败，没有用旧内容代替';
+      if (library.results) library.results.innerHTML = '<div class="tk-empty" style="color:var(--red)">暂时没能读到资料，请稍后再试。</div>';
+      if (library.summary) library.summary.textContent = '暂时无法读取资料';
       if (library.more) library.more.style.display = 'none';
     },
     openReader(item) {
+      root.classList.add('tk-reader-open');
       readerRoot?.classList.add('open');
-      if (reader.heading) reader.heading.textContent = item.concept || 'TK正文';
+      root.querySelectorAll('.tk-library-note').forEach((note) => {
+        note.classList.toggle('is-active', Number(note.dataset.index) === Number(item.index));
+      });
+      if (reader.heading) reader.heading.textContent = libraryTitle(item) || '资料正文';
       if (reader.date) reader.date.textContent = item.date || '日期不明';
-      if (reader.content) reader.content.innerHTML = '<div class="tk-empty">正在读取完整内容…</div>';
+      if (reader.content) reader.content.innerHTML = '<div class="tk-empty">正在打开资料…</div>';
+      setTimeout(() => reader.heading?.focus(), 0);
     },
     showReader(data, fallback) {
-      if (reader.heading) reader.heading.textContent = data.concept || fallback.concept || 'TK正文';
+      if (reader.heading) reader.heading.textContent = libraryTitle({ ...fallback, ...data, preview: data.content || fallback.preview || '' }) || '资料正文';
       if (reader.date) reader.date.textContent = data.date || fallback.date || '日期不明';
       if (reader.content) reader.content.innerHTML = renderTKReaderContent(data.content || '');
     },
     showReaderError() {
-      if (reader.content) reader.content.innerHTML = '<div class="tk-empty" style="color:var(--red)">完整内容读取失败，请关闭后重试。</div>';
+      if (reader.content) reader.content.innerHTML = '<div class="tk-empty" style="color:var(--red)">暂时没能打开这条资料，请返回列表后重试。</div>';
     },
-    closeReader() { readerRoot?.classList.remove('open'); },
+    openQuickReader(item) {
+      if (!quickReaderRoot) return this.openReader(item);
+      quickSearchRoot?.classList.add('is-reading');
+      quickReaderRoot.classList.add('open');
+      quickList?.classList.add('is-reader-open');
+      if (quickReader.heading) quickReader.heading.textContent = item.concept || '资料全文';
+      if (quickReader.date) quickReader.date.textContent = item.date || '日期不明';
+      if (quickReader.content) quickReader.content.innerHTML = '<div class="tk-empty">正在读取完整内容…</div>';
+    },
+    showQuickReader(data, fallback) {
+      if (!quickReaderRoot) return this.showReader(data, fallback);
+      if (quickReader.heading) quickReader.heading.textContent = data.concept || fallback.concept || '资料全文';
+      if (quickReader.date) quickReader.date.textContent = data.date || fallback.date || '日期不明';
+      if (quickReader.content) quickReader.content.innerHTML = renderTKReaderContent(data.content || '');
+    },
+    showQuickReaderError() {
+      if (!quickReaderRoot) return this.showReaderError();
+      if (quickReader.content) quickReader.content.innerHTML = '<div class="tk-empty" style="color:var(--red)">完整内容读取失败，请返回列表后重试。</div>';
+    },
+    closeQuickReader() {
+      quickSearchRoot?.classList.remove('is-reading');
+      quickReaderRoot?.classList.remove('open');
+      quickList?.classList.remove('is-reader-open');
+    },
+    closeReader() {
+      root.classList.remove('tk-reader-open');
+      readerRoot?.classList.remove('open');
+      root.querySelectorAll('.tk-library-note.is-active').forEach((note) => note.classList.remove('is-active'));
+      this.closeQuickReader();
+    },
     readQuickQuery: () => quick.query?.value.trim() || '',
     setQuickQuery(value) { if (quick.query) quick.query.value = value || ''; },
-    renderQuickLoading() { if (quick.results) quick.results.innerHTML = '<div class="tk-empty">搜索中…</div>'; },
-    renderQuickError() { if (quick.results) quick.results.innerHTML = '<div class="tk-empty" style="color:var(--red)">搜索失败</div>'; },
-    renderQuickResults(results = []) {
+    renderQuickLoading() {
+      quickSearchRoot?.classList.remove('is-expanded');
+      if (quick.count) quick.count.textContent = '正在读取…';
+      if (quick.toggle) { quick.toggle.disabled = true; quick.toggle.textContent = '展开全部'; quick.toggle.setAttribute('aria-expanded', 'false'); }
+      if (quick.results) quick.results.innerHTML = '<div class="tk-empty">正在读取当前队伍资料…</div>';
+    },
+    renderQuickError() {
+      quickSearchRoot?.classList.remove('is-expanded');
+      if (quick.count) quick.count.textContent = '暂时无法读取';
+      if (quick.toggle) { quick.toggle.disabled = true; quick.toggle.textContent = '展开全部'; quick.toggle.setAttribute('aria-expanded', 'false'); }
+      if (quick.results) quick.results.innerHTML = '<div class="tk-empty" style="color:var(--red)">暂时没能读取当前队伍资料，请稍后再试。</div>';
+    },
+    renderQuickResults(results = [], { total = results.length, expanded = false } = {}) {
       if (!quick.results) return;
-      if (!results.length) {
-        quick.results.innerHTML = '<div class="tk-empty">未找到相关 TK</div>';
+      const readableEntries = results.map((raw, index) => ({
+        entry: quickEntryView({ ...raw, content: raw.content || raw.preview || '' }), index,
+      })).filter(({ entry }) => !entry.isShell);
+      const hasMore = readableEntries.length > QUICK_VIEW_LIMIT;
+      quickSearchRoot?.classList.toggle('is-expanded', expanded && hasMore);
+      if (quick.count) quick.count.textContent = `${Math.max(0, Number(total) || 0)} 条资料`;
+      if (quick.toggle) {
+        quick.toggle.disabled = !hasMore;
+        quick.toggle.textContent = expanded && hasMore ? '收起' : '展开全部';
+        quick.toggle.setAttribute('aria-expanded', String(expanded && hasMore));
+      }
+      if (!readableEntries.length) {
+        quick.results.innerHTML = '<div class="tk-empty">当前队伍还没有可快速阅读的资料。</div>';
         return;
       }
-      quick.results.innerHTML = results.map((raw, index) => {
-        const entry = quickEntryView(raw);
-        const tags = (entry.tags || []).map((tag) => `<span class="tk-tag">${escapeHtml(tag)}</span>`).join(' ');
+      const visibleEntries = expanded && hasMore ? readableEntries : readableEntries.slice(0, QUICK_VIEW_LIMIT);
+      quick.results.innerHTML = visibleEntries.map(({ entry, index }) => {
+        const tags = (entry.tags || []).slice(0, 4).map((tag) => `<span class="tk-tag">${escapeHtml(tag)}</span>`).join('');
         const priority = entry.isTradingTK ? '<span class="tk-tag" style="background:var(--orange);color:#fff">交易 TK 优先</span>' : '';
-        return `<div class="tk-item${entry.isShell ? ' tk-empty-shell' : ''}${entry.isTradingTK ? ' tk-trading-priority' : ''}" data-tk-index="${index}">
-          <button class="tk-title" data-tk-action="toggle-quick" data-index="${index}"><span class="tk-expand-icon">▸</span><span>${escapeHtml(entry.concept || entry.id)}</span></button>
+        return `<article class="tk-item${entry.isTradingTK ? ' tk-trading-priority' : ''}" data-tk-index="${index}">
+          <button class="tk-title" data-tk-action="open-quick-reader" data-index="${index}"><span>${escapeHtml(entry.concept || entry.id)}</span></button>
           <div class="tk-preview">${escapeHtml(entry.preview)}${entry.hasMore ? '…' : ''}</div>
-          <div class="tk-full">${escapeHtml(entry.content)}</div>
-          <div class="tk-meta"><span>${escapeHtml(entry.date || '')}</span><span>${escapeHtml(entry.source || '')}</span>${entry.isShell ? '<span style="color:var(--ink-3)">⚠ 内容较少</span>' : ''}</div>
-          ${priority || tags ? `<div style="margin-top:4px">${priority}${tags ? ` ${tags}` : ''}</div>` : ''}
-          <div class="tk-actions"><button data-tk-action="edit-quick" data-index="${index}">✏️ 编辑</button><button class="danger" data-tk-action="delete-quick" data-index="${index}">🗑 删除</button></div>
-        </div>`;
+          <div class="tk-meta"><time>${escapeHtml(entry.date || '日期不明')}</time>${entry.isShell ? '<span>内容较少</span>' : ''}</div>
+          <div class="tk-item-footer">
+            ${priority || tags ? `<div class="tk-tag-list">${priority}${tags}</div>` : ''}
+          </div>
+        </article>`;
       }).join('');
     },
-    toggleQuick(index) { quick.results?.querySelector(`[data-tk-index="${index}"]`)?.classList.toggle('expanded'); },
     openEditor(draft, message = '') {
       editorRoot?.classList.add('open');
-      if (editor.title) editor.title.textContent = draft.filename ? '编辑 TK' : '新建 TK';
+      if (editor.title) editor.title.textContent = draft.filename ? '编辑资料' : '新建资料';
       if (editor.filename) editor.filename.value = draft.filename || '';
       if (editor.content) editor.content.value = draft.content || '';
       if (editor.tags) editor.tags.value = draft.tags || '';
@@ -144,8 +206,8 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
       on(root, 'keydown', (event) => { if (event.target === library.query && event.key === 'Enter') actions.applyFilters(); });
       on(library.team, 'change', () => actions.applyFilters());
       on(library.month, 'change', () => actions.setPeriod('month'));
-      on(readerRoot, 'click', (event) => {
-        if (event.target === readerRoot || event.target.closest('[data-tk-action="close-reader"]')) actions.closeReader();
+      on(quickReaderRoot, 'click', (event) => {
+        if (event.target.closest('[data-tk-action="close-quick-reader"]')) actions.closeQuickReader();
       });
       on(editorRoot, 'click', (event) => {
         if (event.target === editorRoot || event.target.closest('[data-tk-action="close-editor"]')) actions.closeEditor();
@@ -159,27 +221,60 @@ export function createTKLibraryView({ root, readerRoot, editorRoot, quickSearchR
 }
 
 export function renderTKReaderContent(raw) {
-  const normalized = String(raw || '').replace(/\s*(【[^】]{1,16}】)\s*/g, '\n$1\n').trim();
+  const normalized = String(raw || '')
+    .replace(/^\s*---[\s\S]*?---\s*/m, '')
+    .replace(/```ya?ml\s*[\s\S]*?```/gi, '')
+    .replace(/\s*(【[^】]{1,16}】)\s*/g, '\n$1\n')
+    .trim();
   if (!normalized) return '<div class="tk-empty">这条 TK 没有可读正文。</div>';
   const blocks = [];
   let sectionOpen = false;
   let skipSection = false;
-  normalized.split(/\n+/).map((line) => line.trim()).filter(Boolean).forEach((line) => {
+  let listOpen = false;
+  const closeList = () => {
+    if (listOpen) blocks.push('</ul>');
+    listOpen = false;
+  };
+  normalized.split('\n').map((line) => line.trim()).forEach((line) => {
+    if (!line) {
+      closeList();
+      return;
+    }
     const section = line.match(/^【([^】]+)】$/);
     if (section) {
+      closeList();
       if (sectionOpen) blocks.push('</section>');
       skipSection = ['来源', '标签', '文件'].includes(section[1]);
       sectionOpen = !skipSection;
       if (!skipSection) blocks.push(`<section><h3>${escapeHtml(section[1])}</h3>`);
     } else if (!skipSection && !/^(来源|标签|文件)[:：]/.test(line)) {
-      const heading = line.match(/^#{1,4}\s+(.+)$/);
-      if (heading) blocks.push(`<h4>${escapeHtml(heading[1])}</h4>`);
-      else if (/^[-*•]\s+/.test(line)) blocks.push(`<ul><li>${escapeHtml(line.replace(/^[-*•]\s+/, ''))}</li></ul>`);
-      else blocks.push(`<p>${escapeHtml(line)}</p>`);
+      const heading = line.match(/^(#{2,4})\s+(.+)$/);
+      const listItem = line.match(/^[-*•]\s+(.+)$/);
+      const quote = line.match(/^>\s*(.+)$/);
+      if (heading) {
+        closeList();
+        const level = Math.min(4, heading[1].length);
+        blocks.push(`<h${level}>${renderInlineMarkdown(heading[2])}</h${level}>`);
+      } else if (listItem) {
+        if (!listOpen) blocks.push('<ul>');
+        listOpen = true;
+        blocks.push(`<li>${renderInlineMarkdown(listItem[1])}</li>`);
+      } else if (quote) {
+        closeList();
+        blocks.push(`<blockquote>${renderInlineMarkdown(quote[1])}</blockquote>`);
+      } else {
+        closeList();
+        blocks.push(`<p>${renderInlineMarkdown(line)}</p>`);
+      }
     }
   });
+  closeList();
   if (sectionOpen) blocks.push('</section>');
   return blocks.join('');
+}
+
+function renderInlineMarkdown(value) {
+  return escapeHtml(value).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
 function handleAction(event, actions) {
@@ -190,9 +285,15 @@ function handleAction(event, actions) {
   if (action === 'apply-filters') actions.applyFilters();
   if (action === 'load-more') actions.loadMore();
   if (action === 'open-reader') actions.openReader(index);
+  if (action === 'close-reader') actions.closeReader();
+  if (action === 'edit-reader') actions.editReader();
+  if (action === 'delete-reader') actions.deleteReader();
   if (action === 'new-entry') actions.openEditor();
   if (action === 'quick-search') actions.quickSearch();
-  if (action === 'toggle-quick') actions.toggleQuick(index);
+  if (action === 'toggle-quick-list') actions.toggleQuickList();
+  if (action === 'go-to-library') actions.goToLibrary();
+  if (action === 'open-quick-reader') actions.openQuickReader(index);
+  if (action === 'close-quick-reader') actions.closeQuickReader();
   if (action === 'edit-quick') actions.editQuick(index);
   if (action === 'delete-quick') actions.deleteQuick(index);
   if (action?.startsWith('period-')) actions.setPeriod(action.slice(7));

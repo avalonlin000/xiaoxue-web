@@ -1,1 +1,18 @@
-MODULE = {"id": "tk_knowledge", "name": "TK资料库"}
+MODULE = {
+    "id": "tk_knowledge",
+    "name": "TK资料库",
+    "version": "1.0.0",
+    "purpose": "搜索 TK，并在钧钧明确要求时保存一种身份清楚的 TK。",
+    "examples": ["搜 HLE 相关 TK", "帮我记一条交易 TK"],
+    "inputs": {"optional": ["query", "statement", "scope"]},
+    "effect": "write",
+    "reads": ["Wiki + MemPalace xiaoxue-tk"],
+    "writes": ["TK 正源（仅明确写入）"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"legacy_sqlite": "forbidden"},
+    "settings": {},
+    "dependencies": ["tk_dir"],
+    "health": {"checks": ["tk_dir"], "reason_code": "tk_directory_unavailable"},
+    "tests": ["tests/test_tk_contract.py"],
+    "order": 60,
+}

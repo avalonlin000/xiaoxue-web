@@ -4,7 +4,7 @@ import test from 'node:test';
 
 
 const root = new URL('../', import.meta.url);
-const activeModules = ['current-event', 'teams', 'tk-library', 'market-notes'];
+const activeModules = ['current-event', 'teams', 'tk-library', 'market-notes', 'project-center'];
 
 
 test('active frontend modules have view service data and public layers', () => {
@@ -86,4 +86,14 @@ test('daily and lineup modules are not mounted inside the long-term workbench', 
   const shell = readFileSync(new URL('src/main.js', root), 'utf8');
   assert.doesNotMatch(catalog, /modules\/(?:daily|lineup-handoff)/);
   assert.doesNotMatch(shell, /lineupActions|page === 'today'|showPage\('today'\)/);
+});
+
+test('project center stays inside the workbench shell with a stable deep link', () => {
+  const html = readFileSync(new URL('index.html', root), 'utf8');
+  const shell = readFileSync(new URL('src/main.js', root), 'utf8');
+  assert.match(html, /id="tab-project-center"/);
+  assert.match(html, /id="project-center"/);
+  assert.match(shell, /project-center/);
+  assert.match(shell, /book\|architecture\|objects\|modules\|requests\|deliveries\|manual/);
+  assert.doesNotMatch(html, /project-center[^\n]*<iframe/i);
 });

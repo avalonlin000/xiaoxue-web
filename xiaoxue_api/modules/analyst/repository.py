@@ -26,10 +26,11 @@ def load_runtime_config() -> dict:
     return {}
 
 
-def read_skill(name: str) -> str:
+def read_skill(relative: str) -> str:
+    """Read a skill text file by path relative to any skills root."""
     for base in SKILL_DIRS:
         try:
-            with open(os.path.join(base, name, "SKILL.md"), encoding="utf-8") as source:
+            with open(os.path.join(base, relative), encoding="utf-8") as source:
                 return source.read()
         except OSError:
             continue
@@ -39,7 +40,10 @@ def read_skill(name: str) -> str:
 def read_team_profile(team: str, limit: int = 3000) -> str:
     for base in SKILL_DIRS:
         try:
-            with open(os.path.join(base, f"{team.lower()}-team-profile", "SKILL.md"), encoding="utf-8") as source:
+            with open(
+                os.path.join(base, "esports", "teams", "team-profiles", "references", f"{team.lower()}.md"),
+                encoding="utf-8",
+            ) as source:
                 return source.read(limit)
         except OSError:
             continue

@@ -37,10 +37,19 @@ REQUIRED_API_PATHS = {
     "/api/stage-review/candidates/{candidate_id}",
     "/api/trading-tk",
     "/api/trading-tk/{filename}",
+    "/api/research/subjects",
+    "/api/research/subjects/{subject_id}",
+    "/api/research/subjects/{subject_id}/events",
+    "/api/research/subjects/{subject_id}/materials",
+    "/api/research/subjects/{subject_id}/digests",
+    "/api/research/subjects/{subject_id}/notes",
+    "/api/research/subjects/{subject_id}/reviews",
+    "/api/research/match-brief",
 }
 REQUIRED_MCP_TOOLS = {
     "xiaoxue_get_today",
     "xiaoxue_find_schedules",
+    "xiaoxue_search_external_news",
     "xiaoxue_start_match_run",
     "xiaoxue_get_match_run",
     "xiaoxue_get_active_match_trade",
@@ -53,17 +62,26 @@ REQUIRED_MCP_TOOLS = {
     "xiaoxue_add_stage_candidate",
     "xiaoxue_list_stage_candidates",
     "xiaoxue_update_stage_candidate",
-    "xiaoxue_remember_trading_tk",
+
     "xiaoxue_search_trading_tk",
-    "xiaoxue_update_trading_tk",
+
     "xiaoxue_get_match_workspace",
     "xiaoxue_save_match_workspace",
     "xiaoxue_record_match_change",
     "xiaoxue_get_team",
+    "xiaoxue_get_match_research_brief",
+    "xiaoxue_open_research_subject",
+    "xiaoxue_list_research_subjects",
+    "xiaoxue_get_research_subject",
+    "xiaoxue_record_research_event",
+    "xiaoxue_record_research_digest",
+    "xiaoxue_record_research_review",
+    "xiaoxue_record_research_material",
+    "xiaoxue_record_research_note",
     "xiaoxue_search_tk",
     "xiaoxue_get_tk_entry",
     "xiaoxue_list_market_notes",
-    "xiaoxue_record_team_trading_note",
+
 }
 RETIRED_RUNTIME_MARKERS = (
     "localhost:8768",
@@ -77,26 +95,20 @@ REQUIRED_ENABLED_SKILLS = {
     "junjun-trading-system",
     "xiaoxue-data-reconciliation",
     "xiaoxue-knowledge-loop",
-    "xiaoxue-stage-trading",
-    "xiaoxue-tk-compression",
-    "xiaoxue-version-refresh",
+    "xiaoxue-retrospective",
+    "xiaoxue-knowledge-maintenance",
     "xiaoxue-version-team-brief",
 }
 REQUIRED_DISABLED_SKILLS = {
-    "dianjing",
-    "xiaoxue-esports-toolkit",
-    "xiaoxue-esports-workflow",
-    "xiaoxue-knowledge-refresh",
-    "xiaoxue-stage-knowledge",
+    "xiaoxue-dev-index",
 }
 
 LIVE_TARGETS = {
     "hermes-config": Path("/home/ubuntu/.hermes/config.yaml"),
     "xiaoxue-product-mcp": Path("/home/ubuntu/xiaoxue-web/scripts/hermes/xiaoxue_product_mcp.py"),
     "xiaoxue-root": Path("/home/ubuntu/.agents/skills/小雪/SKILL.md"),
-    "xiaoxue-toolkit": Path("/home/ubuntu/.agents/skills/xiaoxue-esports-toolkit/SKILL.md"),
-    "xiaoxue-workflow": Path("/home/ubuntu/.agents/skills/xiaoxue-esports-workflow/SKILL.md"),
-    "lol-knowledge-engine": Path("/home/ubuntu/.agents/skills/lol-knowledge-engine/SKILL.md"),
+    "xiaoxue-dev-index": Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index/SKILL.md"),
+    "lol-knowledge-engine": Path("/home/ubuntu/.agents/skills/esports/knowledge/lol-knowledge-engine/SKILL.md"),
 }
 
 
@@ -105,9 +117,8 @@ def _load_package(package: Path | None) -> tuple[dict[str, Path], list[Path]]:
         paths = dict(LIVE_TARGETS)
         runtime_docs = [
             Path("/home/ubuntu/.agents/skills/小雪"),
-            Path("/home/ubuntu/.agents/skills/xiaoxue-esports-toolkit"),
-            Path("/home/ubuntu/.agents/skills/xiaoxue-esports-workflow"),
-            Path("/home/ubuntu/.agents/skills/lol-knowledge-engine"),
+            Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index"),
+            Path("/home/ubuntu/.agents/skills/esports/knowledge/lol-knowledge-engine"),
         ]
         return paths, runtime_docs
 
@@ -129,9 +140,9 @@ def _load_package(package: Path | None) -> tuple[dict[str, Path], list[Path]]:
     ]
     runtime_docs = staged_runtime_docs or [
         Path("/home/ubuntu/.agents/skills/小雪"),
-        Path("/home/ubuntu/.agents/skills/xiaoxue-esports-toolkit"),
-        Path("/home/ubuntu/.agents/skills/xiaoxue-esports-workflow"),
-        Path("/home/ubuntu/.agents/skills/lol-knowledge-engine"),
+        Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index"),
+        Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index"),
+        Path("/home/ubuntu/.agents/skills/esports/knowledge/lol-knowledge-engine"),
     ]
     return targets, runtime_docs
 
@@ -185,7 +196,8 @@ def _check_config(config: dict[str, Any], mcp_target: Path) -> list[str]:
     for marker in (
         "never use terminal, file, read_file, search_files, or shell",
         "xiaoxue_get_today",
-        "xiaoxue_record_team_trading_note exactly once",
+        "xiaoxue_search_external_news",
+        "call it exactly once",
         "without a generic-tool fallback",
     ):
         if marker not in platform_hint:
@@ -229,11 +241,9 @@ def _check_runtime_docs(paths: list[Path]) -> list[str]:
 def _check_root_route(root_skill: Path) -> list[str]:
     text = root_skill.read_text(encoding="utf-8")
     errors = []
-    for token in ("记一下TK", "xiaoxue_record_team_trading_note", "xiaoxue_search_tk", "xiaoxue_get_today"):
+    for token in ("lol-competition-basics", "明确提到“TK”", "xiaoxue_remember"):
         if token not in text:
             errors.append(f"小雪根入口缺少确定性路由：{token}")
-    if "不得退回 search_files" not in text:
-        errors.append("小雪根入口没有禁止产品请求退回文件搜索")
     return errors
 
 

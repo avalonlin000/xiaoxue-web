@@ -1,1 +1,19 @@
-MODULE = {"id": "platform", "name": "应用外壳"}
+MODULE = {
+    "id": "platform",
+    "name": "应用外壳",
+    "version": "1.1.0",
+    "purpose": "提供 FastAPI 应用外壳、静态产物、公共健康入口和小雪日常数据刷新入口。",
+    "examples": ["刷新赛果和 TS 表"],
+    "inputs": {},
+    "effect": "write",
+    "reads": ["dist", "ScoreGG", "英雄联盟数据库.db"],
+    "writes": ["英雄联盟数据库.db", "data_readiness manifest"],
+    "output_schema": {"type": "object"},
+    "source_policy": {},
+    "settings": {},
+    "dependencies": ["dist"],
+    "health": {"checks": ["dist"], "reason_code": "dist_missing"},
+    "tests": ["tests/test_public_route_contract.py"],
+    "order": 90,
+    "critical": True,
+}

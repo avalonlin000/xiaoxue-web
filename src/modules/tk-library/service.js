@@ -40,21 +40,49 @@ export function groupLibraryItems(items = []) {
 
 export function librarySummary(state) {
   const filtered = state.query || state.team || state.period !== 'all';
-  return `${filtered ? '筛选结果' : '全部TK'} ${state.total} 条 · 已显示 ${state.results.length} 条`;
+  return `${filtered ? '找到' : '全部资料'} ${state.total} 条 · 已显示 ${state.results.length} 条`;
+}
+
+function readableTKText(value = '') {
+  return String(value || '')
+    .replace(/^\s*---[\s\S]*?---\s*/m, '')
+    .replace(/```ya?ml\s*[\s\S]*?```/gi, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*[-*•]\s+/gm, '')
+    .replace(/\*\*(.*?)\*\*/g, '$1')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/【([^】]+)】/g, '$1：')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+export function libraryTitle(item = {}) {
+  const content = String(item.preview || item.content || '');
+  const heading = content.match(/^\s*###\s+(.+)$/m);
+  if (heading?.[1]) return readableTKText(heading[1]).slice(0, 140);
+  const conclusion = content.match(/【结论】\s*([^\n【]+)/);
+  if (conclusion?.[1]) return readableTKText(conclusion[1]).slice(0, 140);
+  return readableTKText(item.concept || item.filename || '未命名TK').replace(/\.md$/i, '').slice(0, 140) || '未命名TK';
 }
 
 export function libraryPreview(item = {}) {
-  let preview = item.preview || '';
-  if (item.concept && preview.startsWith(item.concept)) preview = preview.slice(item.concept.length).trim();
-  return preview || item.preview || '点击阅读全文查看内容。';
+  const title = libraryTitle(item);
+  let preview = readableTKText(item.preview || item.content || '');
+  if (preview.startsWith(title)) preview = preview.slice(title.length).replace(/^[：:，,。\s]+/, '');
+  return preview.slice(0, 220) || '点击阅读全文查看内容。';
 }
 
 export function quickEntryView(entry = {}) {
   const content = entry.content || '';
+  const concept = libraryTitle({ ...entry, preview: content });
+  let preview = readableTKText(content);
+  if (preview.startsWith(concept)) preview = preview.slice(concept.length).replace(/^[：:，,。\s]+/, '');
   return {
     ...entry,
-    preview: content.slice(0, 200),
-    hasMore: content.length > 200,
+    concept,
+    preview: preview.slice(0, 220),
+    hasMore: preview.length > 220,
     isShell: content.trim().length < 50,
   };
 }
@@ -64,7 +92,7 @@ export function buildEditorDraft(entry = null, selectedTeam = '') {
   return {
     filename: entry.filename || '', content: entry.content || '',
     tags: Array.isArray(entry.tags) ? entry.tags.join(', ') : String(entry.tags || ''),
-    team: selectedTeam || '',
+    team: entry.team || selectedTeam || '',
   };
 }
 

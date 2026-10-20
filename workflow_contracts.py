@@ -67,6 +67,8 @@ def prepare_lineup_workflow(payload: dict[str, Any], config: dict[str, Any]) -> 
 def build_market_note_review(
     note: dict[str, Any], payload: dict[str, Any], config: dict[str, Any]
 ) -> dict[str, Any]:
+    if payload.get("_commit") and not payload.get("confirmed"):
+        raise ValueError("提交复盘前需要明确确认")
     review_config = config.get("market_review_workflow") or {}
     valid_results = set((config.get("market") or {}).get("results") or [])
     result = str(payload.get("result") or "未结算").strip()

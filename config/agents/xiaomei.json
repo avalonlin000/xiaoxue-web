@@ -1,0 +1,9 @@
+{
+  "schema": "esports-agent-adapter-v1",
+  "agent_id": "xiaomei",
+  "display_name": "小美",
+  "profile": "xiaomei",
+  "soul_path": "/home/ubuntu/.hermes/profiles/xiaomei/SOUL.md",
+  "root_skill_path": "/home/ubuntu/.agents/skills/xiaomei/SKILL.md",
+  "env_selector": "ESPORTS_AGENT_ADAPTER"
+}

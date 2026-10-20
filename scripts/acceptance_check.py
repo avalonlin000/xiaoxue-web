@@ -9,6 +9,9 @@ import time
 import urllib.error
 import urllib.request
 
+sys.path.insert(0, "/home/ubuntu/xiaoxue-web")
+from xiaoxue_api.modules.fundamentals.repository import active_stage as _active_stage  # noqa: E402
+
 
 BASE = "http://127.0.0.1:8880"
 
@@ -31,6 +34,33 @@ def request(path: str, *, method: str = "GET", body: dict | None = None) -> dict
 def assert_true(value: bool, message: str) -> None:
     if not value:
         raise AssertionError(message)
+
+
+def check_project_modules() -> None:
+    data = request("/api/modules")
+    modules = data.get("modules") or []
+    assert_true(data.get("schema") == "xiaoxue-module-contract-v1", "project module contract schema missing")
+    assert_true(len(modules) == 8, f"unexpected project module count: {len(modules)}")
+    assert_true(all(item.get("read_capability") for item in modules), "module read contract missing")
+    assert_true(all(item.get("readback_capability") for item in modules), "module readback contract missing")
+    print(f"project-modules ok ({len(modules)} registered)")
+
+
+def check_ts_display(team: str = "BLG") -> None:
+    data = request(f"/api/fundamentals/teams?scope=lpl&team={team}&limit=1")
+    rows = data.get("teams") or []
+    assert_true(len(rows) == 1 and rows[0].get("short_name") == team, f"TS team not found: {data}")
+    display = rows[0].get("ts_display") or {}
+    fields = ("power_score", "volatility_score", "trend", "momentum", "status")
+    assert_true(all(field in display for field in fields), f"TS display fields missing: {display}")
+    assert_true(rows[0].get("ts_stage") == _active_stage(), f"TS is not current stage: {rows[0]}")
+    print(f"ts-display ok ({team}: {display})")
+
+
+def check_tk_read(team: str = "BLG") -> None:
+    data = request(f"/api/tk/search?q={team}&limit=1")
+    assert_true(isinstance(data.get("results"), list), "TK result list missing")
+    print(f"tk-read ok ({team}: {len(data.get('results', []))} result(s))")
 
 
 def check_health() -> None:
@@ -91,10 +121,10 @@ def check_profile_fallback(team: str = "EDG") -> None:
     data = request(f"/api/profile-full/{team}")
     assert_true(data.get("found") is True, f"profile not found for {team}: {data}")
     source = data.get("source")
-    assert_true(source in {"wiki", "skill", "database_fallback"}, f"unexpected profile source: {source}")
+    assert_true(source in {"team_profile", "wiki", "skill", "database_fallback"}, f"unexpected profile source: {source}")
     if source == "database_fallback":
         html = data.get("html", "")
-        assert_true("数据库只读画像" in html and "不替代人工画像" in html, "fallback profile boundary missing")
+        assert_true("资料总览" in html and "队伍 TK 共" in html, "fallback profile boundary missing")
     print(f"profile ok ({team}, source={source})")
 
 
@@ -120,9 +150,12 @@ def main() -> int:
     BASE = args.base.rstrip("/")
 
     checks = [
+        ("项目模块合同", check_project_modules),
         ("模块状态", check_health),
         ("临场记录", check_market_notes_readonly),
-        ("队伍画像", check_profile_fallback),
+        ("TS 展示", check_ts_display),
+        ("队伍画像", lambda: check_profile_fallback("BLG")),
+        ("TK 读取", check_tk_read),
         ("版本理解", check_version_understanding),
     ]
     if args.write_market_notes:

@@ -1,1 +1,18 @@
-MODULE = {"id": "lineup", "name": "阵容"}
+MODULE = {
+    "id": "lineup",
+    "name": "阵容",
+    "version": "1.0.0",
+    "purpose": "根据明确输入的十英雄提供纯阵容分析能力。",
+    "examples": ["只看这十个英雄", "分析蓝红方阵容"],
+    "inputs": {"required": ["blue", "red"]},
+    "effect": "read",
+    "reads": ["用户本轮阵容输入", "已确认版本知识"],
+    "writes": [],
+    "output_schema": {"type": "object"},
+    "source_policy": {"external_search": False},
+    "settings": {},
+    "dependencies": [],
+    "health": {"message": "本地输入契约可用"},
+    "tests": ["tests/test_lineup_contract.py"],
+    "order": 10,
+}

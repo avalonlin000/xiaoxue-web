@@ -1,0 +1,9 @@
+{
+  "schema": "esports-agent-adapter-v1",
+  "agent_id": "<agent_id>",
+  "display_name": "<display_name>",
+  "profile": "<hermes_profile>",
+  "soul_path": "<soul_path>",
+  "root_skill_path": "<root_skill_path>",
+  "env_selector": "ESPORTS_AGENT_ADAPTER"
+}

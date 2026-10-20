@@ -1,6 +1,10 @@
 import ast
+import importlib
 import unittest
 from pathlib import Path
+
+from xiaoxue_api.core.module_loader import discover_module_names
+from xiaoxue_api.core.module_registry import REQUIRED_MANIFEST_FIELDS, normalize_manifest
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,19 +18,21 @@ class BackendArchitectureBoundaryTests(unittest.TestCase):
         self.assertLessEqual(len(source.splitlines()), 20)
         self.assertFalse(any(isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) for node in tree.body))
 
-    def test_active_modules_have_presentation_service_and_data_layers(self):
-        for module_name in (
-            "lineup", "market_notes", "team_data", "daily_content",
-            "profiles", "tk_knowledge", "fundamentals", "analyst", "platform", "weread_bridge",
-            "pre_match", "legacy_trades",
-            "current_event",
-        ):
+    def test_registered_modules_have_public_presentation_and_service_layers(self):
+        for module_name in discover_module_names():
             module_dir = BACKEND_MODULES / module_name
             with self.subTest(module=module_name):
                 self.assertTrue((module_dir / "presentation.py").is_file())
                 self.assertTrue((module_dir / "service.py").is_file())
-                self.assertTrue((module_dir / "repository.py").is_file())
                 self.assertTrue((module_dir / "public.py").is_file())
+
+    def test_all_discovered_modules_have_complete_valid_manifests(self):
+        self.assertTrue(discover_module_names())
+        for module_name in discover_module_names():
+            with self.subTest(module=module_name):
+                imported = importlib.import_module(f"xiaoxue_api.modules.{module_name}.manifest")
+                manifest = normalize_manifest(imported.MODULE, module_name=module_name)
+                self.assertTrue(set(REQUIRED_MANIFEST_FIELDS).issubset(manifest))
 
     def test_backend_modules_never_import_the_application_shell(self):
         for path in BACKEND_MODULES.glob("**/*.py"):

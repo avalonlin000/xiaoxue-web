@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
 
-from .models import GeneralTradingTKIn, GeneralTradingTKStatusIn, TradingNoteIn, TradingNoteTextIn
+from .models import GeneralTradingTKIn, GeneralTradingTKStatusIn, PersonalNoteIn, TradingNoteIn, TradingNoteTextIn
 from . import service
 
 
@@ -20,8 +20,8 @@ def _raise_http(exc: Exception) -> None:
 
 
 @router.get("/tk/search")
-def search_tk(q: str = Query(...), team: str = Query(None), limit: int = Query(20)):
-    return service.search(q, team, limit)
+def search_tk(q: str = Query(...), team: str = Query(None), limit: int = Query(20), game: str = Query(None)):
+    return service.search(q, team, limit, game=game)
 
 
 @router.get("/tk/library")
@@ -59,19 +59,11 @@ def create_tk(data: dict):
         _raise_http(exc)
 
 
-@router.post("/team-trading-notes")
-def create_team_trading_note(data: TradingNoteIn):
+@router.post("/tk/remember")
+def remember_personal_tk(data: PersonalNoteIn):
     try:
-        return service.create_team_trading_note(data)
-    except (service.InvalidInput, service.EntryNotFound, service.ModuleUnavailable) as exc:
-        _raise_http(exc)
-
-
-@router.post("/team-trading-notes/from-text")
-def create_team_trading_note_from_text(data: TradingNoteTextIn):
-    try:
-        return service.create_team_trading_note(service.parse_trading_note_text(data.text))
-    except (service.InvalidInput, service.EntryNotFound, service.TeamUnconfirmed, service.ModuleUnavailable) as exc:
+        return service.remember_personal_note(data.text, data.tags)
+    except service.InvalidInput as exc:
         _raise_http(exc)
 
 
@@ -86,11 +78,11 @@ def list_team_trading_notes(team: str, status: str = "active", limit: int = 20):
 @router.get("/trading-tk")
 def list_general_trading_tk(
     q: str = Query(""), status: str = Query("all"), scope: str = Query("all"), region: str = Query(""),
-    subject: str = Query(""), version_context: str = Query(""), limit: int = Query(100),
+    subject: str = Query(""), version_context: str = Query(""), limit: int = Query(100), game: str = Query(""),
 ):
     try:
         return service.list_general_trading_tk(
-            q, status, limit, scope=scope, region=region, subject=subject, version_context=version_context,
+            q, status, limit, scope=scope, region=region, subject=subject, version_context=version_context, game=game,
         )
     except service.InvalidInput as exc:
         _raise_http(exc)
@@ -108,7 +100,7 @@ def create_general_trading_tk(data: GeneralTradingTKIn):
 def update_general_trading_tk(filename: str, data: GeneralTradingTKStatusIn):
     try:
         return service.update_general_trading_tk_status(filename, data.status, data.review_note)
-    except (service.InvalidInput, service.EntryNotFound) as exc:
+    except (service.InvalidInput, service.EntryNotFound, service.ModuleUnavailable) as exc:
         _raise_http(exc)
 
 

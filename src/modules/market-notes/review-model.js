@@ -8,7 +8,7 @@ export function buildMarketReviewPayload(values = {}) {
     wrong_points: values.wrongPoints || '',
     missing_evidence: values.missingEvidence || '',
     calibration: values.calibration || '',
-    destinations: ['market_notes'],
+    destinations: ['trading_tk'],
     confirmed: false,
   };
 }

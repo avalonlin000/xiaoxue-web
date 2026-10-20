@@ -12,9 +12,10 @@ import { actions as tkLibraryActions } from './modules/tk-library/public.js';
 import { actions as marketNotesActions } from './modules/market-notes/public.js';
 
 const appContext = createAppContext();
-const primaryPages = new Set(['teams', 'event', 'stage', 'tk']);
+const primaryPages = new Set(['teams', 'event', 'stage', 'tk', 'project']);
 const pages = new Set([...primaryPages, 'market']);
 let page = 'teams';
+let projectView = 'book';
 
 function tick() {
   const now = new Date();
@@ -23,21 +24,29 @@ function tick() {
     `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
 }
 
-function showPage(nextPage) {
+function showPage(nextPage, { view = projectView, history = true } = {}) {
   page = pages.has(nextPage) ? nextPage : 'teams';
+  projectView = validProjectView(view) ? view : 'book';
+  const activeTabId = `tab-${page === 'project' ? 'project-center' : page}`;
   document.querySelectorAll('.workspace-tab').forEach(button => {
-    button.classList.toggle('active', button.id === `tab-${page}`);
+    button.classList.toggle('active', button.id === activeTabId);
   });
+  document.getElementById(activeTabId)?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
   document.getElementById('empty-state').style.display = 'none';
   const content = document.getElementById('content-area');
-  content.style.display = 'flex';
-  for (const name of pages) content.classList.toggle(`page-${name}`, page === name);
+  const projectCenter = document.getElementById('project-center');
+  const isProject = page === 'project';
+  content.style.display = isProject ? 'none' : 'flex';
+  projectCenter.classList.toggle('visible', isProject);
+  for (const name of pages) content.classList.toggle(`page-${name}`, !isProject && page === name);
   appContext.events.emit('page:changed', { page });
+  if (isProject) appContext.events.emit('project-center:shown', { view: projectView });
   if (page === 'market') marketNotesActions.load().catch(() => {});
   if (page === 'tk') {
     tkLibraryActions.populateTeams(teamsActions.snapshot().teams);
     if (!tkLibraryActions.getState().library.initialized) tkLibraryActions.load(true);
   }
+  if (history) updateLocation(page, projectView);
 }
 
 function bindShell() {
@@ -54,6 +63,14 @@ function bindShell() {
       teamsActions.closeTeamDropdown();
     }
   });
+  appContext.events.on('project-center:navigate', ({ view }) => showPage('project', { view }));
+  appContext.events.on('project-center:open-entry', ({ page: targetPage }) => showPage(targetPage));
+  const restoreFromLocation = () => {
+    const target = locationTarget();
+    showPage(target.page, { view: target.view, history: false });
+  };
+  window.addEventListener('popstate', restoreFromLocation);
+  window.addEventListener('hashchange', restoreFromLocation);
 }
 
 async function init() {
@@ -74,6 +91,7 @@ async function init() {
       getTeams: () => teamsActions.snapshot().teams,
       getSelectedTeam: () => appContext.selectedTeam,
       readerRoot: document.getElementById('tk-reader-overlay'),
+      quickReaderRoot: document.getElementById('tk-quick-reader'),
       editorRoot: document.getElementById('tk-editor-overlay'),
       quickSearchRoot: document.getElementById('card-tk'),
     },
@@ -94,9 +112,30 @@ async function init() {
   const teams = teamsActions.snapshot();
   tkLibraryActions.populateTeams(teams.teams);
   appContext.events.on('team:selected', ({ team }) => {
-    if (team) tkLibraryActions.quickSearch(team);
+    if (team) {
+      tkLibraryActions.closeQuickReader();
+      tkLibraryActions.quickSearch('', { team, teamOverview: true });
+    }
   });
-  showPage('teams');
+  const target = locationTarget();
+  showPage(target.page, { view: target.view, history: false });
+}
+
+function validProjectView(value) {
+  return ['book', 'architecture', 'objects', 'modules', 'requests', 'deliveries', 'manual'].includes(value);
+}
+
+function locationTarget() {
+  const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
+  const project = raw.match(/^project-center(?:\/(book|architecture|objects|modules|requests|deliveries|manual))?$/);
+  if (project) return { page: 'project', view: project[1] || 'book' };
+  return { page: pages.has(raw) ? raw : 'teams', view: 'book' };
+}
+
+function updateLocation(nextPage, nextProjectView) {
+  const hash = nextPage === 'project' ? `#project-center/${nextProjectView}` : `#${nextPage}`;
+  if (location.hash === hash) return;
+  history.pushState({}, '', hash);
 }
 
 tick();

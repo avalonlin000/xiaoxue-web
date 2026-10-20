@@ -2,7 +2,6 @@ export function createTeamsView(doc = document) {
   const root = doc.getElementById('card-fundamentals');
   if (!root) throw new Error('队伍资料入口不存在');
   const listeners = [];
-  let saveTimer = null;
 
   function listen(element, eventName, listener) {
     if (!element) return;
@@ -25,19 +24,8 @@ export function createTeamsView(doc = document) {
           handlers.onScope?.(button.dataset.scope || 'all');
         });
       });
-      const saveButton = doc.getElementById('btn-save');
-      removeLegacyHandler(saveButton, 'onclick');
-      listen(saveButton, 'click', (event) => {
-        event.preventDefault();
-        handlers.onSave?.();
-      });
       listen(doc.getElementById('profile-toggle'), 'click', () => handlers.onToggleProfile?.());
       listen(doc.querySelector('[data-teams-action="refresh-fundamentals"]'), 'click', () => handlers.onScope?.('lpl'));
-      ['d1-val', 'd2-val', 'd3-val', 'notes-area'].forEach((id) => {
-        const input = doc.getElementById(id);
-        removeLegacyHandler(input, 'onchange');
-        listen(input, 'change', () => handlers.onDirty?.());
-      });
       listen(doc, 'click', (event) => {
         const dropdown = doc.getElementById('team-dropdown');
         const button = doc.getElementById('sel-team');
@@ -48,14 +36,12 @@ export function createTeamsView(doc = document) {
       listen(doc, 'keydown', (event) => {
         if (event.ctrlKey && event.key.toLowerCase() === 's') {
           event.preventDefault();
-          handlers.onSave?.();
         }
         if (event.key === 'Escape') handlers.onEscape?.();
       });
     },
     unbind() {
       listeners.splice(0).forEach((dispose) => dispose());
-      if (saveTimer) clearTimeout(saveTimer);
     },
     markStatus(status, message = '') {
       root.dataset.moduleId = 'teams';
@@ -89,26 +75,6 @@ export function createTeamsView(doc = document) {
       column?.classList.toggle('collapsed');
       if (button && column) button.textContent = column.classList.contains('collapsed') ? '▶' : '◀';
     },
-    applyEditCommand(field, value, rawCommand = '') {
-      const fixed = { '操稳': 'd1-val', '血腥': 'd1-val', '运营': 'd2-val' };
-      const labels = [1, 2, 3].map((index) => ({
-        label: doc.getElementById(`d${index}-label`)?.textContent || '', id: `d${index}-val`,
-      }));
-      const matched = labels.find((item) => item.label && field.includes(item.label));
-      const id = matched?.id || Object.entries(fixed).find(([name]) => field.includes(name))?.[1];
-      if (id) {
-        const input = doc.getElementById(id);
-        if (input) { input.value = value; input.focus(); return true; }
-      }
-      const notes = doc.getElementById('notes-area');
-      if (notes) {
-        const text = rawCommand.replace(/^改\s*/, '');
-        notes.value += `${notes.value ? '\n' : ''}${text}`;
-        notes.focus();
-        return true;
-      }
-      return false;
-    },
     updateTopBar(team) {
       setText(doc, 'sel-team-label', team || '选择队伍…');
       setText(doc, 'sel-team-code', team || '');
@@ -122,7 +88,6 @@ export function createTeamsView(doc = document) {
       if (profile) profile.innerHTML = `<div class="tk-empty">加载 ${escapeHtml(team)} 队伍资料中…</div>`;
     },
     renderProfile(profile, team) { renderProfile(profile, team, doc); },
-    render3D(data) { render3D(data, doc); this.setDirty(false); },
     loadingFundamentals(scope) {
       doc.querySelectorAll('.scope-btn').forEach((button) => button.classList.toggle('active', button.dataset.scope === scope));
       const table = doc.getElementById('fundamentals-table');
@@ -133,29 +98,6 @@ export function createTeamsView(doc = document) {
       const table = doc.getElementById('fundamentals-table');
       if (table) table.innerHTML = '<div class="tk-empty" style="color:var(--red)">队伍资料加载失败</div>';
     },
-    read3D() {
-      return {
-        dim_1_value: valueOf(doc, 'd1-val'), dim_2_value: valueOf(doc, 'd2-val'),
-        dim_3_value: valueOf(doc, 'd3-val'), notes: valueOf(doc, 'notes-area'),
-      };
-    },
-    setDirty(dirty) {
-      const button = doc.getElementById('btn-save');
-      if (!button) return;
-      button.classList.toggle('saved', !dirty);
-      button.disabled = !dirty;
-    },
-    saving() { showSaveMessage(doc, '保存中…', 'save-msg show'); },
-    saved() {
-      this.setDirty(false);
-      showSaveMessage(doc, '✅ 已保存', 'save-msg show');
-      saveTimer = setTimeout(() => doc.getElementById('save-msg')?.classList.remove('show'), 2000);
-    },
-    saveFailed() {
-      showSaveMessage(doc, '❌ 保存失败', 'save-msg show err');
-      const button = doc.getElementById('btn-save');
-      if (button) button.disabled = false;
-    },
   };
 }
 
@@ -165,6 +107,19 @@ export function markTeamsModule(root, status, message = '') {
   root.dataset.moduleMessage = message;
 }
 
+const FUNDAMENTALS_SORT_STATE = new WeakMap();
+const FUNDAMENTALS_FOCUS_STATE = new WeakMap();
+const DEFAULT_FUNDAMENTALS_SORT = Object.freeze({ key: 'power_score', direction: 'desc' });
+
+const FUNDAMENTALS_SORTS = Object.freeze({
+  team: { directions: ['asc', 'desc'] },
+  power_score: { directions: ['desc', 'asc', null] },
+  volatility_score: { directions: ['desc', 'asc', null] },
+  trend: { directions: ['desc', 'asc', null] },
+  momentum: { directions: ['desc', 'asc', null] },
+  status: { directions: ['desc', 'asc'] },
+});
+
 export function renderFundamentalsTable(rows, onSelectTeam, doc = document) {
   const element = doc.getElementById('fundamentals-table');
   if (!element) return;
@@ -172,42 +127,299 @@ export function renderFundamentalsTable(rows, onSelectTeam, doc = document) {
     element.innerHTML = '<div class="tk-empty">暂无队伍资料</div>';
     return;
   }
-  const head = '<div class="fund-row fund-head"><span>队伍</span><span>赛区</span><span>赔率</span><span>实力均值</span><span>波动</span><span>TS</span><span>风格摘要</span><span>首发</span><span>资料</span></div>';
-  element.innerHTML = head + rows.map((team) => {
-    const quality = team.data_quality === '完整' ? 'good' : (team.data_quality === '部分' ? 'mid' : 'low');
-    const summary = team.notes_summary || '暂无摘要，待补画像/TK';
-    const number = (value) => Number(value ?? 0).toFixed(1);
-    const odds = team.odds ? Number(team.odds).toFixed(1) : '-';
+  const sortState = FUNDAMENTALS_SORT_STATE.get(element) || { key: null, direction: null };
+  const focusSignal = FUNDAMENTALS_FOCUS_STATE.get(element) || '';
+  const focusRows = focusSignal
+    ? rows.filter((team) => cycleFocusGroup(team.ts_display?.cycle) === focusSignal)
+    : rows;
+  const sortedRows = sortFundamentalsRows(focusRows, sortState);
+  renderCycleFocusPanel(doc, rows, focusSignal, (nextSignal) => {
+    FUNDAMENTALS_FOCUS_STATE.set(element, nextSignal);
+    renderFundamentalsTable(rows, onSelectTeam, doc);
+  });
+
+  // 本表消费 TS 展示层：队伍 | 赛区 | 综合实力 | 稳定性 | 趋势 | 势头 | 走势类型 | 状态。
+  element.innerHTML = renderFundamentalsHead(sortState) + sortedRows.map((team) => {
+    const signedNumber = (value) => {
+      const n = Number(value ?? 0);
+      return `${n > 0 ? '+' : ''}${n.toFixed(1)}`;
+    };
+    // ts_display 的五项均是处理后的展示值；趋势/势头为 -100～+100 有向信号，原始 mu/sigma/ts 不进用户界面。
+    const display = team.ts_display || {};
+    const trendText = display.trend === undefined ? '-' : signedNumber(display.trend);
+    const momentumText = display.momentum === undefined
+      ? '-'
+      : momentumPhase(display.trend, display.momentum);
+    const cycleText = display.cycle
+      ? `${display.cycle.cycle_type}·${display.cycle.cycle_stage}`
+      : '-';
+    const statusClass = statusTone(display.status);
     return `<div class="fund-row" data-team="${escapeAttr(team.short_name)}">
-      <span class="fund-team">${escapeHtml(team.short_name)}</span><span>${escapeHtml(team.region || '-')}</span>
-      <span>${escapeHtml(odds)}</span><span>${number(team.seed_mu ?? team.mu)}</span>
-      <span>${number(team.seed_sigma ?? team.sigma)}</span><span>${number(team.seed_ts ?? team.ts_score)}</span>
-      <span>${escapeHtml(summary)}</span><span class="player-cards">${renderPlayerCards(team.players || [], team.players_note)}</span>
-      <span class="quality ${quality}">${escapeHtml(team.data_quality || '资料不足')}</span></div>`;
+      <span class="fund-team">${escapeHtml(team.short_name)}</span><span class="fund-region">${escapeHtml(team.region || '-')}</span>
+      <span class="fund-num">${display.power_score ?? '-'}</span>
+      <span class="fund-num">${display.volatility_score ?? '-'}</span><span class="fund-num">${trendText}</span><span class="fund-num fund-momentum">${escapeHtml(momentumText)}</span>
+      <span class="fund-cycle" title="${escapeAttr(display.cycle?.signal_reason || '')}">${escapeHtml(cycleText)}</span>
+      <span class="fund-status"><span class="fund-status-tag ${statusClass}">${escapeHtml(display.status || '-')}</span></span>
+    </div>`;
   }).join('');
   element.querySelectorAll('[data-team]').forEach((row) => {
     row.addEventListener('click', () => onSelectTeam?.(row.dataset.team));
   });
+  element.querySelectorAll('[data-fundamentals-sort]').forEach((header) => {
+    const applySort = () => {
+      FUNDAMENTALS_SORT_STATE.set(element, nextFundamentalsSort(sortState, header.dataset.fundamentalsSort));
+      renderFundamentalsTable(rows, onSelectTeam, doc);
+    };
+    header.addEventListener('click', applySort);
+    header.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        applySort();
+      }
+    });
+  });
 }
 
-function renderProfile(profile, team, doc) {
+function momentumPhase(trendValue, momentumValue) {
+  const trend = Number(trendValue ?? 0);
+  const momentum = Number(momentumValue ?? 0);
+  if (trend > 15 && momentum > 15) return '上涨加速 ↑';
+  if (trend > 15 && momentum < -15) return '上涨钝化 ↓';
+  if (trend < -15 && momentum < -15) return '下跌加速 ↓';
+  if (trend < -15 && momentum > 15) return '下跌钝化 ↑';
+  if (trend >= 85 && momentum >= -15 && momentum <= 15) return '高位延续观察 →';
+  if (trend <= -85 && momentum >= -15 && momentum <= 15) return '低位延续观察 →';
+  if (Math.abs(trend) <= 15 && momentum > 15) return '上涨启动 ↑';
+  if (Math.abs(trend) <= 15 && momentum < -15) return '下跌启动 ↓';
+  return '变化平缓 →';
+}
+
+function cycleFocusGroup(cycle) {
+  const signal = cycle?.focus_signal || '';
+  if (signal === '上行启动' || signal === '强势上行') return 'up';
+  if (signal === '下行启动' || signal === '强势下行') return 'down';
+  if (signal === '强震荡') return 'oscillation';
+  if (signal === '趋势末期') return 'late';
+  return '';
+}
+
+function renderCycleFocusPanel(doc, rows, activeSignal, onSelect) {
+  const panel = doc.getElementById('cycle-focus-panel');
+  if (!panel) return;
+  const groups = [
+    ['up', '上行趋势'],
+    ['down', '下行趋势'],
+    ['oscillation', '强震荡'],
+    ['late', '趋势末期'],
+  ].map(([signal, label]) => ({
+    signal,
+    label,
+    teams: rows.filter((team) => cycleFocusGroup(team.ts_display?.cycle) === signal),
+  }));
+  const activeGroups = groups.filter((group) => group.teams.length);
+  panel.innerHTML = `<div class="cycle-focus-head"><b>周期重点关注</b><span>只筛已形成明显周期结构的队伍</span></div>
+    <div class="cycle-focus-actions">
+      <button class="cycle-filter ${activeSignal ? '' : 'active'}" data-cycle-filter="">全部队伍</button>
+      ${activeGroups.map((group) => `<button class="cycle-filter ${activeSignal === group.signal ? 'active' : ''}" data-cycle-filter="${group.signal}">${group.label} <b>${group.teams.length}</b></button>`).join('')}
+    </div>
+    <div class="cycle-focus-list">${activeGroups.length
+      ? activeGroups.map((group) => `<span><b>${group.label}</b>：${group.teams.map((team) => `${escapeHtml(team.short_name)}（${escapeHtml(team.ts_display?.cycle?.cycle_stage || '')}）`).join('、')}</span>`).join('')
+      : '<span>当前没有足够明显的周期重点信号，保持观察。</span>'}</div>
+    <p class="cycle-focus-help">怎么用：先点信号筛队，再点队伍看原因；上行和下行都是周期方向，强震荡不按单边趋势处理，趋势末期等待后续确认。</p>
+    <details class="cycle-focus-guide"><summary>这四类重点怎么用</summary><ul><li><b>上行趋势</b>：初期重点跟踪能否连续确认；延续期可作背景，不当新机会。</li><li><b>下行趋势</b>：同样是方向结构；初期重点确认，延续期防止仍按旧印象高估。</li><li><b>强震荡</b>：不把一场赢或输当趋势反转，优先看对手和其他条件。</li><li><b>趋势末期</b>：变化持续过久或开始钝化，只做反转观察，不能直接追反转。</li></ul></details>`;
+  panel.querySelectorAll('[data-cycle-filter]').forEach((button) => {
+    button.addEventListener('click', () => onSelect(button.dataset.cycleFilter || ''));
+  });
+}
+
+function renderFundamentalsHead(sortState) {
+  return `<div class="fund-row fund-head">
+    ${renderSortHeader('team', '队伍', 'fund-team', sortState)}
+    <span class="fund-region">赛区</span>
+    ${renderSortHeader('power_score', '综合实力', 'fund-num', sortState)}
+    ${renderSortHeader('volatility_score', '稳定性', 'fund-num', sortState)}
+    ${renderSortHeader('trend', '趋势', 'fund-num', sortState)}
+    ${renderSortHeader('momentum', '势头', 'fund-num', sortState)}
+    <span class="fund-cycle">走势类型</span>
+    ${renderSortHeader('status', '状态', 'fund-status', sortState)}
+  </div>`;
+}
+
+function renderSortHeader(key, label, className, sortState) {
+  const active = sortState.key === key && sortState.direction;
+  const direction = active ? sortState.direction : null;
+  const arrow = direction === 'asc' ? '▲' : (direction === 'desc' ? '▼' : '');
+  const ariaSort = direction === 'asc' ? 'ascending' : (direction === 'desc' ? 'descending' : 'none');
+  const nextDirection = nextFundamentalsSort(sortState, key).direction;
+  const orderText = key === 'status'
+    ? (nextDirection === 'desc' ? '强到弱' : '弱到强')
+    : (nextDirection === 'asc' ? '升序' : (nextDirection === 'desc' ? '降序' : '默认顺序'));
+  const style = active
+    ? 'cursor:pointer;color:var(--blue);background:var(--blue-light);border-radius:6px;padding:2px 4px;'
+    : 'cursor:pointer;padding:2px 4px;';
+  return `<span class="${className}" data-fundamentals-sort="${key}" role="button" tabindex="0" aria-sort="${ariaSort}" title="点击按${orderText}排序" style="${style}">${label}<span aria-hidden="true">${arrow ? ` ${arrow}` : ''}</span></span>`;
+}
+
+function nextFundamentalsSort(sortState, key) {
+  const directions = FUNDAMENTALS_SORTS[key]?.directions || [];
+  const current = sortState.key === key ? sortState.direction : null;
+  const currentIndex = directions.indexOf(current);
+  const direction = directions[(currentIndex + 1) % directions.length];
+  return direction ? { key, direction } : { key: null, direction: null };
+}
+
+function sortFundamentalsRows(rows, sortState) {
+  // 默认也固定为综合实力降序，避免后端投影顺序变化影响用户第一眼看到的强弱顺序。
+  const activeSort = sortState.key && sortState.direction ? sortState : DEFAULT_FUNDAMENTALS_SORT;
+  return rows.map((team, index) => ({ team, index })).sort((left, right) => {
+    const compared = compareFundamentalsTeams(left.team, right.team, activeSort);
+    return compared || left.index - right.index;
+  }).map(({ team }) => team);
+}
+
+function compareFundamentalsTeams(left, right, sortState) {
+  const { key, direction } = sortState;
+  if (key === 'team') {
+    const result = String(left.short_name || '').localeCompare(String(right.short_name || ''), 'en', { sensitivity: 'base' });
+    return direction === 'asc' ? result : -result;
+  }
+  if (key === 'status') return compareStatusValues(left.ts_display?.status, right.ts_display?.status, direction);
+  const leftValue = displayNumber(left.ts_display?.[key]);
+  const rightValue = displayNumber(right.ts_display?.[key]);
+  return compareDisplayValues(leftValue, rightValue, direction);
+}
+
+function displayNumber(value) {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
+}
+
+function statusParts(status) {
+  const text = String(status || '');
+  if (!text) return null;
+  const strength = text.includes('强') ? 2 : (text.includes('弱') ? 1 : 0);
+  const trend = text.includes('上升') ? 4 : (text.includes('回升') ? 3 : (text.includes('平稳') ? 2 : (text.includes('下滑') ? 1 : 0)));
+  return { strength, trend };
+}
+
+function compareStatusValues(left, right, direction) {
+  const leftParts = statusParts(left);
+  const rightParts = statusParts(right);
+  if (!leftParts) return rightParts ? 1 : 0;
+  if (!rightParts) return -1;
+  const strength = direction === 'asc'
+    ? leftParts.strength - rightParts.strength
+    : rightParts.strength - leftParts.strength;
+  // 切换只反转强/弱主序；同一档位内始终按“上升→回升→平稳→下滑”。
+  return strength || rightParts.trend - leftParts.trend;
+}
+
+function compareDisplayValues(left, right, direction) {
+  if (left === null) return right === null ? 0 : 1;
+  if (right === null) return -1;
+  return (direction === 'asc' ? 1 : -1) * (left - right);
+}
+
+function statusTone(status) {
+  if (!status) return '';
+  if (status.includes('上升') || status.includes('回升')) return 'tone-up';
+  if (status.includes('下滑')) return 'tone-down';
+  return 'tone-flat';
+}
+
+function renderProfile(profile, teamInfo, doc) {
   const element = doc.getElementById('profile-content');
   if (!element) return;
-  element.innerHTML = profile?.found ? profile.html : `<div style="padding:20px;color:var(--ink-3);text-align:center">
-    <div style="font-size:32px;margin-bottom:8px">📄</div>暂无 ${escapeHtml(team)} 的画像<br>
-    <span style="font-size:12px">（SKILL.md 不存在）</span></div>`;
+  const team = typeof teamInfo === 'string'
+    ? { short_name: teamInfo, name: teamInfo }
+    : (teamInfo || {});
+  const shortName = team.short_name || team.name || '';
+  const fullName = team.name || shortName;
+  const sections = extractProfileSections(profile?.markdown || '');
+  const heading = `<header class="profile-team-header">
+    <span class="profile-team-code">${escapeHtml(shortName)}</span>
+    <span class="profile-team-name">${escapeHtml(fullName)}</span>
+  </header>`;
+
+  element.innerHTML = profile?.found && sections.length
+    ? `${heading}<div class="profile-sections">${sections.map((section) => `
+      <section class="profile-section">
+        <h2>${escapeHtml(section.title)}</h2>
+        <div class="profile-section-body">${renderProfileMarkdown(section.content)}</div>
+      </section>`).join('')}</div>`
+    : `${heading}<div class="profile-empty">暂无 ${escapeHtml(shortName)} 的画像，可直接和小雪说补上。</div>`;
 }
 
-function render3D(data, doc) {
-  const values = data || {};
-  setText(doc, 'd1-label', values.dim_1_name || '---');
-  setValue(doc, 'd1-val', data ? values.dim_1_value || '-' : '-');
-  setText(doc, 'd2-label', values.dim_2_name || '---');
-  setValue(doc, 'd2-val', data ? values.dim_2_value || '-' : '-');
-  setText(doc, 'd3-label', values.dim_3_name || '---');
-  setValue(doc, 'd3-val', data ? values.dim_3_value || '-' : '-');
-  setValue(doc, 'notes-area', values.notes || '');
-  setText(doc, 'dim-updated', values.updated_at ? ` · 更新于 ${values.updated_at}` : '');
+const PROFILE_SECTION_TITLES = ['队伍定位', '怎么赢', '怎么输', '关键点', 'BP 倾向'];
+
+function extractProfileSections(markdown = '') {
+  const contentByTitle = new Map();
+  let activeTitle = '';
+  String(markdown).split('\n').forEach((rawLine) => {
+    const line = rawLine.trim();
+    const section = matchProfileSection(line);
+    if (section) {
+      activeTitle = section.title;
+      contentByTitle.set(section.title, [section.content]);
+      return;
+    }
+    // 只接收当前五项的缩进续行，避免把其他资料混入队伍画像列。
+    if (activeTitle && /^\s{2,}\S/.test(rawLine) && !/^\s*#/.test(rawLine)) {
+      contentByTitle.get(activeTitle).push(line);
+      return;
+    }
+    if (line) activeTitle = '';
+  });
+  return PROFILE_SECTION_TITLES
+    .filter((title) => contentByTitle.has(title))
+    .map((title) => ({ title, content: contentByTitle.get(title).join('\n').trim() }))
+    .filter((section) => section.content);
+}
+
+function matchProfileSection(line) {
+  const bold = line.match(/^(?:[-*•]\s+)?\*\*([^*]+?)\*\*\s*(.*)$/);
+  const plain = line.match(/^(?:[-*•]\s+)?(队伍定位|怎么赢|怎么输|关键点|BP\s*倾向)\s*[：:]\s*(.*)$/);
+  const candidate = bold ? bold[1] : plain?.[1];
+  const title = String(candidate || '').replace(/[：:\s]/g, '');
+  const matchedTitle = PROFILE_SECTION_TITLES.find((item) => item.replace(/\s/g, '') === title);
+  if (!matchedTitle) return null;
+  const content = bold ? bold[2] : plain?.[2];
+  return { title: matchedTitle, content: String(content || '').trim() };
+}
+
+function renderProfileMarkdown(value = '') {
+  const blocks = [];
+  let listOpen = false;
+  const closeList = () => {
+    if (listOpen) blocks.push('</ul>');
+    listOpen = false;
+  };
+  String(value).split('\n').map((line) => line.trim()).forEach((line) => {
+    if (!line) {
+      closeList();
+      return;
+    }
+    const heading = line.match(/^(#{1,4})\s+(.+)$/);
+    const listItem = line.match(/^[-*•]\s+(.+)$/);
+    if (heading) {
+      closeList();
+      const level = Math.min(4, heading[1].length + 2);
+      blocks.push(`<h${level}>${renderProfileInlineMarkdown(heading[2])}</h${level}>`);
+    } else if (listItem) {
+      if (!listOpen) blocks.push('<ul>');
+      listOpen = true;
+      blocks.push(`<li>${renderProfileInlineMarkdown(listItem[1])}</li>`);
+    } else {
+      closeList();
+      blocks.push(`<p>${renderProfileInlineMarkdown(line)}</p>`);
+    }
+  });
+  closeList();
+  return blocks.join('');
+}
+
+function renderProfileInlineMarkdown(value) {
+  return escapeHtml(value).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
 }
 
 function renderTeamDropdown(doc, teams, onSelectTeam) {
@@ -240,21 +452,7 @@ function positionDropdown(doc, dropdown) {
   dropdown.style.left = `${rect.left}px`;
 }
 
-function renderPlayerCards(players, note) {
-  if (!players.length) return `<span class="player-card gap">${escapeHtml(note || '资料缺口/暂无数据')}</span>`;
-  return players.map((player) => `<span class="player-card" title="${escapeAttr(player.status || '资料缺口')}"><b>${escapeHtml(player.role || '位置暂无数据')}</b>${escapeHtml(player.name || '暂无数据')}</span>`).join('');
-}
-
-function showSaveMessage(doc, text, className) {
-  const message = doc.getElementById('save-msg');
-  if (!message) return;
-  message.textContent = text;
-  message.className = className;
-}
-
 function setText(doc, id, value) { const element = doc.getElementById(id); if (element) element.textContent = value; }
-function setValue(doc, id, value) { const element = doc.getElementById(id); if (element) element.value = value; }
-function valueOf(doc, id) { return doc.getElementById(id)?.value || ''; }
 function removeLegacyHandler(element, attribute) {
   if (!element) return;
   element.removeAttribute(attribute);

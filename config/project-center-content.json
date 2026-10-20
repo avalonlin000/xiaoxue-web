@@ -1,0 +1,1639 @@
+{
+  "schema": "xiaoxue-project-center-content-v2",
+  "content_version": "2026-10-20.1",
+  "content_schema": {
+    "book": "chapters: id, title, summary, paragraphs, module_tree_ids",
+    "module_tree": "node: id, name, purpose, when_to_use, current_capability, entry, ability_ids, related_modules, boundaries, next_step, basket_module_id, engineering_details, children",
+    "manual": "scenarios: id, title, what, where, say, get, not_for, module_tree_id"
+  },
+  "project": {
+    "name": "小雪项目中心",
+    "summary": "先看清小雪现在能怎样帮你，再按眼前的问题开始；哪里不顺，就留下来继续改。",
+    "boundary": "小雪负责事实、资料、分析、记录与复盘辅助；交易决定始终由钧钧自己作出。"
+  },
+  "book": {
+    "headline": "先看清小雪现在怎样，再决定哪里值得改。",
+    "directory_label": "项目开发书目录",
+    "chapters": [
+      {
+        "id": "what-is-xiaoxue",
+        "title": "小雪是什么",
+        "summary": "一位长期陪你看 LOL 的电竞交易辅助，不替你下单，也不把资料伪装成结论。",
+        "paragraphs": [
+          "小雪帮你把队伍、版本、资料、比赛变化、自己的观察和赛后结果放回各自该在的位置：需要时查回、对照、记录、复盘；基于证据给出建议时，也会说明资料从哪里来、还缺什么和什么会改变判断。",
+          "她不是普通赛程表：赛程只是理解当前赛事和一场比赛的背景。她也不是自动交易机器人：不会替你下单、跟单、发布交易结论或承诺必然结果。最终判断与交易决定始终在你手里。"
+        ],
+        "module_tree_ids": [
+          "long-term-understanding",
+          "methods-and-judgment"
+        ]
+      },
+      {
+        "id": "three-windows",
+        "title": "三个使用窗口，各做各最擅长的事",
+        "summary": "聊天与工作台可分别使用；日报与自动化要先核对当天状态，不能默认有成品。",
+        "paragraphs": [
+          "小雪对话适合动态问题：想问一场比赛、追问队伍、BP 出来后看纯阵容、明确讨论交易方法、留下观察或做复盘。你只需要正常说话，不必记工具名或固定口令。",
+          "工作台适合慢下来查看和管理：横向看队伍与当前赛事，检索长期 TK，查看单场已留下的内容和阶段沉淀候选。它不替代聊天生成判断，也不要求你按页面规定的顺序操作。",
+          "日报与自动化是信息供给，不是稳定可用的默认承诺。当前核对时日报当天内容未齐，日报与知识自动化显示需要处理；不能据此说任务已经成功或已发布。后续是否恢复以刷新后的状态为准，其他可用入口仍可独立使用。"
+        ],
+        "module_tree_ids": [
+          "daily-and-automation",
+          "workbench-and-project",
+          "chat-capability"
+        ]
+      },
+      {
+        "id": "flexible-thread",
+        "title": "从一个问题到长期理解，是一条可组合的主线",
+        "summary": "资料、赛前、BP、记录、复盘和长期知识相互连接，但不是必须照着跑的流水线。",
+        "paragraphs": [
+          "常见的一条线是：先看资料和当前赛事，按需要为一场比赛准备；BP 出来后只分析十个英雄；临场留下盘口或变化；赛后把原判断和实际结果对照；最后只把足够稳定、可复用的结论沉淀为长期知识。",
+          "但这不是必须照着跑的流水线：你可以从任何一个问题开始，只查一支队、只找一条 TK、只看阵容、只记录一句变化或直接复盘都可以。临时比赛线程可以切换、暂停和恢复；它不会因为被打开就自动写进画像、TK 或交易结论。"
+        ],
+        "module_tree_ids": [
+          "current-event-prep",
+          "methods-and-judgment",
+          "records-and-review",
+          "knowledge-and-data"
+        ]
+      },
+      {
+        "id": "why-this-design",
+        "title": "为什么现在这样设计",
+        "summary": "把长期事实、临时判断、交易方法和页面职责拆开，才不会因为一次使用把所有东西混在一起。",
+        "paragraphs": [
+          "队伍长期理解已经收成五项画像：队伍定位、怎么赢、怎么输、关键点、BP 倾向。原来的三维只保留兼容投影，不再是需要单独维护的第二份队伍描述。TS、首发、版本和赛果是会变的事实；TK 和你的交易记录是材料或个人判断，不能自动改写画像。",
+          "纯十英雄阵容分析与交易判断分开：前者只看蓝红方十个英雄和通用版本知识；明确讨论交易时，才另行结合队伍、市场、趋势、分歧和风险。这样不会把一条阵容结论伪装成完整交易决定。",
+          "对话负责理解问题、按需组合能力和继续追问；页面负责查看、整理、复制提示、记录和回看。资料不足、新旧冲突、临时观察和长期知识也各自显式保留，不能被静默拼成一个看似确定的答案。"
+        ],
+        "module_tree_ids": [
+          "long-term-understanding",
+          "methods-and-judgment",
+          "records-and-review"
+        ]
+      },
+      {
+        "id": "capability-map",
+        "title": "项目能力地图",
+        "summary": "按资料、当前赛事、方法、记录、知识、日报、工作台和对话八个方向展开，不用记技术名。",
+        "paragraphs": [
+          "每一块下面都写清它解决什么、什么时候用、从哪里进入、当前状态、相互关系和不能越过的边界。状态来自当前项目合同和运行观察；内容说明只解释使用效果，不把实现细节塞到默认阅读里。"
+        ],
+        "module_tree_ids": [
+          "long-term-understanding",
+          "current-event-prep",
+          "methods-and-judgment",
+          "records-and-review",
+          "knowledge-and-data",
+          "daily-and-automation",
+          "workbench-and-project",
+          "chat-capability"
+        ]
+      },
+      {
+        "id": "real-status",
+        "title": "怎样读当前真实状态",
+        "summary": "可用、部分可用、暂停、待真实验收、资料不足/冲突与已废弃不是同一件事。",
+        "paragraphs": [
+          "可用表示已有实际入口能给出结果；部分可用表示入口或能力存在，但资料覆盖、内容新鲜度或某个环节仍有限制。资料不足和冲突会单独出现，不把旧资料或相邻对象拿来填空。",
+          "模块状态同时参考已交付范围和当前运行结果：合同仍是部分可用的能力，不会因为接口有响应就升级成稳定可用；需要处理的模块要看具体受影响部分。日报内容未齐不等于主动暂停，不能仅凭缺内容推断任务被暂停或已发布。旧三维独立维护、退役记录表和旧固定流程不再作为当前入口。"
+        ],
+        "module_tree_ids": [
+          "daily-and-automation",
+          "knowledge-and-data",
+          "workbench-and-project"
+        ]
+      },
+      {
+        "id": "long-term-road",
+        "title": "长期路线：先把真实使用走通",
+        "summary": "当前优先是薄骨架、可组合能力和真实日常路径，不是再堆一条强制大流程。",
+        "paragraphs": [
+          "接下来优先让已有能力在真实入口里稳定衔接：资料缺口如实可见，当前赛事能按问题组织，纯阵容和交易判断不混用，记录能读回，复盘能区分一次观察与长期结论。新增能力应像插入一块积木，而不是重写小雪的核心思路。",
+          "当前明确不做：自动交易、把日报当成全部入口、把工作台改成网页聊天、把前端变成另一套固定业务流程，也不会为了填满内容恢复旧赛事、旧数据或废弃功能。"
+        ],
+        "module_tree_ids": [
+          "current-event-prep",
+          "methods-and-judgment",
+          "records-and-review"
+        ]
+      },
+      {
+        "id": "how-to-improve",
+        "title": "怎样参与改进",
+        "summary": "先留下真实感受，再在飞书聊清楚；处理、体验和归档各有自己的位置。",
+        "paragraphs": [
+          "任何模块里觉得不顺，直接点“加入待修改”，可选补一句当时的感受。不必先写成工单，也不代表已经承诺施工。",
+          "回到飞书说“聊聊待修改”，把真实使用中的问题、想要的体验和边界聊清楚后，才进入正式处理。完成后会出现在“当前交付”供你体验；好用就归档，还不对就放回待修改。"
+        ],
+        "module_tree_ids": [
+          "workbench-and-project"
+        ]
+      }
+    ],
+    "status_guide": [
+      {
+        "label": "可用",
+        "meaning": "已有实际入口能读取或完成当前能力。"
+      },
+      {
+        "label": "部分可用",
+        "meaning": "入口可用，但资料、覆盖范围或后续环节仍有限制。"
+      },
+      {
+        "label": "暂时暂停",
+        "meaning": "能力并不等于今天在运行；暂停会单独说明。"
+      },
+      {
+        "label": "待真实验收",
+        "meaning": "已有实现或局部回归，但仍需从真实日常入口走通。"
+      },
+      {
+        "label": "资料不足 / 冲突",
+        "meaning": "明确保留缺口或分歧，不用猜测补齐。"
+      },
+      {
+        "label": "已废弃 / 兼容",
+        "meaning": "仅为读回旧内容保留，不再作为当前主线。"
+      }
+    ],
+    "not_now": "不把项目中心做成网页聊天、自动交易、另一套固定流程，或展示一墙技术实现。"
+  },
+  "module_tree": [
+    {
+      "id": "daily-and-automation",
+      "group": "mainline",
+      "name": "日报与自动化",
+      "purpose": "把今日成品、资料准备状态、后台健康与主动暂停分开讲清楚，不让“有任务”冒充“今天有内容”。",
+      "when_to_use": "想知道今天先看什么、日报为何没出现、资料是否准备好，或需要理解自动化当前状态时。",
+      "current_capability": "可以查看整体状态和今天内容是否齐全；日报与知识自动化当前有需要处理部分。状态可读取不等于日报已生成、知识已导入或任务成功运行。",
+      "entry": {
+        "type": "status",
+        "page": "project",
+        "label": "查看今日与运行状态",
+        "chat_prompt": "看看今天内容是否准备好；若没有，说明是无比赛、资料不足、暂停还是状态读不到"
+      },
+      "ability_ids": [
+        "daily_knowledge",
+        "knowledge_automation",
+        "current_match"
+      ],
+      "related_modules": [
+        "当前赛事",
+        "知识与数据",
+        "工作台体验"
+      ],
+      "boundaries": "后台任务只提供数据和状态，不替小雪决定业务结论；不因入口存在就声称日报已生成或自动化已完成。",
+      "next_step": "先查当天数据准备、最近执行结果和日报产物；问题处理并读回后再判断恢复情况，期间可直接使用当前赛事、队伍与 TK。",
+      "basket_module_id": "daily_knowledge",
+      "engineering_details": {
+        "source": "今日内容状态、运行观察与自动化回执",
+        "verification": "确认当天成品、资料缺口、主动暂停和服务异常分别可见"
+      },
+      "children": [
+        {
+          "id": "daily-report",
+          "name": "日报与当前内容准备",
+          "purpose": "把当天已加工的比赛、资料要点、风险和缺口作为一个可读成品提供出来。",
+          "when_to_use": "想从今天的成品开始，或需要确认当天有无真实比赛和可读内容时。",
+          "current_capability": "日报状态入口仍能报告内容未齐，但日报运行检查需要处理；目前不能承诺今天已有可读成品，也不能把缺内容说成今天无比赛。",
+          "entry": {
+            "type": "status",
+            "page": "project",
+            "label": "看今天内容状态",
+            "chat_prompt": "今天有什么已准备内容？没有的话请说明真实原因和我还能从哪里继续"
+          },
+          "ability_ids": [
+            "daily_knowledge",
+            "current_match"
+          ],
+          "related_modules": [
+            "赛程",
+            "版本理解",
+            "相关 TK"
+          ],
+          "boundaries": "日报是每日成品入口，不是每一场讨论的必经步骤；不会用旧比赛或静态样例替代今天内容。",
+          "next_step": "核对当天数据就绪信息与日报生成、发布结果；确有当天成品再阅读，否则直接转到当前赛事或小雪对话。",
+          "basket_module_id": "daily_knowledge",
+          "engineering_details": {
+            "source": "今日内容与正式赛程状态",
+            "verification": "确认 ready、无比赛、内容缺失和不可读取状态分别展示"
+          }
+        },
+        {
+          "id": "readiness-and-health",
+          "name": "数据就绪与健康状态",
+          "purpose": "说明今天的资料供给和模块运行是否足以支持当前使用，并让局部问题不冒充整站故障。",
+          "when_to_use": "页面提示资料不够、某块读不到，或想确认今天能否从既有资料继续时。",
+          "current_capability": "项目中心能读到整体、今日内容状态和各模块检查结果；日报的数据就绪信息缺失需要处理，不能用服务在线代替当天数据已经准备好。",
+          "entry": {
+            "type": "status",
+            "page": "project",
+            "label": "查看当前状态",
+            "chat_prompt": "为什么现在显示这个状态？请说明影响范围、还能用什么和是否需要等资料"
+          },
+          "ability_ids": [
+            "knowledge_automation",
+            "daily_knowledge"
+          ],
+          "related_modules": [
+            "空态与错误态",
+            "日报",
+            "数据维护"
+          ],
+          "boundaries": "健康状态不是业务结论；资料不足时只能说明不足，不伪造队伍、BP、盘口或赛果。",
+          "next_step": "看受影响范围；可用模块继续用，缺资料则先保留缺口。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "模块运行观察和资料就绪凭据",
+            "verification": "确认局部问题、整体状态与当日内容状态分开"
+          }
+        },
+        {
+          "id": "automation-pause-boundary",
+          "name": "自动化与暂停边界",
+          "purpose": "让你知道哪些事情是后台供给、哪些是主动暂停或需要明确授权的外部动作。",
+          "when_to_use": "想理解为什么日报没有自动发布、是否需要刷新数据，或是否应该恢复某项任务时。",
+          "current_capability": "知识导入、数据准备、巡检和日报发布是不同任务；当前自动化汇总需要处理。是否主动暂停要查任务配置与执行回执，不能从内容缺失或入口异常直接推断。",
+          "entry": {
+            "type": "chat",
+            "label": "问自动化状态",
+            "chat_prompt": "这项自动化现在是可用、暂停、资料不足还是异常？它会不会自动发布或改变业务内容？"
+          },
+          "ability_ids": [
+            "knowledge_automation",
+            "daily_knowledge"
+          ],
+          "related_modules": [
+            "日报",
+            "知识导入",
+            "数据质量"
+          ],
+          "boundaries": "不会未经明确授权恢复生产发布、改变常驻任务、自动交易或执行不可逆动作。",
+          "next_step": "先确认受影响的是任务停用、执行失败还是产物缺失；若确需改变自动化，再单独确定范围与回退，不在内容核对时自动启停任务。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "自动化状态与业务产物分开读取",
+            "verification": "确认暂停不会被误报为失败，任务成功也不等于业务成品已生成"
+          }
+        },
+        {
+          "id": "schedule-driven-push",
+          "name": "赛程驱动的排程与主动推送",
+          "purpose": "让自动化跟着赛程走：赛前按开打时间出简报，赛后刷结果，只在“谁上场变了、价格到了、结果出了”或任务失败时说一句。",
+          "when_to_use": "想知道今天什么时候会有消息、为什么这次没有推送，或收到一条变化提醒想确认依据时。",
+          "current_capability": "待完善：执行时刻由赛程算出而非固定钟点，三条短消息出口与失败告警已运行；无比赛时不产生空转，日报仍按原时间保留。",
+          "entry": {
+            "type": "chat",
+            "label": "问自动化排期与推送",
+            "chat_prompt": "今天什么时候会有消息？这条提醒的依据是什么？没比赛时会不会空跑？"
+          },
+          "ability_ids": [
+            "knowledge_automation",
+            "daily_knowledge",
+            "current_match"
+          ],
+          "related_modules": [
+            "赛事框架与赛程",
+            "日报与当前内容准备",
+            "自动化与暂停边界"
+          ],
+          "boundaries": "只在真实变化或失败时出声，同一信号不重复推送；只推送事实与来源，不推送判断，也不自动改变业务内容。",
+          "next_step": "先看今天是否有比赛和最近一次排程回执；没有消息时按“无变化”或“无比赛”如实说明。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "赛程驱动的排程回执、变化比对与失败告警",
+            "verification": "改一条赛程时间确认执行时刻随之变化；无比赛不空转；人为失败一次能收到告警"
+          }
+        }
+      ]
+    },
+    {
+      "id": "current-event-prep",
+      "group": "mainline",
+      "name": "当前赛事与单场准备",
+      "purpose": "围绕当前赛事和一场比赛组织赛程、已确认资料、焦点与变化，而不把单场临时内容写成长期事实。",
+      "when_to_use": "想看今天有什么比赛、准备一场对局、确认首发或记录刚发生的信息变化时。",
+      "current_capability": "可从当前赛事进入赛程和单场工作区；没有对应赛事、资料或工作区时会分别说明。",
+      "entry": {
+        "type": "web",
+        "page": "event",
+        "label": "打开当前赛事",
+        "chat_prompt": "聊聊这场比赛，先看已有资料和缺口"
+      },
+      "ability_ids": [
+        "current_match",
+        "attention_config",
+        "team_profile",
+        "tk"
+      ],
+      "related_modules": [
+        "资料与长期理解",
+        "方法与判断",
+        "临场记录与复盘"
+      ],
+      "boundaries": "单场线程只整理本场资料和已明确保存的内容；切换、暂停和恢复不等于写入判断，更不会自动改画像或 TK。",
+      "next_step": "先选当前赛事或直接点名一场比赛；按问题进入队伍、阵容、市场或记录。",
+      "basket_module_id": "current_match",
+      "engineering_details": {
+        "source": "正式赛程与单场临时工作区",
+        "verification": "从当前赛事确认比赛身份、已知资料与空态"
+      },
+      "children": [
+        {
+          "id": "event-frame-schedule",
+          "name": "赛事框架、赛程与对局",
+          "purpose": "确认当前在看哪个赛事、哪个赛段、有哪些真实对局，避免把赛程当成独立的预测产品。",
+          "when_to_use": "想知道今天谁打谁、某队什么时候打，或需要先确认正在讨论哪场比赛时。",
+          "current_capability": "可读取当前赛程与对局；没有确认比赛时会显示空态，而不是拿旧赛程代替。",
+          "entry": {
+            "type": "web",
+            "page": "event",
+            "label": "查看当前赛程",
+            "chat_prompt": "看看当前赛事和这支队接下来什么时候打"
+          },
+          "ability_ids": [
+            "current_match",
+            "attention_config"
+          ],
+          "related_modules": [
+            "赛前资料",
+            "日报",
+            "关注范围"
+          ],
+          "boundaries": "赛程只提供背景，不自动产生判断、BP、赛果或交易建议。",
+          "next_step": "点进具体对局后再按需要查队伍资料或建立单场准备。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "当前赛事配置与正式赛程",
+            "verification": "确认当前赛事范围、真实对局与无比赛空态"
+          }
+        },
+        {
+          "id": "prematch-materials",
+          "name": "赛前资料与单场准备",
+          "purpose": "把双方长期资料、首发、相关 TK、已确认信息和当前缺口组织到一场比赛旁边。",
+          "when_to_use": "准备一场比赛、想知道现在已有何种依据，或需要继续追问一场对局时。",
+          "current_capability": "单场工作区能按问题组合既有资料；新场默认是底稿，不要求先走固定步骤。",
+          "entry": {
+            "type": "web",
+            "page": "event",
+            "label": "进入单场准备",
+            "chat_prompt": "帮我准备这场，先列出可靠资料、主要矛盾和缺口"
+          },
+          "ability_ids": [
+            "current_match",
+            "team_profile",
+            "ts_strength",
+            "tk"
+          ],
+          "related_modules": [
+            "队伍资料",
+            "交易预案",
+            "单场记录"
+          ],
+          "boundaries": "赛前只使用已存在的信息；没有 BP、首发或赛果时不会假装已经知道。",
+          "next_step": "先看结论地图与资料缺口；需要哪块再进入对应模块。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "单场工作区及关联资料正源",
+            "verification": "从具体对局读取已知资料、缺口和当前保存内容"
+          }
+        },
+        {
+          "id": "lineup-and-information-changes",
+          "name": "首发与信息变化",
+          "purpose": "把首发、BP、市场或其他明确变化按本场记录下来，便于回看当时为什么改变判断。",
+          "when_to_use": "看到换人、BP、盘口或临场消息，想留下而不是靠记忆回顾时。",
+          "current_capability": "可在单场线程记录明确变化，并与当前判断分开保留。",
+          "entry": {
+            "type": "chat",
+            "label": "让小雪记录本场变化",
+            "chat_prompt": "记录这场的变化：首发 / BP / 盘口 / 其他，内容是……"
+          },
+          "ability_ids": [
+            "current_match"
+          ],
+          "related_modules": [
+            "纯十英雄阵容",
+            "盘口记录",
+            "单场复盘"
+          ],
+          "boundaries": "变化是本场观察，不自动改写长期画像、TK、TS 或交易记录；对象不清楚时先保留未确认。",
+          "next_step": "把变化说清楚后记录；赛后再决定是否需要复盘或沉淀。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "单场变化与当前判断分开保存",
+            "verification": "记录后从同一场比赛读回具体变化"
+          }
+        },
+        {
+          "id": "attention-config",
+          "name": "关注范围与赛事配置",
+          "purpose": "管理当前关注哪些队伍、当前看哪个赛事和使用哪些队伍别名，让新增对象通过配置接入而不是临时改代码。",
+          "when_to_use": "想把这支队加入关注、查看当前关注范围，或确认当前赛事/赛段与队伍别名时。",
+          "current_capability": "关注范围、队伍别名与当前赛事范围已有配置和读取入口；当前合同仍标为部分可用，范围调整后的真实页面与对话效果仍需核验。",
+          "entry": {
+            "type": "chat",
+            "label": "确认关注范围",
+            "chat_prompt": "当前关注哪些队伍、当前赛事是什么？把……加入关注"
+          },
+          "ability_ids": [
+            "attention_config",
+            "current_match"
+          ],
+          "related_modules": [
+            "赛事框架与赛程",
+            "队伍资料",
+            "日报"
+          ],
+          "boundaries": "配置只改变可见范围，不改变队伍事实正源和小雪判断口径；不会未经确认批量改动关注名单。",
+          "next_step": "先看当前关注范围和赛事；需要调整时单独说明对象与范围。",
+          "basket_module_id": "attention_config",
+          "engineering_details": {
+            "source": "项目配置与当前赛事配置",
+            "verification": "从当前赛事与关注范围入口读回生效范围"
+          }
+        },
+        {
+          "id": "scope-and-coverage",
+          "name": "赛事范围与资料覆盖",
+          "purpose": "由当前赛事范围派生出真实比赛清单和参赛队伍，并逐场标出“谁上场、价格、结果”三项资料是否齐全或还有洞。",
+          "when_to_use": "想确认当前关注范围内有哪些比赛和队伍、哪几场资料还有洞，或想知道某场是否已有首发、报价和结果时。",
+          "current_capability": "待完善：范围派生与三项覆盖面已能按需求值并给出洞清单，只报事实与缺口；前端与对话里的真实读回仍按场景继续验收。",
+          "entry": {
+            "type": "chat",
+            "label": "查看范围与资料缺口",
+            "chat_prompt": "现在关注的范围里有哪些比赛和队伍？哪几场资料有洞？"
+          },
+          "ability_ids": [
+            "current_match",
+            "attention_config"
+          ],
+          "related_modules": [
+            "赛事框架与赛程",
+            "关注范围与赛事配置",
+            "赛前资料与单场准备"
+          ],
+          "boundaries": "覆盖范围只派生和计算，不新增第二份名单、不覆盖赛程正源；没有来源的项目一律显示为洞，不用旧值顶替。",
+          "next_step": "先看当前范围和洞清单；缺资料时保留缺口，或按对象说明要补哪一项。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "当前赛事范围配置、正式赛程与队伍事实的只读派生",
+            "verification": "读一次范围与覆盖面，确认区间、队伍集合与三项状态和真实库一致，待定名额不误报为缺口"
+          }
+        }
+      ]
+    },
+    {
+      "id": "records-and-review",
+      "group": "mainline",
+      "name": "临场记录与交易后回溯",
+      "purpose": "保留当时的盘口、观察、单场判断和赛后对照，让复盘能回到原始上下文，而不是事后改写。",
+      "when_to_use": "想记一条盘口或临场观察、回看一场比赛当时发生了什么，或在赛后梳理可复用的结论时。",
+      "current_capability": "交易 TK 与单场记录有各自保存和读回入口；旧盘口页仅兼容读取。阶段整理与日报相关依赖可能需要处理，完整对话复盘仍待真实场景验收，不能把局部读回当成整条复盘可用。",
+      "entry": {
+        "type": "chat",
+        "label": "记录或复盘这场",
+        "chat_prompt": "记录这场的盘口 / 观察；赛后再按原记录一起复盘"
+      },
+      "ability_ids": [
+        "current_match",
+        "tk",
+        "daily_knowledge",
+        "version_lineup"
+      ],
+      "related_modules": [
+        "当前赛事",
+        "交易系统",
+        "阶段沉淀"
+      ],
+      "boundaries": "记录保留当时身份；复盘不会自动生成下次买卖规则，也不会把一条临时观察直接改成长期开结论。",
+      "next_step": "先留下原话或具体变化；赛后回到同一场对照，再决定是否需要沉淀。",
+      "basket_module_id": "current_match",
+      "engineering_details": {
+        "source": "单场线程、交易 TK 与复盘候选",
+        "verification": "保存后从同一场或相关资料入口读回原记录"
+      },
+      "children": [
+        {
+          "id": "market-and-live-records",
+          "name": "盘口记录与临场观察",
+          "purpose": "原样留下盘口、方向、分歧、不碰项或临场变化，方便以后回看当时真正依据。",
+          "when_to_use": "想记下这场盘口、自己的判断、市场变化或一句临场观察时。",
+          "current_capability": "明确说“写进 TK”才会保存长期内容；盘口判断以交易 TK 为长期正源，兼容展示不会替代它。",
+          "entry": {
+            "type": "chat",
+            "label": "记录一条观察",
+            "chat_prompt": "写进 TK：这场 / 这支队的盘口或临场观察是……"
+          },
+          "ability_ids": [
+            "tk",
+            "current_match"
+          ],
+          "related_modules": [
+            "交易预案",
+            "单场变化",
+            "赛后复盘"
+          ],
+          "boundaries": "记录是你的原始判断，不是自动交易指令；队伍不明确时不硬归类，临场内容不自动升为长期知识。",
+          "next_step": "直接说原话和对象；需要时赛后再把它和实际结果对照。",
+          "basket_module_id": "tk",
+          "engineering_details": {
+            "source": "交易 TK 与单场观察正源",
+            "verification": "写入后重新读取原文、对象和状态"
+          }
+        },
+        {
+          "id": "single-match-review",
+          "name": "单场复盘",
+          "purpose": "把赛前判断、BP/变化、实际走势和自己的记录对照，找出哪些依据成立、哪些该保留疑问。",
+          "when_to_use": "一场比赛结束后，想回顾原判断、盘口记录或临场变化是否被事实支持时。",
+          "current_capability": "已有单场记录和交易 TK 可读回供对照；完整小雪对话复盘仍待真实走通，日报与知识维护异常不应被描述为复盘已稳定完成。",
+          "entry": {
+            "type": "chat",
+            "label": "复盘刚才这场",
+            "chat_prompt": "复盘刚才这场：先读回我当时的记录和变化，再和结果对照，不要自动改长期结论"
+          },
+          "ability_ids": [
+            "current_match",
+            "tk",
+            "daily_knowledge"
+          ],
+          "related_modules": [
+            "盘口记录",
+            "纯阵容分析",
+            "沉淀候选"
+          ],
+          "boundaries": "先回看原记录；没有足够证据就保留未确认，不把结果倒灌成赛前理所当然。",
+          "next_step": "点名具体比赛或记录；复盘后再决定是否进入阶段整理。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "单场记录、市场观察与赛果对照",
+            "verification": "从同一场读回原记录和后续复盘结果"
+          }
+        },
+        {
+          "id": "stage-review-candidates",
+          "name": "阶段复盘与沉淀候选",
+          "purpose": "把多场之后真正可能复用的结论先列成候选，再决定是否更新版本、画像或长期 TK。",
+          "when_to_use": "一个赛段、系列赛或一组比赛结束后，想整理哪些认识值得长期保留时。",
+          "current_capability": "沉淀候选有查看入口，但候选是否齐全、整理是否完成和正式更新成功必须分别核对；日报与知识维护存在需处理部分时，不承诺阶段整理全链可用。",
+          "entry": {
+            "type": "web",
+            "page": "stage",
+            "label": "查看沉淀候选",
+            "chat_prompt": "把这阶段值得长期保留的结论先列候选，区分已证实、冲突和资料不足"
+          },
+          "ability_ids": [
+            "daily_knowledge",
+            "tk",
+            "team_profile"
+          ],
+          "related_modules": [
+            "队伍画像维护",
+            "版本理解",
+            "TK 整理"
+          ],
+          "boundaries": "候选不等于已经写入长期知识；长期更新必须按对象、范围和确认边界处理。",
+          "next_step": "先看候选和证据；只点名需要更新的一项。",
+          "basket_module_id": "daily_knowledge",
+          "engineering_details": {
+            "source": "阶段候选、长期画像、版本与 TK 正源",
+            "verification": "确认候选、证据、冲突与正式写入状态分开显示"
+          }
+        }
+      ]
+    },
+    {
+      "id": "long-term-understanding",
+      "group": "foundation",
+      "name": "资料与长期理解",
+      "purpose": "把队伍、实力、画像、首发、选手与长期 TK 放在一起查回，形成能持续更新但不轻易混写的依据。",
+      "when_to_use": "想知道一支队现在是什么队、双方强弱差在哪里、首发有没有变化，或想找回过去留下的资料时。",
+      "current_capability": "队伍资料、TS、五项画像、当前首发和 TK 都可按各自入口读取；资料覆盖不足会明确显示。",
+      "entry": {
+        "type": "web",
+        "page": "teams",
+        "label": "打开队伍资料",
+        "chat_prompt": "看看这支队现在是什么队、怎么赢怎么输"
+      },
+      "ability_ids": [
+        "ts_strength",
+        "team_profile",
+        "tk"
+      ],
+      "related_modules": [
+        "当前赛事与单场准备",
+        "方法与判断",
+        "知识与数据底座"
+      ],
+      "boundaries": "TS 是事实输入，不替你做交易决定；画像是当前结论，TK 和个人判断是材料，不能互相自动改写。",
+      "next_step": "先从队伍资料或一条相关 TK 开始；缺资料时保留缺口，不用旧内容补齐。",
+      "basket_module_id": "team_profile",
+      "engineering_details": {
+        "source": "项目模块合同、队伍与 TK 正源",
+        "verification": "从队伍资料或 TK 阅读入口确认内容和资料不足提示"
+      },
+      "children": [
+        {
+          "id": "teams-ts-profile",
+          "name": "队伍、TS 与五项画像",
+          "purpose": "把一支队的实力趋势、当前定位、赢法、输法、关键点和 BP 倾向放到同一张长期理解里。",
+          "when_to_use": "比较两队、想知道一支队为什么能赢/会怎么输，或需要先建立赛前基本面时。",
+          "current_capability": "可读 TS、趋势与五项画像；部分赛区或当前赛段可能仍显示资料不足或覆盖限制。",
+          "entry": {
+            "type": "web",
+            "page": "teams",
+            "label": "查看队伍与画像",
+            "chat_prompt": "比较这两支队的实力、怎么赢怎么输"
+          },
+          "ability_ids": [
+            "ts_strength",
+            "team_profile"
+          ],
+          "related_modules": [
+            "赛前资料",
+            "纯十英雄阵容",
+            "交易预案"
+          ],
+          "boundaries": "五项画像是唯一长期队伍结论；旧三维只作兼容投影，TS 数字和单场判断不写进画像正文。",
+          "next_step": "选一支队先看画像；需要比较时再看 TS 与趋势。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "统一队伍画像、TS 展示和首发事实",
+            "verification": "读取队伍资料时同时确认画像与资料缺口可见"
+          }
+        },
+        {
+          "id": "rosters-players",
+          "name": "首发与选手信息",
+          "purpose": "确认现在谁在打、阵容是否变化，并把选手长期资料与临场身份分开看。",
+          "when_to_use": "赛前确认首发、看到换人消息，或想查某位选手的长期资料时。",
+          "current_capability": "当前首发可随队伍资料读取；部分选手长期画像仍在逐步补全。",
+          "entry": {
+            "type": "web",
+            "page": "teams",
+            "label": "查看首发信息",
+            "chat_prompt": "看看这支队当前首发和这位选手资料"
+          },
+          "ability_ids": [
+            "team_profile",
+            "current_match"
+          ],
+          "related_modules": [
+            "当前赛事",
+            "单场准备",
+            "资料变化记录"
+          ],
+          "boundaries": "首发是会变化的事实，不因一条传闻自动变成长期结论；资料不清楚时会保留未确认状态。",
+          "next_step": "先确认当前首发，再决定是否需要进入单场准备。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "正式队伍与首发事实、选手长期资料",
+            "verification": "从队伍入口确认当前首发与缺口提示"
+          }
+        },
+        {
+          "id": "team-and-market-tk",
+          "name": "队伍 TK 与交易 TK",
+          "purpose": "找回长期材料、个人观察和可复用规律，并区分普通资料、交易提醒与当下是否采用。",
+          "when_to_use": "想找某队过去的观察、搜索一条规律，或明确要求“写进 TK”保存一条交易相关内容时。",
+          "current_capability": "TK 可检索和阅读；带交易标签的笔记按对象相关性优先展示。",
+          "entry": {
+            "type": "web",
+            "page": "tk",
+            "label": "打开 TK 资料库",
+            "chat_prompt": "找一下这支队相关的 TK 和交易提醒"
+          },
+          "ability_ids": [
+            "tk"
+          ],
+          "related_modules": [
+            "赛前资料",
+            "盘口记录",
+            "阶段沉淀"
+          ],
+          "boundaries": "口述记录可以原样保存；普通 TK 保存知识与方法，交易 TK 保存带条件的交易认识；两者都不自动改画像或交易决定，交易 TK 的状态和复查必须由明确依据驱动。",
+          "next_step": "先搜索与对象相关的 TK；要留下一条，就直接说出内容和归属。",
+          "basket_module_id": "tk",
+          "engineering_details": {
+            "source": "TK 资料库与交易 TK 正源",
+            "verification": "搜索后确认原文、对象和资料不足/未命中状态"
+          }
+        }
+      ]
+    },
+    {
+      "id": "methods-and-judgment",
+      "group": "foundation",
+      "name": "方法与判断",
+      "purpose": "在版本、阵容、赛前预案与交易判断之间保持正确分工：先看什么、能说到哪里、何时应暂不推荐。",
+      "when_to_use": "想了解版本、BP 出来后只看阵容，或明确希望按自己的交易方法讨论一场比赛时。",
+      "current_capability": "可读取版本、整理十英雄输入并在小雪对话中分析；这组能力按当前合同仍是部分可用，不把输入入口正常当成完整分析和交易讨论都已验收。",
+      "entry": {
+        "type": "chat",
+        "label": "在小雪对话里讨论",
+        "chat_prompt": "聊聊这场比赛，先按当前资料说明可以看什么、缺什么"
+      },
+      "ability_ids": [
+        "version_lineup",
+        "current_match",
+        "ts_strength",
+        "tk"
+      ],
+      "related_modules": [
+        "资料与长期理解",
+        "当前赛事与单场准备",
+        "临场记录与复盘"
+      ],
+      "boundaries": "纯阵容只看十个英雄；明确交易判断才另行核对队伍、市场、趋势、分歧和风险，永不自动下单。",
+      "next_step": "先说清你是想看版本、纯阵容，还是希望讨论交易方法。",
+      "basket_module_id": "version_lineup",
+      "engineering_details": {
+        "source": "版本知识、纯阵容方法和交易资料的独立正源",
+        "verification": "用对应说法确认输入不足时明确说明而非补造"
+      },
+      "children": [
+        {
+          "id": "version-understanding",
+          "name": "版本理解与适配",
+          "purpose": "查看统一版本理解正文，再讨论当前版本中哪些变化值得注意和如何适配。",
+          "when_to_use": "想问“现在这个版本怎么玩”、某个变化对队伍或阵容有什么影响时。",
+          "current_capability": "版本正文在当前赛事读取；项目中心只核对版本状态。读取正文不等于已更新到最新版本，版本维护和日报消费仍需分别验证。",
+          "entry": {
+            "type": "chat",
+            "label": "基于当前版本理解讨论/更新",
+            "action_label": "基于当前版本理解讨论/更新",
+            "chat_prompt": "基于当前版本理解讨论/更新：现在最值得注意什么？哪些地方需要补充或调整？"
+          },
+          "ability_ids": [
+            "version_lineup",
+            "daily_knowledge"
+          ],
+          "related_modules": [
+            "队伍画像",
+            "纯十英雄阵容",
+            "日报"
+          ],
+          "boundaries": "版本结论不自动写进某支队画像；有冲突时并列显示，不把不同来源偷偷合成一个答案。",
+          "next_step": "先看当前版本事实和风险；需要再问它如何影响具体对局。",
+          "basket_module_id": "version_lineup",
+          "engineering_details": {
+            "source": "通用版本理解与可读镜像",
+            "verification": "确认版本内容的适用时间、来源与冲突提示"
+          }
+        },
+        {
+          "id": "hero-static-data",
+          "name": "英雄静态资料查询",
+          "purpose": "按需读取英雄技能、属性、标签和版本静态资料，支持模糊匹配，为版本与阵容讨论提供基础素材。",
+          "when_to_use": "想查一个英雄的技能机制、属性标签，或想确认某个英雄在当前版本资料时。",
+          "current_capability": "英雄静态资料已有本地版本快照与查询能力；这不等于实时比赛资料，完整对话调用与展示仍待按真实问题验收。",
+          "entry": {
+            "type": "chat",
+            "label": "在小雪对话查询英雄资料",
+            "chat_prompt": "查一下这个英雄的技能机制和当前版本资料：……"
+          },
+          "ability_ids": [
+            "version_lineup"
+          ],
+          "related_modules": [
+            "版本理解与适配",
+            "纯十英雄阵容分析",
+            "查询与资料分流"
+          ],
+          "boundaries": "英雄静态资料只提供游戏事实素材，不自动组合成阵容强弱或交易结论。",
+          "next_step": "说出英雄名或模糊描述即可查询；需要阵容判断时再给出完整十英雄。",
+          "basket_module_id": "version_lineup",
+          "engineering_details": {
+            "source": "英雄版本静态资料本地快照（本地只读，不联网）",
+            "verification": "发起一次英雄查询，确认技能、属性、标签与版本信息可读"
+          }
+        },
+        {
+          "id": "pure-ten-lineup",
+          "name": "纯十英雄阵容分析",
+          "purpose": "BP 出来后，只根据蓝红方十个英雄和通用版本知识判断双方结构、阶段与观赛重点。",
+          "when_to_use": "蓝红方五个英雄已经齐了，想看阵容怎么赢、何时强弱转换、节奏和观赛信号时。",
+          "current_capability": "完整十英雄可进入纯阵容分析；英雄未齐需补齐。当前支持超时后的完整保守判断，但不能把它当作完整长推理已完成，也不能据本地结果宣称飞书端到端已验收。",
+          "entry": {
+            "type": "chat",
+            "label": "复制纯阵容话术",
+            "chat_prompt": "小雪，只看十英雄分析这把。蓝色方：上 / 野 / 中 / 下 / 辅；红色方：上 / 野 / 中 / 下 / 辅"
+          },
+          "ability_ids": [
+            "version_lineup"
+          ],
+          "related_modules": [
+            "BP 信息变化",
+            "交易判断",
+            "单场复盘"
+          ],
+          "boundaries": "不带入队伍、选手、TS、盘口、当前经济或赛果；它不是交易结论，也不承诺确定胜负。",
+          "next_step": "补齐十个英雄后直接发给小雪；想讨论交易时另行明确说明。",
+          "basket_module_id": "version_lineup",
+          "engineering_details": {
+            "source": "纯十英雄阵容方法与通用版本知识",
+            "verification": "完整/不完整十英雄输入分别确认分析与待补提示"
+          }
+        },
+        {
+          "id": "trading-method-and-plan",
+          "name": "交易系统、赛前预案与风险条件",
+          "purpose": "在你明确提出交易讨论时，组织队伍、市场、趋势、分歧、风险和破相条件，帮助你自己作决定。",
+          "when_to_use": "明确说想按交易系统看这场、做赛前预案、比较市场分歧或判断该不该暂不推荐时。",
+          "current_capability": "明确交易请求后可组织已有证据、分歧与风险；该组合能力仍是部分可用，实时市场材料与真实对话结果必须逐场核对，资料不足时不硬给方向。",
+          "entry": {
+            "type": "chat",
+            "label": "明确讨论交易方法",
+            "chat_prompt": "按交易系统帮我看这场：先列证据、市场分歧、风险和什么条件会推翻判断，不替我下决定"
+          },
+          "ability_ids": [
+            "version_lineup",
+            "ts_strength",
+            "team_profile",
+            "tk",
+            "current_match"
+          ],
+          "related_modules": [
+            "盘口记录",
+            "赛前资料",
+            "单场复盘"
+          ],
+          "boundaries": "这是判断辅助，不给自动买卖、跟单或确定性承诺；纯阵容结论只能是独立输入之一。",
+          "next_step": "明确要讨论交易系统，再提供正在看的比赛或市场信息。",
+          "basket_module_id": "version_lineup",
+          "engineering_details": {
+            "source": "交易方法、队伍事实、市场记录与相关 TK",
+            "verification": "确认结论、依据、风险与资料缺口分开可见"
+          }
+        },
+        {
+          "id": "query-and-material-split",
+          "name": "查询与资料分流",
+          "purpose": "判断此刻只需查内部资料、需要外部最新信息，还是应把内容留作之后沉淀。",
+          "when_to_use": "想看最新消息、打开外部资料，或不确定一条内容应当场回答还是保存时。",
+          "current_capability": "已有资料优先直接读取；明确需要最新或外部核对时才搜索，资料默认不自动进入长期知识。",
+          "entry": {
+            "type": "chat",
+            "label": "让小雪分流资料",
+            "chat_prompt": "这件事先查已有资料；如果需要最新外部信息再告诉我，并说明要不要沉淀"
+          },
+          "ability_ids": [
+            "tk",
+            "knowledge_automation",
+            "current_match"
+          ],
+          "related_modules": [
+            "知识导入",
+            "TK 搜索",
+            "对话边界"
+          ],
+          "boundaries": "不因为能搜就自动联网，不因为看过就自动正式写入；对象或归属不清楚时先保留为临时内容。",
+          "next_step": "说清想查什么；是否保存或导入只在你明确需要时处理。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "既有资料、外部资料入口与知识写入边界",
+            "verification": "确认只读查询不会产生意外写入或外部动作"
+          }
+        }
+      ]
+    },
+    {
+      "id": "knowledge-and-data",
+      "group": "foundation",
+      "name": "知识与数据底座",
+      "purpose": "让资料能找回、导入、维护和校验，同时把用户看到的内容与后台供给、数据缺口分开。",
+      "when_to_use": "想找长期知识、导入 B 站/公众号材料、维护版本/队伍/选手，或查清为什么资料还不够时。",
+      "current_capability": "已有 TK 可浏览、搜索和读原文；知识导入与自动化、日报与维护的运行状态要分别看，当前有需要处理的依赖，不能笼统说整个知识底座稳定可用。",
+      "entry": {
+        "type": "web",
+        "page": "tk",
+        "label": "查看知识资料库",
+        "chat_prompt": "找相关长期知识；如果要导入或维护，请先说明对象和范围"
+      },
+      "ability_ids": [
+        "tk",
+        "daily_knowledge",
+        "knowledge_automation",
+        "team_profile",
+        "version_lineup"
+      ],
+      "related_modules": [
+        "资料与长期理解",
+        "日报与自动化",
+        "阶段复盘"
+      ],
+      "boundaries": "知识检索只负责找回材料；资料导入、候选、事实、个人判断和长期结论不能互相冒充。",
+      "next_step": "先搜索已有内容；确认缺口后再决定导入、维护或仅保留候选。",
+      "basket_module_id": "daily_knowledge",
+      "engineering_details": {
+        "source": "TK 资料库、版本/队伍/选手正源与数据就绪状态",
+        "verification": "搜索、导入或维护后各自从正式阅读入口确认结果"
+      },
+      "children": [
+        {
+          "id": "tk-library-and-search",
+          "name": "TK 资料库与知识搜索",
+          "purpose": "按时间、对象或关键词找回长期 LOL 资料，而不是让小雪扫描所有文件猜答案。",
+          "when_to_use": "想找过去某个月、某队、某个战术或相近观点的长期材料时。",
+          "current_capability": "可浏览和搜索 TK；没有命中会明确返回空态和查询范围。",
+          "entry": {
+            "type": "web",
+            "page": "tk",
+            "label": "搜索 TK",
+            "chat_prompt": "找一下关于……的 TK，优先给我相关原文和时间"
+          },
+          "ability_ids": [
+            "tk"
+          ],
+          "related_modules": [
+            "队伍资料",
+            "交易 TK",
+            "阶段沉淀"
+          ],
+          "boundaries": "检索结果是材料，不自动当成最新事实或长期结论；归档内容也不能未经筛选当作新证据。",
+          "next_step": "先用队伍、选手、时间或关键词查；需要时再打开原文。",
+          "basket_module_id": "tk",
+          "engineering_details": {
+            "source": "TK 阅读、搜索与索引",
+            "verification": "确认命中内容、时间和未命中空态可读"
+          }
+        },
+        {
+          "id": "knowledge-import",
+          "name": "B 站、公众号与外部知识导入",
+          "purpose": "把值得长期保存的外部资料经过独立导入和读回，变成可检索的材料，而不是直接混进判断。",
+          "when_to_use": "明确想检查或导入新视频、新文章，或希望把一份外部材料纳入长期资料时。",
+          "current_capability": "B 站和公众号已有独立导入方法与入口，但知识自动化当前显示需要处理；不能据入口存在就说今天已导入或已可搜索。已有 TK 的搜索仍可独立使用。",
+          "entry": {
+            "type": "chat",
+            "label": "请求知识导入",
+            "chat_prompt": "检查并导入这类外部知识：B 站 / 公众号；完成后告诉我新增、重复和可搜索结果"
+          },
+          "ability_ids": [
+            "knowledge_automation",
+            "tk"
+          ],
+          "related_modules": [
+            "查询与资料分流",
+            "TK 搜索",
+            "日报"
+          ],
+          "boundaries": "外部搜索或导入不是默认动作；导入材料也不自动改写队伍画像、版本结论或交易判断。",
+          "next_step": "先核对来源登录、最近一次执行回执和缺失环节；确需导入时明确来源，完成后从 TK 搜索重新找回。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "独立知识导入回执与 TK 索引",
+            "verification": "确认新增/重复结果并从知识入口读回"
+          }
+        },
+        {
+          "id": "maintenance-and-quality",
+          "name": "版本、队伍、选手维护与数据质量",
+          "purpose": "明确哪些长期内容需要维护、哪里存在覆盖不足或冲突，让缺口成为可处理的信息。",
+          "when_to_use": "想更新一个队伍画像、版本理解、选手资料，或发现数据过期、缺失、前后不一致时。",
+          "current_capability": "队伍五项画像有明确对象的更新入口；版本、选手维护和数据供给不能共用一个成功结论，受影响部分及真实业务写回仍需分别核对。",
+          "entry": {
+            "type": "chat",
+            "label": "说明要维护什么",
+            "chat_prompt": "我想维护……（版本 / 某队 / 某选手）。先告诉我现有资料、冲突、范围和需要确认的地方"
+          },
+          "ability_ids": [
+            "team_profile",
+            "daily_knowledge",
+            "version_lineup",
+            "knowledge_automation"
+          ],
+          "related_modules": [
+            "队伍资料",
+            "版本理解",
+            "阶段沉淀"
+          ],
+          "boundaries": "小范围明确更新可按既有正源处理并读回；删除、整包覆盖、迁移或不清楚的长期结论不会静默执行。",
+          "next_step": "先点名对象和想改变的内容；先看资料缺口与冲突，再决定是否更新。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "长期知识正源、数据就绪与冲突观察",
+            "verification": "更新后从同一正式入口读回，空态与冲突不被覆盖"
+          }
+        },
+        {
+          "id": "business-mutations",
+          "name": "业务变更与正源更新",
+          "purpose": "以统一业务变更合同小范围更新已有正源（首发、队伍画像、三维备注），结构级或不可逆动作升级人工确认。",
+          "when_to_use": "想更新某队已确认首发、修正队伍画像、补三维备注，或其它改动已有正式资料时。",
+          "current_capability": "待完善：后端模块与 MCP 工具已接入，真实业务写回仍按对象继续验收。",
+          "entry": {
+            "type": "chat",
+            "label": "让小雪更新已有正源",
+            "chat_prompt": "更新 XX 队首发为…… / 修正 XX 画像 / 补 XX 三维备注"
+          },
+          "ability_ids": [
+            "team_profile",
+            "ts_strength"
+          ],
+          "related_modules": [
+            "队伍资料",
+            "版本理解",
+            "数据质量"
+          ],
+          "boundaries": "只更新已有正源的小范围变更；删除、整包覆盖、迁移等结构级或不可逆动作升级人工确认，不会静默执行。",
+          "next_step": "点名对象和想改的内容，改完从同一正源读回确认。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "business_mutations 后端模块（统一业务变更合同）与 MCP 工具 xiaoxue_apply_business_mutation",
+            "verification": "发起一次小范围更新后从同一正式入口读回（首发/画像/三维备注）"
+          }
+        },
+        {
+          "id": "golgg-fact-check",
+          "name": "Gol.gg 逐局事实核对",
+          "purpose": "按需读取 Gol.gg 已公开的赛事与逐局 BP 事实，作为单场资料和异常核对的可追溯证据。",
+          "when_to_use": "想核对一场系列赛的真实逐局 BP、确认赛事事实，或发现单场资料与外部公开记录不一致时。",
+          "current_capability": "待完善：模块已接入，仍需在真实核对场景继续验收。",
+          "entry": {
+            "type": "chat",
+            "label": "请求逐局事实核对",
+            "chat_prompt": "用 Gol.gg 核对这场逐局 BP / 赛事事实，给出来源和时间"
+          },
+          "ability_ids": [
+            "current_match",
+            "knowledge_automation"
+          ],
+          "related_modules": [
+            "赛前资料",
+            "数据质量",
+            "查询与资料分流"
+          ],
+          "boundaries": "Gol.gg 是外部公开事实的按需核对源，不自动写入长期资料，也不替代正式赛程与单场工作区正源。",
+          "next_step": "点名赛事或系列赛，说明要核对哪一项；核对结果按来源和时间保留。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "gol_gg 后端模块（按需实时读取 gol.gg 公开页面）",
+            "verification": "发起一次按需核对并确认来源链接、检索时间与边界"
+          }
+        },
+        {
+          "id": "external-fact-intake",
+          "name": "外部事实入库与来源留痕",
+          "purpose": "把库里还没有的队伍身份、首发和报价按需留存下来，每条都带来源和时间，只在缺失处写入，不覆盖已有事实。",
+          "when_to_use": "范围里出现库内没有的队伍、需要补一场首发或一条报价，且手上有明确来源时。",
+          "current_capability": "待完善：入库入口已接通，无来源会直接拒绝，写入后来源与是否人工核实可读回；自动抓取未做，没有确定来源的价格一律显示为未接入。",
+          "entry": {
+            "type": "chat",
+            "label": "说明要入库的事实与来源",
+            "chat_prompt": "这支队 / 这份首发 / 这条报价还没有，来源是……，帮我入库并在缺口里读回"
+          },
+          "ability_ids": [
+            "team_profile",
+            "current_match"
+          ],
+          "related_modules": [
+            "版本、队伍、选手维护与数据质量",
+            "Gol.gg 逐局事实核对",
+            "赛事范围与资料覆盖"
+          ],
+          "boundaries": "只在缺失处写入、不覆盖正式赛果与画像正源；没有来源的直接拒绝；不自动抓取，也不把历史赔率当作当前报价。",
+          "next_step": "先确认库里缺哪一项，再说明来源；入库后从覆盖面读回缺口是否关闭。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "统一业务变更合同的队伍/首发入库与价格留存入口",
+            "verification": "入库一次，确认只在缺失处写入、来源与核实状态可读回、重复入库幂等"
+          }
+        }
+      ]
+    },
+    {
+      "id": "workbench-and-project",
+      "group": "foundation",
+      "name": "工作台体验与项目能力",
+      "purpose": "让工作台成为好找、好读、好回看的地方，并把项目中心、待修改、待体验和旧入口归档放进同一条改进闭环。",
+      "when_to_use": "想搜索/筛选资料、复制给小雪、理解空态和数据新鲜度，或想反馈一个真实使用问题时。",
+      "current_capability": "工作台保留队伍、当前赛事、阶段整理和 TK 资料库；项目中心可查看状态、模块、说明、待修改与交付。",
+      "entry": {
+        "type": "project",
+        "page": "project",
+        "label": "留在项目中心",
+        "chat_prompt": "聊聊待修改"
+      },
+      "ability_ids": [
+        "current_match",
+        "team_profile",
+        "tk",
+        "daily_knowledge",
+        "knowledge_automation"
+      ],
+      "related_modules": [
+        "全部业务模块",
+        "小雪对话",
+        "日报与自动化"
+      ],
+      "boundaries": "工作台帮助查看、整理、记录和回看，不成为网页聊天、自动交易或强制工作流；前台不默认展示内部实现。",
+      "next_step": "按当前问题打开相应页面；觉得不顺就加入待修改。",
+      "basket_module_id": "current_match",
+      "engineering_details": {
+        "source": "工作台模块合同、项目中心状态与待修改记录",
+        "verification": "从用户可见页面确认跳转、空态和待修改读回"
+      },
+      "children": [
+        {
+          "id": "browse-copy-empty-state",
+          "name": "搜索、筛选、复制与空态",
+          "purpose": "帮你在资料库和工作台更快找到内容、把合适的话术交给小雪，并读懂没有数据或读取失败时发生了什么。",
+          "when_to_use": "想找 TK、筛队伍、复制 BP 提示，或页面显示暂无内容、资料不足、读取失败时。",
+          "current_capability": "已有各页面的搜索/筛选和复制入口；空态、错误态与资料新鲜度应以人话说明，不拿旧内容代替。",
+          "entry": {
+            "type": "web",
+            "page": "tk",
+            "label": "从资料库开始找",
+            "chat_prompt": "帮我找这类资料；如果没有，请明确说是未命中、资料不足还是当前读不到"
+          },
+          "ability_ids": [
+            "tk",
+            "team_profile",
+            "current_match"
+          ],
+          "related_modules": [
+            "TK 搜索",
+            "当前赛事",
+            "纯阵容分析"
+          ],
+          "boundaries": "复制提示只是帮助进入正确对话，不会替你自动发消息或把页面内容伪装成结论。",
+          "next_step": "先用当前页面找；空态时按提示换入口或保留缺口。",
+          "basket_module_id": "tk",
+          "engineering_details": {
+            "source": "各工作台页面的用户可见读取结果",
+            "verification": "确认空态/错误态不展示旧数据，复制不会触发自动写入"
+          }
+        },
+        {
+          "id": "project-center-and-feedback",
+          "name": "项目中心、待修改与待体验",
+          "purpose": "看懂小雪项目、定位一个模块、记录不顺之处，并在改完后回到真实页面体验。",
+          "when_to_use": "想看整体现在怎样、找到模块说明、记录一个体验问题，或确认一项交付是否真的解决问题时。",
+          "current_capability": "可查看开发书、模块树、使用说明、待修改、正式处理与当前交付；待修改写入后会读回。",
+          "entry": {
+            "type": "project",
+            "page": "project",
+            "label": "查看项目中心",
+            "chat_prompt": "聊聊待修改"
+          },
+          "ability_ids": [
+            "current_match"
+          ],
+          "related_modules": [
+            "所有模块",
+            "飞书讨论",
+            "当前交付"
+          ],
+          "boundaries": "待修改只是收集体验，不代表已经承诺施工；正式处理必须先把目标和影响聊清楚。",
+          "next_step": "在对应模块点加入待修改，回飞书说“聊聊待修改”，完成后再回这里体验。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "项目中心的待修改、处理与交付记录",
+            "verification": "加入待修改后重新读取；交付反馈可归档或放回待修改"
+          }
+        },
+        {
+          "id": "legacy-entry-archive",
+          "name": "旧入口归档与兼容边界",
+          "purpose": "保留需要读回的历史信息，但不让过期入口、旧流程或兼容投影重新主导现在的使用。",
+          "when_to_use": "发现旧文档、旧页面或旧说法与当前体验不同，想确认它是否仍是正式能力时。",
+          "current_capability": "项目会保留必要兼容读取；旧阵容长报告、独立三维维护、旧固定知识流程和退役记录表不回主线。",
+          "entry": {
+            "type": "chat",
+            "label": "问当前入口",
+            "chat_prompt": "这个旧说法现在还是正式入口吗？请告诉我当前替代能力和不能恢复的边界"
+          },
+          "ability_ids": [
+            "team_profile",
+            "version_lineup",
+            "tk"
+          ],
+          "related_modules": [
+            "五项画像",
+            "纯阵容分析",
+            "交易 TK"
+          ],
+          "boundaries": "兼容只为读回历史，不让旧设计覆盖当前正源或重新引入固定业务流水线。",
+          "next_step": "以项目中心和当前使用说明为准；不确定就先问再进入旧入口。",
+          "basket_module_id": "team_profile",
+          "engineering_details": {
+            "source": "当前模块合同和能力地图中的兼容关系",
+            "verification": "确认当前入口不回退到已废弃流程"
+          }
+        }
+      ]
+    },
+    {
+      "id": "chat-capability",
+      "group": "foundation",
+      "name": "小雪对话能力与固定边界",
+      "purpose": "让你按自然语言触发小雪，知道会得到什么、何时保存、何时搜索，以及哪些事不会自动发生。",
+      "when_to_use": "日常任何动态问题：查队伍、问比赛、BP、交易讨论、记录观察、复盘、外部资料或知识导入。",
+      "current_capability": "小雪会按当前问题组合资料、当前赛事、方法和记录入口；同一个能力失败不会阻断其他可用部分。",
+      "entry": {
+        "type": "chat",
+        "label": "在小雪对话开始",
+        "chat_prompt": "聊聊我现在最想解决的问题"
+      },
+      "ability_ids": [
+        "ts_strength",
+        "team_profile",
+        "tk",
+        "current_match",
+        "version_lineup",
+        "daily_knowledge",
+        "knowledge_automation",
+        "attention_config"
+      ],
+      "related_modules": [
+        "全部业务模块",
+        "三个使用窗口",
+        "待修改"
+      ],
+      "boundaries": "不需要暗号；但不会自动交易、自动联网、自动发布、自动把临时观察变长期知识，删除/覆盖会明确确认。",
+      "next_step": "直接像平时一样说明正在看的对象和问题；需要保存、外部核对或交易讨论时把意图说清楚。",
+      "basket_module_id": "current_match",
+      "engineering_details": {
+        "source": "小雪日常入口与项目模块合同",
+        "verification": "从真实对话或工作台入口确认用户语言得到相应结果"
+      },
+      "children": [
+        {
+          "id": "natural-triggers",
+          "name": "怎么自然触发",
+          "purpose": "让“聊聊明天 HLE 打 GEN”“看看这支队”“写进 TK”这类日常说法直接进入正确的当前问题。",
+          "when_to_use": "不确定该点哪个页面、也不想记命令时。",
+          "current_capability": "可按对象和目标识别队伍、比赛、TK、BP、交易讨论与复盘等常见问题。",
+          "entry": {
+            "type": "chat",
+            "label": "复制一条自然说法",
+            "chat_prompt": "聊聊这场比赛：我现在最关心的是……"
+          },
+          "ability_ids": [
+            "current_match",
+            "team_profile",
+            "tk",
+            "version_lineup"
+          ],
+          "related_modules": [
+            "当前赛事",
+            "队伍资料",
+            "方法与判断"
+          ],
+          "boundaries": "不会为了内部方便要求你补工具名或固定步骤；只有对象、正式写入归属或外部动作会改变结果时才会自然追问。",
+          "next_step": "先说你在看谁、想弄清什么；需要的话再补一条上下文。",
+          "basket_module_id": "current_match",
+          "engineering_details": {
+            "source": "小雪对话路由与可组合模块",
+            "verification": "用不同自然说法确认不会退回到固定口令"
+          }
+        },
+        {
+          "id": "chat-results-and-readback",
+          "name": "会得到什么，什么会读回",
+          "purpose": "区分一次回答、临时比赛上下文、正式记录和长期知识，避免把“看过”误解为“已经保存”。",
+          "when_to_use": "想让小雪记下一条内容、修改已有资料，或想确认刚才保存的东西在哪时。",
+          "current_capability": "明确保存、更新或配置变化会按对应正源读回；普通查询、临时上下文和切换不会自动形成正式记录。",
+          "entry": {
+            "type": "chat",
+            "label": "明确保存并读回",
+            "chat_prompt": "写进 TK：……；完成后请读回保存的内容、归属和状态"
+          },
+          "ability_ids": [
+            "tk",
+            "current_match",
+            "team_profile",
+            "daily_knowledge"
+          ],
+          "related_modules": [
+            "TK",
+            "单场记录",
+            "长期维护"
+          ],
+          "boundaries": "只有明确写入意图、对象和内容足够清楚时才正式保存；临时判断不会自动进入长期知识。",
+          "next_step": "需要留存时明确说“写进 TK/保存为 TK”；之后让小雪读回确认。",
+          "basket_module_id": "tk",
+          "engineering_details": {
+            "source": "各模块正式写入与读回合同",
+            "verification": "保存后从正式入口读回内容、对象和状态"
+          }
+        },
+        {
+          "id": "fixed-safety-boundaries",
+          "name": "固定边界：不会自动发生什么",
+          "purpose": "在自然使用的同时，保证高影响动作、资料缺口和不同身份的信息不会被悄悄越过。",
+          "when_to_use": "担心小雪会不会自动下单、自动查外网、自动覆盖资料，或看到一个结论不确定它依据什么时。",
+          "current_capability": "读取和临时整理尽量自然；正式保存会读回，高风险动作会明确确认；缺数据时显示缺口或暂不推荐。",
+          "entry": {
+            "type": "chat",
+            "label": "确认边界",
+            "chat_prompt": "这件事会不会自动写入、联网、发布或改变长期内容？请先说明边界和需要我确认的地方"
+          },
+          "ability_ids": [
+            "knowledge_automation",
+            "tk",
+            "current_match",
+            "team_profile"
+          ],
+          "related_modules": [
+            "查询分流",
+            "数据质量",
+            "待修改"
+          ],
+          "boundaries": "不自动交易、不编造、不混用纯阵容与交易判断、不自动沉淀临时观察；删除、迁移、批量覆盖、权限和发布必须明确确认。",
+          "next_step": "有任何不确定时先问影响；能只读就先只读。",
+          "basket_module_id": "knowledge_automation",
+          "engineering_details": {
+            "source": "统一动作边界与模块写入合同",
+            "verification": "确认禁止行为未触发，空态/冲突与读回结果可观察"
+          }
+        }
+      ]
+    }
+  ],
+  "manual": {
+    "headline": "不需要记流程，按你此刻的问题开始就行。",
+    "quick_jumps": [
+      {
+        "label": "第一次怎么选入口",
+        "scenario_id": "first-time"
+      },
+      {
+        "label": "查队伍与长期资料",
+        "scenario_id": "teams-and-tk"
+      },
+      {
+        "label": "看当前赛事与赛程",
+        "scenario_id": "current-event"
+      },
+      {
+        "label": "准备一场比赛",
+        "scenario_id": "match-prep"
+      },
+      {
+        "label": "BP 与交易讨论",
+        "scenario_id": "lineup-and-trading"
+      },
+      {
+        "label": "记录与复盘",
+        "scenario_id": "record-and-review"
+      },
+      {
+        "label": "赛后复盘与长期结论",
+        "scenario_id": "review-and-long-term"
+      },
+      {
+        "label": "维护资料与知识",
+        "scenario_id": "knowledge-maintenance"
+      },
+      {
+        "label": "日报、状态与改进",
+        "scenario_id": "daily-and-improve"
+      },
+      {
+        "label": "查看固定边界",
+        "scenario_id": "fixed-boundaries"
+      }
+    ],
+    "sections": [
+      {
+        "id": "first-time",
+        "title": "第一次使用：先选你现在的问题，不用选对流程",
+        "what": "先判断你是在问一个动态问题、想慢慢查看资料，还是想看今天是否已有成品。",
+        "where": "动态问题去小雪对话；看队伍、当前赛事、TK 或阶段候选去工作台；想先看今天准备到哪了，先看日报/项目中心状态。",
+        "say": [
+          "聊聊我现在最想解决的问题",
+          "今天有什么比赛和已准备内容？",
+          "看看这支队现在是什么队"
+        ],
+        "get": "你会得到当前可以直接看的内容、资料缺口和下一步可选入口；不需要按固定步骤继续。",
+        "not_for": "日报不是所有对话的前置；工作台也不替你生成交易判断或自动发消息。",
+        "module_tree_id": "chat-capability"
+      },
+      {
+        "id": "teams-and-tk",
+        "title": "查队伍、TS、画像、选手和长期 TK",
+        "what": "想知道一支队现在是什么队、怎么赢怎么输、当前首发、实力趋势，或找回过去资料时。",
+        "where": "工作台的队伍资料适合横向查看；TK 资料库适合按队伍、时间或关键词找原文；也可以直接在小雪对话问。",
+        "say": [
+          "看看 HLE 现在是什么队、怎么赢怎么输",
+          "比较 HLE 和 GEN 的实力、趋势和资料缺口",
+          "找一下 BLG 关于纪律性的 TK",
+          "看看这支队当前首发和这位选手资料"
+        ],
+        "get": "会得到 TS/趋势、五项画像、首发、相关 TK 或明确的资料不足；材料、事实和你的判断不会混在一起。",
+        "not_for": "TS 不等于交易决定；一条 TK 或一场比赛不会自动改写五项画像。",
+        "module_tree_id": "long-term-understanding"
+      },
+      {
+        "id": "current-event",
+        "title": "看当前赛事、赛程、赛段和具体单场",
+        "what": "确认今天谁打谁、某队什么时候打，或把注意力放到一场真实对局上。",
+        "where": "工作台的当前赛事可以看赛程和点进对局；直接聊天也可以说出比赛。",
+        "say": [
+          "今天有什么比赛？",
+          "HLE 和 GEN 什么时候打？",
+          "聊聊明天 HLE 打 GEN，先确认已有资料和缺口"
+        ],
+        "get": "会得到真实赛事/对局背景或明确空态；进入单场后能继续看资料、阵容、市场或记录。",
+        "not_for": "赛程不是预测表；没有确认的 BP、首发或赛果不会被编出来。",
+        "module_tree_id": "current-event-prep"
+      },
+      {
+        "id": "match-prep",
+        "title": "查资料、问一场比赛、做赛前准备",
+        "what": "先把双方长期资料、首发、相关 TK、已知信息和缺口放到一场比赛旁边，再决定要看哪块。",
+        "where": "在当前赛事点进具体对局，或直接在小雪对话说出比赛和当前关心的问题。",
+        "say": [
+          "帮我准备这场，先列出可靠资料、主要矛盾和缺口",
+          "这场先看双方既有赢法、首发和相关 TK",
+          "这场资料不够的话，先告诉我哪里不该下结论"
+        ],
+        "get": "会先得到一张短的结论地图，再按需展开队伍、版本、TK、市场或记录；可以随时换模块或暂停。",
+        "not_for": "赛前准备不是八步强制流程，也不会在没有 BP 时假装分析 BP。",
+        "module_tree_id": "current-event-prep"
+      },
+      {
+        "id": "lineup-and-trading",
+        "title": "BP 出来后的纯阵容分析，以及明确交易讨论",
+        "what": "十个英雄齐了就只看阵容；要讨论交易系统时再明确提出，分开看市场、队伍、风险与破相条件。",
+        "where": "这两件事都在小雪对话中完成；工作台只帮助整理输入、查看资料和记录。",
+        "say": [
+          "小雪，只看十英雄分析这把。蓝色方：上 / 野 / 中 / 下 / 辅；红色方：上 / 野 / 中 / 下 / 辅",
+          "按交易系统帮我看这场：先列证据、市场分歧、风险和什么条件会推翻判断，不替我下决定"
+        ],
+        "get": "纯阵容会给十英雄范围内的结构、阶段和观赛信号；交易讨论会把依据、分歧、风险和暂不推荐分开说。",
+        "not_for": "纯阵容不带入队伍、TS、盘口或赛果；交易讨论不自动下单、不承诺必中，也不会把两条链混成一个结论。",
+        "module_tree_id": "methods-and-judgment"
+      },
+      {
+        "id": "record-and-review",
+        "title": "临场记录、盘口记录与留下一条观察",
+        "what": "把当时的盘口、自己的判断、首发/BP/市场变化或一句观察原样留下，方便赛后对照。",
+        "where": "直接在小雪对话说“写进 TK”或“记录这场变化”；当前赛事承接本场变化，TK 承接长期可找回材料。",
+        "say": [
+          "写进 TK：这场我先不碰，原因是……",
+          "记录这场的变化：首发 / BP / 盘口 / 其他，内容是……",
+          "写进 TK：这条交易规律是……"
+        ],
+        "get": "明确保存时会读回内容、对象和状态；单场变化会留在本场，不会混成长期知识。",
+        "not_for": "记录不是自动交易指令；对象不明确时不会硬塞进某支队，临时观察不自动进入画像或版本结论。",
+        "module_tree_id": "records-and-review"
+      },
+      {
+        "id": "review-and-long-term",
+        "title": "单场赛后复盘、阶段复盘与长期结论",
+        "what": "先回看当时写了什么，再和实际结果对照；多场之后再把真正可复用的内容列为候选。",
+        "where": "单场复盘直接和小雪聊；阶段候选可在工作台阶段整理查看；长期更新按具体对象进入。",
+        "say": [
+          "复盘刚才这场：先读回我当时的记录和变化，再和结果对照",
+          "把这阶段值得长期保留的结论先列候选，区分已证实、冲突和资料不足",
+          "我想维护 BLG 的画像，先告诉我现有资料和需要确认的范围"
+        ],
+        "get": "会得到原记录与结果的对照、待确认的地方和可沉淀候选；正式长期更新后应从原入口读回。",
+        "not_for": "复盘不会生成下次自动买卖规则，也不会因为一场结果就自动改写长期画像、TK 或版本。",
+        "module_tree_id": "records-and-review"
+      },
+      {
+        "id": "knowledge-maintenance",
+        "title": "查找/维护 TK、版本、队伍画像和知识导入",
+        "what": "找既有资料、导入外部材料，或明确维护一个版本、队伍、选手的长期内容。",
+        "where": "TK 资料库负责找回；知识导入、版本或资料维护可直接在小雪对话说明对象与范围。",
+        "say": [
+          "找一下关于……的 TK，优先给我相关原文和时间",
+          "检查并导入这类外部知识：B 站 / 公众号",
+          "我想维护……（版本 / 某队 / 某选手），先告诉我资料、冲突和范围"
+        ],
+        "get": "会得到搜索结果、导入的新增/重复与可找回情况，或维护前的资料缺口、冲突与确认边界。",
+        "not_for": "外部搜索和导入不是默认动作；材料不会未经判断自动写进画像、版本或交易结论；删除/整包覆盖会明确确认。",
+        "module_tree_id": "knowledge-and-data"
+      },
+      {
+        "id": "daily-and-improve",
+        "title": "日报、资料不足、暂停、错误/空态，以及怎么改进",
+        "what": "分清今天有无成品、资料是否不足、某项是否主动暂停或只是局部读不到；遇到体验问题就留下。",
+        "where": "项目中心首屏显示整体和今日状态；对应工作台页面显示局部空态；待修改从任何模块都可以加入。",
+        "say": [
+          "今天有什么已准备内容？没有的话请说明真实原因和我还能从哪里继续",
+          "为什么现在显示这个状态？请说明影响范围和还能用什么",
+          "聊聊待修改"
+        ],
+        "get": "会明确是无比赛、内容未齐、资料不足、主动暂停还是当前状态读不到；加入待修改后可以回飞书讨论并在交付后体验。",
+        "not_for": "不会拿旧内容顶替今天的空态，不会把任务存在说成内容已生成，也不会未经讨论把待修改当成交付承诺。",
+        "module_tree_id": "daily-and-automation"
+      },
+      {
+        "id": "fixed-boundaries",
+        "title": "所有固定边界，一次看清",
+        "what": "确认小雪在自然使用中始终不会越过的边界。",
+        "where": "任何时候都可以直接在小雪对话确认影响；项目中心模块展开后可看当前状态、使用边界与资料缺口。",
+        "say": [
+          "这件事会不会自动写入、联网、发布或改变长期内容？请先说明边界和需要我确认的地方"
+        ],
+        "get": "会明确：不自动交易、不编造、纯阵容与交易判断不混用、临时判断不自动进长期知识；明确保存才读回，删除/覆盖会先确认。",
+        "not_for": "不要把一条能用的入口理解为所有资料都齐、所有自动化都在运行，或所有历史功能仍是当前主线。",
+        "module_tree_id": "chat-capability"
+      }
+    ],
+    "extras": [
+      {
+        "label": "周期扫描",
+        "say": [
+          "分析今天全部比赛",
+          "扫一下 LCK 赛区",
+          "HLE 最近为什么震荡"
+        ]
+      },
+      {
+        "label": "盘口判断",
+        "say": [
+          "这场小时间怎么看",
+          "单局人头有机会吗",
+          "让分盘是什么意思"
+        ]
+      },
+      {
+        "label": "分析师",
+        "say": [
+          "叫分析师"
+        ]
+      },
+      {
+        "label": "其他电竞",
+        "say": [
+          "CS2 大小分怎么看",
+          "无畏契约这场比赛怎么看"
+        ]
+      },
+      {
+        "label": "研究底稿",
+        "say": [
+          "研究这场"
+        ]
+      }
+    ]
+  },
+  "module_mapping": {
+    "ts_strength": {
+      "module_name": "队伍资料",
+      "user_purpose": "看一支队伍的实力、趋势、画像、首发和长期资料。",
+      "entry_type": "web",
+      "page": "teams",
+      "entry_label": "打开队伍资料",
+      "chat_prompt": "看看队伍实力和趋势"
+    },
+    "team_profile": {
+      "module_name": "队伍资料",
+      "user_purpose": "看一支队伍的实力、趋势、画像、首发和长期资料。",
+      "entry_type": "web",
+      "page": "teams",
+      "entry_label": "打开队伍资料",
+      "chat_prompt": "看看这支队怎么赢怎么输"
+    },
+    "tk": {
+      "module_name": "TK 与交易记录",
+      "entry_type": "web",
+      "page": "tk",
+      "entry_label": "打开 TK 资料库",
+      "chat_prompt": "找一下相关 TK"
+    },
+    "current_match": {
+      "module_name": "当前赛事与单场",
+      "entry_type": "web",
+      "page": "event",
+      "entry_label": "打开当前赛事",
+      "chat_prompt": "聊聊这场比赛"
+    },
+    "version_lineup": {
+      "module_name": "版本、方法与阵容",
+      "entry_type": "chat",
+      "entry_label": "在小雪对话使用",
+      "chat_prompt": "BP 出来了，分析这十个英雄"
+    },
+    "daily_knowledge": {
+      "module_name": "日报与知识维护",
+      "entry_type": "web",
+      "page": "stage",
+      "entry_label": "打开沉淀候选",
+      "chat_prompt": "看看今天日报和待沉淀内容"
+    },
+    "knowledge_automation": {
+      "module_name": "数据与知识自动化",
+      "entry_type": "status",
+      "entry_label": "查看当前状态",
+      "chat_prompt": "看看今天内容为什么还没准备好"
+    },
+    "attention_config": {
+      "module_name": "关注范围与赛事配置",
+      "entry_type": "web",
+      "page": "event",
+      "entry_label": "打开当前赛事",
+      "chat_prompt": "看看当前关注范围"
+    }
+  }
+}

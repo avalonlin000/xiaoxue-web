@@ -10,7 +10,7 @@ let dispose = () => {};
 
 export default {
   id: 'stage-review',
-  name: '阶段整理',
+  name: '沉淀候选',
   async mount(context = {}) {
     const root = document.getElementById('card-stage-review');
     const view = createStageReviewView(root);
@@ -58,7 +58,7 @@ export default {
         }
       },
       async copyPrompt() {
-        const text = '小雪，开始阶段知识整理。先读取待整理候选，再结合原有版本理解、队伍和选手资料、三维、TK 与 TS 依据；只展示真正需要修改的内容，最后等我确认后再写回。';
+        const text = '小雪，看看这些沉淀候选。只挑赛后反复出现、下次还能用的内容；先告诉我该留到哪里，等我确认后再写入长期资料。';
         try {
           await copyText(text);
           view.setMessage('已复制，直接发给小雪', 'success');

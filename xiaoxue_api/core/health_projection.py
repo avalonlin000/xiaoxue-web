@@ -1,85 +1,78 @@
 from __future__ import annotations
 
+from typing import Any
+
 from xiaoxue_api.core.module_registry import ModuleRegistry
 
 
 def project_module_health(checks: dict, boot_status: dict | None = None) -> dict:
+    """Project runtime health from registered capability manifests."""
+
     registry = ModuleRegistry()
+    statuses = boot_status or {}
 
-    database_ok = bool((checks.get("database") or {}).get("ok"))
-    tk_ok = bool((checks.get("tk_dir") or {}).get("ok"))
-    skills_ok = bool((checks.get("skill_dirs") or {}).get("ok"))
-    market_ok = bool((checks.get("market_notes") or {}).get("ok"))
-    daily_ok = bool((checks.get("data_readiness") or {}).get("ok"))
-    shell_ok = bool((checks.get("dist") or {}).get("ok"))
+    for fallback_id, boot in statuses.items():
+        manifest = boot.get("manifest") if isinstance(boot, dict) else None
+        if not isinstance(manifest, dict):
+            registry.broken(
+                fallback_id,
+                reason_code=(boot or {}).get("reason_code") or "module_manifest_unavailable",
+                message="该能力没有可用声明，其他模块继续运行",
+            )
+            continue
 
-    _record(registry, "platform", "应用外壳", shell_ok, "dist_missing", critical=True)
-    _record(registry, "team_data", "队伍资料", database_ok, "database_unavailable")
-    _record(registry, "tk_knowledge", "TK资料库", tk_ok, "tk_directory_unavailable")
-    if skills_ok or database_ok:
-        registry.healthy("profiles", "画像", message="画像正源或数据库兜底可用")
-    else:
-        registry.broken(
-            "profiles",
-            "画像",
-            reason_code="profile_sources_unavailable",
-            message="画像正源和数据库兜底均不可用",
-        )
-    _record(registry, "fundamentals", "队伍资料", database_ok, "database_unavailable")
-    _record(registry, "market_notes", "盘口记录", market_ok, "market_notes_unavailable")
-    daily_operation = checks.get("daily_operation") or {}
-    if daily_operation.get("state") == "paused_by_user":
-        registry.disabled(
-            "daily_content",
-            "日报",
-            message=daily_operation.get("message") or "钧钧已主动暂停，待确认后恢复",
-        )
-    else:
-        _record(registry, "daily_content", "日报", daily_ok, "readiness_missing")
+        manifest = registry.register_manifest(manifest, module_name=manifest["id"])
+        module_id = manifest["id"]
+        if boot.get("status") == "broken":
+            registry.broken(
+                module_id,
+                reason_code=boot.get("reason_code") or "module_load_failed",
+                message="该模块加载失败，其他模块继续运行",
+            )
+            continue
+        _project_manifest_health(registry, manifest, checks)
 
-    registry.healthy("lineup", "阵容", message="本地输入契约可用")
-    registry.disabled("pre_match", "赛前交易判断日报", message="由日报统一展示，保留兼容接口")
-    registry.disabled("analyst", "分析", message="非核心能力，失败不影响其他模块")
-    registry.disabled("legacy_trades", "旧交易记录兼容", message="仅保留历史接口")
-    registry.disabled("weread_bridge", "知识导入登录", message="按需启用")
-    _apply_boot_status(registry, boot_status or {})
     return registry.as_dict()
 
 
-def _record(
+def _project_manifest_health(
     registry: ModuleRegistry,
-    module_id: str,
-    name: str,
-    ok: bool,
-    reason_code: str,
-    *,
-    critical: bool = False,
+    manifest: dict[str, Any],
+    checks: dict[str, Any],
 ) -> None:
-    if ok:
-        registry.healthy(module_id, name)
+    module_id = manifest["id"]
+    health = manifest["health"]
+
+    if health.get("state") == "disabled":
+        registry.disabled(module_id, message=health.get("message") or "当前已停用")
         return
+
+    pause_key = health.get("pause_check")
+    if pause_key:
+        pause_value = checks.get(pause_key) or {}
+        if pause_value.get("state") == health.get("pause_state"):
+            registry.disabled(
+                module_id,
+                message=pause_value.get("message") or health.get("message") or "当前已暂停",
+            )
+            return
+
+    required_checks = health.get("checks") or []
+    outcomes = [_check_ok(checks.get(key)) for key in required_checks]
+    mode = health.get("check_mode", "all")
+    available = any(outcomes) if mode == "any" else all(outcomes)
+    if available:
+        registry.healthy(module_id, message=health.get("message") or "")
+        return
+
     registry.broken(
         module_id,
-        name,
-        reason_code=reason_code,
-        message="该模块当前不可用，其他模块继续运行",
-        critical=critical,
+        reason_code=health.get("reason_code") or "dependency_unavailable",
+        message=health.get("unavailable_message") or "该模块当前不可用，其他模块继续运行",
     )
 
 
-def _apply_boot_status(registry: ModuleRegistry, boot_status: dict) -> None:
-    names = {
-        "lineup": "阵容",
-        "market_notes": "盘口记录",
-        "team_data": "队伍资料",
-        "daily_content": "日报",
-    }
-    for module_id, status in boot_status.items():
-        if status.get("status") != "broken":
-            continue
-        registry.broken(
-            module_id,
-            names.get(module_id, module_id),
-            reason_code=status.get("reason_code") or "module_load_failed",
-            message="该模块加载失败，其他模块继续运行",
-        )
+def _check_ok(value: Any) -> bool:
+    if isinstance(value, dict):
+        return bool(value.get("ok"))
+    return bool(value)

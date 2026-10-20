@@ -18,7 +18,6 @@ def team_row(team: str, *, mu: float, sigma: float, seed_mu: float | None = None
         "final_seed_mu": seed_mu,
         "seed_sigma": seed_sigma,
         "seed_ts": (seed_mu - 3 * seed_sigma) if seed_mu is not None and seed_sigma is not None else None,
-        "outright_odds_decimal": None,
         "note": "",
     }
 
@@ -75,11 +74,41 @@ class MatchDeskContractTests(unittest.TestCase):
         ):
             payload = current_event_service.get_match_desk("A", "B", "LPL")
 
+        self.assertTrue(payload["quantitative"]["available"])
         self.assertEqual(payload["quantitative"]["compare"]["ts_diff"], 2.4)
         self.assertEqual(payload["team_a"]["three_dimensional"]["items"][0], {"label": "优势局", "value": "控资源"})
         self.assertEqual(payload["trading_notes"]["team_b"][0]["hint"], "前期主动")
         self.assertEqual(payload["trading_framework"]["items"][0]["scope"], "global")
         self.assertNotIn("direction", payload)
+
+    def test_match_desk_returns_other_available_facts_when_ts_is_missing(self):
+        with (
+            patch.object(current_event_service, "get_match_context", side_effect=LookupError("TS 底表未找到")),
+            patch.object(current_event_service, "get_profile_bundle", return_value=None),
+            patch.object(current_event_service, "list_team_trading_notes", return_value={"notes": []}),
+            patch.object(current_event_service, "list_match_trading_tk", return_value={"items": [], "call_order": []}),
+            patch.object(current_event_service, "get_match_workspace", return_value={"exists": False, "current": None, "changes": []}),
+            patch.object(current_event_service, "get_match_run", return_value={"exists": False}),
+        ):
+            payload = current_event_service.get_match_desk("A", "B", "LPL")
+
+        self.assertFalse(payload["quantitative"]["available"])
+        self.assertIn("TS 底表", payload["quantitative"]["reason"])
+        self.assertEqual(payload["team_a"]["team"], "A")
+
+    def test_bo5_match_desk_exposes_series_context_without_creating_a_second_score(self):
+        with (
+            patch.object(current_event_service, "get_match_context", return_value={"team_a": {}, "team_b": {}, "compare": {}}),
+            patch.object(current_event_service, "get_profile_bundle", return_value=None),
+            patch.object(current_event_service, "list_team_trading_notes", return_value={"notes": []}),
+            patch.object(current_event_service, "list_match_trading_tk", return_value={"items": [], "call_order": []}),
+            patch.object(current_event_service, "get_match_workspace", return_value={"exists": False, "current": None, "changes": []}),
+            patch.object(current_event_service, "get_match_run", return_value={"exists": False}),
+        ):
+            payload = current_event_service.get_match_desk("A", "B", "LPL", match_format="BO5")
+
+        self.assertTrue(payload["series_context"]["is_bo5"])
+        self.assertIn("TS", payload["series_context"]["items"][0])
 
     def test_dashboard_keeps_each_match_tied_to_its_schedule(self):
         config = {"event": "LPL", "phase": "第三赛段"}

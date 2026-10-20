@@ -125,6 +125,65 @@ class TkLibraryTests(unittest.TestCase):
         self.assertEqual(payload["total"], 1)
         self.assertEqual(payload["results"][0]["filename"], "short.md")
 
+    def test_library_hides_pointer_files_and_strips_technical_blocks_from_readable_tk(self) -> None:
+        import main
+        from fastapi.testclient import TestClient
+        from xiaoxue_api.modules.tk_knowledge import repository
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_tk(root, "pointer.md", "2026-07-14", "@/tmp/BV1example_tk.txt")
+            write_tk(root, "readable.md", "2026-07-14", "【结论】保留这条战术判断。\n```yaml\ninternal: should-not-show\n```\n- 证据：/home/ubuntu/internal.md\n【推演】后续继续观察。")
+            with mock.patch.object(repository, "TK_DIR", str(root)):
+                with TestClient(main.app) as client:
+                    library = client.get("/api/tk/library?period=all&limit=30").json()
+                    entry = client.get("/api/tk/entry/readable.md").json()
+                    hidden_search = client.get("/api/tk/library?period=all&q=/home/ubuntu&limit=30").json()
+
+        self.assertEqual(library["total"], 1)
+        self.assertEqual(library["results"][0]["filename"], "readable.md")
+        self.assertIn("保留这条战术判断", entry["content"])
+        self.assertIn("后续继续观察", entry["content"])
+        self.assertNotIn("internal:", entry["content"])
+        self.assertNotIn("/home/ubuntu", entry["content"])
+        self.assertEqual(hidden_search["total"], 0)
+
+    def test_personal_write_strips_technical_fragments_before_persistence(self) -> None:
+        from xiaoxue_api.modules.tk_knowledge import repository, service
+
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(repository, "TK_DIR", directory), mock.patch.object(repository, "request_reindex", return_value=True):
+            created = service.create({"content": "【结论】保留正常判断。\n```json\n{\"debug\": true}\n```\n/tmp/ignore-me"})
+            raw = repository.read_document(created["filename"])["content"]
+
+        self.assertIn("保留正常判断", raw)
+        self.assertNotIn("debug", raw)
+        self.assertNotIn("/tmp/ignore-me", raw)
+
+    def test_personal_remember_writes_raw_words_without_metadata_or_overwrite(self) -> None:
+        import main
+        from fastapi.testclient import TestClient
+        from xiaoxue_api.modules.tk_knowledge import repository, service
+
+        teams = [
+            {"short_name": "BLG", "name": "Bilibili Gaming", "team_id": "blg"},
+            {"short_name": "T1", "name": "T1", "team_id": "t1"},
+        ]
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(repository, "TK_DIR", directory), mock.patch.object(service, "list_teams", return_value=teams):
+            with TestClient(main.app) as client:
+                first = client.post("/api/tk/remember", json={"text": "BLG 对 T1 这场先不碰，观察前十五分钟。"}).json()
+                second = client.post("/api/tk/remember", json={"text": "BLG 对 T1 这场先不碰，观察前十五分钟。"}).json()
+                entry = client.get(f"/api/tk/entry/{first['filename']}").json()
+                raw = repository.read_document(first["filename"])["content"]
+
+        self.assertTrue(first["ok"])
+        self.assertTrue(second["ok"])
+        self.assertEqual(first["filename"], second["filename"])
+        self.assertEqual(first["source"], "钧钧口述")
+        self.assertEqual(first["teams"], ["BLG", "T1"])
+        self.assertEqual(entry["content"], "BLG 对 T1 这场先不碰，观察前十五分钟。")
+        self.assertIn("队伍:BLG", raw)
+        self.assertIn("队伍:T1", raw)
+
     def test_entry_rejects_unsafe_or_non_markdown_filenames(self) -> None:
         import main
         from fastapi.testclient import TestClient
@@ -136,6 +195,23 @@ class TkLibraryTests(unittest.TestCase):
                     response = client.get("/api/tk/entry/not-markdown.txt")
 
         self.assertEqual(response.status_code, 400)
+
+    def test_delete_removes_the_selected_tk_and_the_entry_cannot_be_read_back(self) -> None:
+        import main
+        from fastapi.testclient import TestClient
+        from xiaoxue_api.modules.tk_knowledge import repository
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_tk(root, "remove-me.md", "2026-07-14", "【结论】这是一条用于删除验收的临时 TK。")
+            with mock.patch.object(repository, "TK_DIR", directory), mock.patch.object(repository, "request_reindex", return_value=True):
+                with TestClient(main.app) as client:
+                    deleted = client.delete("/api/tk/remove-me.md")
+                    readback = client.get("/api/tk/entry/remove-me.md")
+
+        self.assertEqual(deleted.status_code, 200)
+        self.assertEqual(deleted.json(), {"ok": True})
+        self.assertEqual(readback.status_code, 404)
 
 
 if __name__ == "__main__":

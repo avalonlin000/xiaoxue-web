@@ -1,1 +1,18 @@
-MODULE = {"id": "team_data", "name": "队伍资料"}
+MODULE = {
+    "id": "team_data",
+    "name": "队伍资料",
+    "version": "1.0.0",
+    "purpose": "读取正式数据库中的队伍、选手和赛程基础事实。",
+    "examples": ["查 HLE 队伍资料", "看 GEN 后续赛程"],
+    "inputs": {"optional": ["team", "player", "date"]},
+    "effect": "read",
+    "reads": ["英雄联盟数据库.db"],
+    "writes": [],
+    "output_schema": {"type": "object"},
+    "source_policy": {"source": "official_database"},
+    "settings": {},
+    "dependencies": ["database"],
+    "health": {"checks": ["database"], "reason_code": "database_unavailable"},
+    "tests": ["tests/test_team_data_contract.py"],
+    "order": 30,
+}

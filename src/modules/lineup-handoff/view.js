@@ -2,7 +2,7 @@ export function readLineupInput(source = 'trade') {
   return {
     matchName: value('trade-match'),
     marketDirection: value('trade-winner'),
-    oddsScore: value('trade-score'),
+    matchObservation: value('trade-score'),
     preThought: value('trade-reason'),
     review: value('trade-review'),
     lineupText: source === 'analyst' ? value('analyst-bp-input') : '',

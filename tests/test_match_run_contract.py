@@ -26,6 +26,41 @@ class MatchRunContractTests(unittest.TestCase):
         self.db_patch.stop()
         self.temp_dir.cleanup()
 
+    def test_non_lol_match_run_is_persisted_and_reopened_without_lol_schedule_lookup(self):
+        with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
+            started = current_event_service.start_match_run({
+                "game": "valorant", "team_a": "T1", "team_b": "NRG",
+                "event": "VCT", "match_date": "2026-10-10", "match_time": "19:00",
+                "match_format": "BO3", "mode": "virtual_pre",
+            })
+            reopened = current_event_service.get_match_run({
+                "game": "valorant", "team_a": "T1", "team_b": "NRG",
+                "event": "changed label", "match_date": "2026-10-10", "match_time": "19:00",
+                "match_format": "BO3",
+            })
+        self.assertEqual(started["match"]["game"], "valorant")
+        self.assertEqual(started["id"], reopened["id"])
+        self.assertTrue(reopened["exists"])
+
+    def test_three_games_keep_entries_separate_and_resume_after_pause(self):
+        ids = []
+        with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
+            for game in ("lol", "valorant", "cs2"):
+                identity = {**IDENTITY, "game": game}
+                started = current_event_service.start_match_run(identity)
+                ids.append(started["id"])
+                current_event_service.save_match_trade_entry({
+                    **identity, "section": "review", "content": f"{game} isolated review",
+                })
+                current_event_service.pause_match_run(identity)
+            for game, run_id in zip(("lol", "valorant", "cs2"), ids):
+                identity = {**IDENTITY, "game": game}
+                resumed = current_event_service.start_match_run(identity)
+                self.assertEqual(resumed["id"], run_id)
+                self.assertEqual(resumed["entries"][0]["content"], f"{game} isolated review")
+                self.assertEqual(resumed["activity_status"], "active")
+        self.assertEqual(len(set(ids)), 3)
+
     def test_virtual_run_keeps_result_sealed_and_exposes_actionable_fact_statuses(self):
         facts = [
             {
@@ -92,7 +127,7 @@ class MatchRunContractTests(unittest.TestCase):
         self.assertEqual(loaded["facts"][0]["value"], "赛前不采用这条旧三维")
         self.assertIsNone(loaded["virtual_judgment"])
 
-    def test_score_result_stays_hidden_until_user_explicitly_unlocks_review(self):
+    def test_score_result_is_independently_readable_without_a_match_run(self):
         current_event_service.repository.ensure_match_run_tables()
         with database.connect() as conn:
             conn.execute("""
@@ -112,13 +147,12 @@ class MatchRunContractTests(unittest.TestCase):
                     'completed', 'DK', 1, 2, '2026-07-30 21:00:00', '第三赛段')
             """)
 
-        with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
-            current_event_service.start_match_run({**IDENTITY, "mode": "virtual_pre"})
+        standalone = current_event_service.get_score_match_result(IDENTITY)
+        self.assertEqual(standalone["status"], "completed")
+        self.assertEqual(standalone["result"]["winner"], "DK")
+        self.assertIn("不读取或改变任何交易推演状态", standalone["boundary"])
+        self.assertFalse(current_event_service.get_match_run(IDENTITY)["exists"])
 
-        before = current_event_service.get_score_match_evidence({**IDENTITY, "view": "pre"})
-        self.assertNotIn("result", before["score_match"])
-
-        current_event_service.unlock_match_run_result(IDENTITY)
         after = current_event_service.get_score_match_evidence({**IDENTITY, "view": "post"})
         self.assertEqual(after["score_match"]["result"]["winner"], "DK")
 
@@ -164,6 +198,26 @@ class MatchRunContractTests(unittest.TestCase):
         self.assertEqual(loaded["entries"][0]["content"], "只有盘口回到可接受位置且首发不变时才考虑进入")
         self.assertEqual(loaded["focus"], "entry")
         self.assertEqual(loaded["activity_status"], "active")
+
+    def test_guide_groups_existing_section_ids_into_pre_live_and_post_stages(self):
+        with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
+            started = current_event_service.start_match_run({**IDENTITY, "mode": "live", "focus": "lineup"})
+
+        stages = started["guide"]["stages"]
+        self.assertEqual(list(stages), ["pre", "live", "post"])
+        self.assertEqual([item["id"] for item in stages["pre"]["modules"]], [
+            "version", "team", "trend", "matchup", "branches", "market", "plan", "entry", "exit",
+        ])
+        self.assertEqual([item["id"] for item in stages["live"]["modules"]], ["lineup", "execution"])
+        self.assertEqual([item["id"] for item in stages["post"]["modules"]], ["review"])
+        self.assertEqual(started["focus"], "lineup")
+        self.assertEqual(next(item for item in started["guide"]["modules"] if item["id"] == "lineup")["stage"], "live")
+
+        saved = current_event_service.save_match_trade_entry({
+            **IDENTITY, "section": "review", "content": "赛后只复盘这一场的判断和执行。",
+        })
+        self.assertEqual(saved["entries"][0]["section"], "review")
+        self.assertEqual(saved["entries"][0]["stage"], "post")
 
     def test_new_match_opens_as_a_neutral_draft_instead_of_forcing_version_first(self):
         with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
@@ -213,22 +267,14 @@ class MatchRunContractTests(unittest.TestCase):
         self.assertEqual([item["scope"] for item in started["trading_framework"]["items"]], ["global", "region", "team"])
         self.assertEqual(started["trading_framework"]["items"][1]["status"], "candidate")
 
-    def test_trend_entry_requires_user_confirmation(self):
+    def test_trend_entry_can_be_saved_without_user_confirmation(self):
         with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
             current_event_service.start_match_run({**IDENTITY, "mode": "live"})
-
-        with self.assertRaisesRegex(ValueError, "用户确认"):
-            current_event_service.save_match_trade_entry({
-                **IDENTITY,
-                "section": "trend",
-                "content": "换人队近期更容易打出好表现",
-            })
 
         saved = current_event_service.save_match_trade_entry({
             **IDENTITY,
             "section": "trend",
             "content": "换人队近期更容易打出好表现",
-            "confirmed_by_user": True,
         })
         self.assertEqual(saved["entries"][0]["section"], "trend")
 

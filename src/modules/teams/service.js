@@ -1,10 +1,10 @@
 import {
-  fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, saveTeam3D,
+  fetchFundamentals, fetchMatchContext, fetchProfile, fetchTeams,
+  fetchUpcomingSchedule,
 } from './api.js';
 
 export function createTeamsService({ view, appContext, events } = {}) {
-  const state = { team: '', teams: [], threeDimensional: null, dirty: false, fundScope: 'lpl' };
+  const state = { team: '', teams: [], fundScope: 'lpl' };
   const disposers = [];
   let mounted = false;
 
@@ -13,8 +13,6 @@ export function createTeamsService({ view, appContext, events } = {}) {
     view.bind({
       onToggleTeams: () => view.toggleTeamDropdown(state.teams, selectTeam),
       onScope: loadFundamentals,
-      onSave: save3D,
-      onDirty: markDirty,
       onEscape: () => view.closeTeamDropdown(),
       onToggleProfile: () => view.toggleProfile(),
     });
@@ -45,17 +43,13 @@ export function createTeamsService({ view, appContext, events } = {}) {
     const team = String(code || '').trim().toUpperCase();
     if (!team || state.team === team) return snapshot();
     state.team = team;
-    state.dirty = false;
     view.showTeamDetails();
     view.updateTopBar(team);
-    view.setDirty(false);
     view.loadingTeam(team);
     if (announce) appContext?.selectTeam?.(team);
-    const [profile, wiki, threeDimensional] = await fetchTeamBundle(team);
+    const profile = await fetchProfile(team).catch(() => ({ found: false, markdown: '' }));
     if (!mounted || state.team !== team) return snapshot();
-    state.threeDimensional = threeDimensional;
-    view.renderProfile(wiki?.found ? { ...wiki, source: 'wiki' } : profile, team);
-    view.render3D(threeDimensional);
+    view.renderProfile(profile, getTeamInfo(team));
     events?.emit?.('teams:loaded', { team, teamInfo: getTeamInfo(team) });
     return snapshot();
   }
@@ -73,39 +67,11 @@ export function createTeamsService({ view, appContext, events } = {}) {
     }
   }
 
-  function markDirty() {
-    state.dirty = true;
-    view.setDirty(true);
-  }
-
   function toggleTeamDropdown() {
     view.toggleTeamDropdown(state.teams, selectTeam);
   }
 
   function closeTeamDropdown() { view.closeTeamDropdown(); }
-
-  function applyEditCommand(field, value, rawCommand) {
-    const applied = view.applyEditCommand(field, value, rawCommand);
-    if (applied) markDirty();
-    return applied;
-  }
-
-  async function save3D() {
-    if (!state.team || !state.dirty) return null;
-    const body = view.read3D();
-    view.saving();
-    try {
-      const result = await saveTeam3D(state.team, body);
-      state.dirty = false;
-      state.threeDimensional = { ...(state.threeDimensional || {}), ...body, updated_at: new Date().toLocaleString() };
-      view.saved();
-      events?.emit?.('teams:3d-saved', { team: state.team });
-      return result;
-    } catch (error) {
-      view.saveFailed();
-      throw error;
-    }
-  }
 
   function getTeamInfo(code = state.team) {
     return state.teams.find((team) => team.short_name === code)
@@ -116,8 +82,6 @@ export function createTeamsService({ view, appContext, events } = {}) {
     return {
       team: state.team,
       teams: [...state.teams],
-      threeDimensional: state.threeDimensional ? { ...state.threeDimensional } : null,
-      dirty: state.dirty,
       fundScope: state.fundScope,
     };
   }
@@ -130,11 +94,11 @@ export function createTeamsService({ view, appContext, events } = {}) {
 
   return {
     mount, unmount, selectTeam, loadFundamentals,
-    markDirty, save3D, toggleTeamDropdown, closeTeamDropdown, applyEditCommand, getTeamInfo, snapshot,
+    toggleTeamDropdown, closeTeamDropdown, getTeamInfo, snapshot,
   };
 }
 
 export {
-  fetchFundamentals, fetchMatchContext, fetchTeamBundle, fetchTeams,
-  fetchUpcomingSchedule, saveTeam3D,
+  fetchFundamentals, fetchMatchContext, fetchProfile, fetchTeams,
+  fetchUpcomingSchedule,
 };

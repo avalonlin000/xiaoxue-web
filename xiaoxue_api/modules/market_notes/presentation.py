@@ -1,73 +1,30 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Query
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, HTTPException, Query, Response
 
 from . import service
 
 
-router = APIRouter(prefix="/api/market-notes", tags=["market-notes"])
+router = APIRouter(prefix="/api/market-notes", tags=["deprecated-market-notes"])
+SUNSET_MESSAGE = "盘口记录表已退役；盘口判断唯一正源为交易 TK，请使用 /api/trading-tk。"
 
 
-class MarketNoteIn(BaseModel):
-    game: str = "lol"
-    match_name: str
-    match_time: str = ""
-    direction: str = ""
-    total_lean: str = "放弃"
-    score_note: str = ""
-    reason: str = ""
-    confidence: str = "中"
-    review: str = ""
-    linked_team: str = ""
-
-
-class MarketReviewIn(BaseModel):
-    result: str = "未结算"
-    actual_score: str = ""
-    actual_lineup: str = ""
-    key_turns: str = ""
-    correct_points: str = ""
-    wrong_points: str = ""
-    missing_evidence: str = ""
-    calibration: str = ""
-    destinations: list[str] = Field(default_factory=lambda: ["market_notes"])
-    confirmed: bool = False
-
-
-@router.post("/{note_id}/review-preview")
-def preview_review(note_id: int, data: MarketReviewIn):
-    return _present(service.review, note_id, data.model_dump(), commit=False)
-
-
-@router.put("/{note_id}/review")
-def commit_review(note_id: int, data: MarketReviewIn):
-    return _present(service.review, note_id, data.model_dump(), commit=True)
+def _deprecated_headers() -> dict[str, str]:
+    return {"Deprecation": "true", "Link": "</api/trading-tk>; rel=successor-version"}
 
 
 @router.get("")
-def list_notes(game: str = Query(""), limit: int = Query(30)):
-    return _present(service.list_notes, game, limit)
-
-
-@router.post("")
-def create_note(data: MarketNoteIn):
-    return _present(service.create_note, data.model_dump())
-
-
-@router.delete("/{note_id}")
-def delete_note(note_id: int):
-    if not _present(service.delete_note, note_id):
-        raise HTTPException(404, "记录不存在")
-    return {"ok": True}
-
-
-def _present(operation, *args, **kwargs):
+def list_notes(response: Response, game: str = Query(""), limit: int = Query(30, ge=1, le=200)):
     try:
-        return operation(*args, **kwargs)
-    except service.InvalidMarketNote as exc:
-        raise HTTPException(400, str(exc)) from exc
-    except service.MarketNoteNotFound as exc:
-        raise HTTPException(404, str(exc)) from exc
+        response.headers.update(_deprecated_headers())
+        return service.list_notes(game, limit)
     except service.MarketNotesUnavailable as exc:
         raise HTTPException(503, str(exc)) from exc
+
+
+@router.post("", include_in_schema=False)
+@router.delete("/{note_id}", include_in_schema=False)
+@router.post("/{note_id}/review-preview", include_in_schema=False)
+@router.put("/{note_id}/review", include_in_schema=False)
+def retired_write(note_id: str = ""):
+    raise HTTPException(410, SUNSET_MESSAGE, headers=_deprecated_headers())

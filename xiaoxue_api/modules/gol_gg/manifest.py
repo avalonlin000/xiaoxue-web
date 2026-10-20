@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "gol_gg",
+    "name": "Gol.gg 局级事实",
+    "version": "1.0.0",
+    "purpose": "按需读取 Gol.gg 已公开的赛事与逐局事实，作为现有单场资料和异常核对的可追溯证据。",
+    "examples": ["查 Gol.gg 这场系列赛的逐局 BP", "查 LPL 2026 Split 3 的赛事事实"],
+    "inputs": {"required": ["kind"], "optional": ["tournament", "game_id"]},
+    "effect": "live_search",
+    "reads": ["https://gol.gg 固定赛事、队伍、选手与逐局页面"],
+    "writes": [],
+    "output_schema": {"type": "object", "fields": ["source_url", "retrieved_at", "boundary"]},
+    "source_policy": {"domain_allowlist": ["gol.gg"], "official_api": False, "on_demand_only": True, "long_term_write": False},
+    "settings": {"timeout_seconds": 45, "max_series_games": 5},
+    "dependencies": ["network", "gol.gg"],
+    "health": {"checks": [], "message": "按需查询时检查 Gol.gg 可用性", "reason_code": "gol_unavailable"},
+    "tests": ["tests/test_gol_gg_service.py"],
+    "order": 115,
+}

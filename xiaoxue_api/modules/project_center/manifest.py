@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "project_center",
+    "name": "项目中心",
+    "version": "1.0.0",
+    "purpose": "用独立项目内容域展示小雪开发书、待修改、正式处理和交付体验，不改写业务正源。",
+    "examples": ["聊聊待修改", "先看待修改里的当前赛事", "看看待体验"],
+    "inputs": {"optional": ["module", "note", "request", "delivery"]},
+    "effect": "reversible_change",
+    "reads": ["项目模块合同", "当前运行状态", "日报状态", "项目中心专用内容域"],
+    "writes": ["项目中心专用 SQLite 内容域"],
+    "output_schema": {"type": "object", "result_statuses": ["ok", "partial", "empty", "conflict", "unavailable", "error"]},
+    "source_policy": {"isolated_domain": True, "business_sources": "read_only", "no_business_write": True},
+    "settings": {},
+    "dependencies": ["module_contract", "project_center_store"],
+    "health": {"message": "项目中心可独立读取和记录，不影响小雪业务模块"},
+    "tests": ["tests/test_project_center_api.py", "tests/test_xiaoxue_product_mcp.py"],
+    "order": 150,
+}

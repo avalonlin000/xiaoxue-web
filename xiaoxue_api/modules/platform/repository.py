@@ -5,7 +5,7 @@ import json
 import os
 import shutil
 
-from xiaoxue_api.core.database import DB_PATH, connect
+from xiaoxue_api.core.database import DB_PATH, db
 
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
@@ -18,16 +18,12 @@ SKILL_DIR_MAIN = os.environ.get("XIAOXUE_SKILL_DIR_MAIN", "/home/ubuntu/.hermes/
 def collect_checks() -> dict:
     checks = {}
     try:
-        with connect() as conn:
+        with db() as conn:
             team_count = conn.execute("SELECT COUNT(*) AS n FROM teams").fetchone()["n"]
             schedule_count = conn.execute("SELECT COUNT(*) AS n FROM schedules").fetchone()["n"]
-            table = conn.execute("SELECT COUNT(*) AS n FROM sqlite_master WHERE type='table' AND name='market_notes'").fetchone()["n"]
-            note_count = conn.execute("SELECT COUNT(*) AS n FROM market_notes").fetchone()["n"] if table else 0
         checks["database"] = {"ok": True, "path": DB_PATH, "teams": team_count, "schedules": schedule_count}
-        checks["market_notes"] = {"ok": True, "table": "market_notes", "records": note_count, "boundary": "manual_notes_only"}
     except Exception as exc:
         checks["database"] = {"ok": False, "path": DB_PATH, "error": str(exc)}
-        checks["market_notes"] = {"ok": False, "table": "market_notes", "error": str(exc)}
     dist_index = os.path.join(ROOT, "dist", "index.html")
     memory_bank = os.path.join(ROOT, "memory-bank")
     checks["dist"] = {"ok": os.path.exists(dist_index), "path": dist_index}

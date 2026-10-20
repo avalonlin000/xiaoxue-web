@@ -1,0 +1,9 @@
+{
+  "schema": "esports-agent-adapter-v1",
+  "agent_id": "xiaoxue",
+  "display_name": "小雪",
+  "profile": "default",
+  "soul_path": "/home/ubuntu/.hermes/SOUL.md",
+  "root_skill_path": "/home/ubuntu/.agents/skills/小雪/SKILL.md",
+  "env_selector": "ESPORTS_AGENT_ADAPTER"
+}

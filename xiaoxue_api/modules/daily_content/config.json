@@ -1,7 +1,7 @@
 {
   "daily_content": {
-    "operating_state": "paused_by_user",
-    "operating_message": "钧钧已主动暂停；待日报模块修好并验收后再恢复。",
+    "operating_state": "active",
+    "operating_message": "日报生成与投递自动化运行中；按每日 07:00 调度执行。",
     "allowed_roots": [
       "/home/ubuntu/lol_data/scripts",
       "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life"
@@ -12,18 +12,6 @@
         "title": "LOL电竞日报 {date}",
         "kind": "daily_report",
         "path": "/home/ubuntu/lol_data/scripts/LOL电竞日报_{date}.md"
-      },
-      {
-        "id": "trading_report",
-        "title": "赛前交易判断日报 {date}",
-        "kind": "trading_report",
-        "path": "/home/ubuntu/lol_data/scripts/赛前交易判断日报_{date}.md"
-      },
-      {
-        "id": "analyst_entry_copy",
-        "title": "BP 后问小雪入口说明",
-        "kind": "analyst_entry_copy",
-        "path": "/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/ANALYST-ENTRY-COPY.md"
       }
     ]
   }

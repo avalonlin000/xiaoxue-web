@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import time
 
 from xiaoxue_api.modules.profiles.public import get_wiki_team
 from xiaoxue_api.modules.tk_knowledge.public import count_team_entries
@@ -12,9 +13,36 @@ class TeamsNotFound(LookupError):
     pass
 
 
-def list_teams(scope: str = "all", limit: int = 80) -> dict:
-    rows = repository.list_team_rows(scope, limit)
+# list_teams 热路径会逐队读 Wiki/TK 文档（31 次/请求），用 TTL 缓存兜住高频访问。
+# 队伍画像/3D/TK 更新接口会显式 invalidate；TTL 作为兜底保证最多 _CACHE_TTL 秒旧。
+_CACHE_TTL = 120.0
+_teams_cache: dict[str, tuple[float, dict]] = {}
+
+
+def invalidate_teams_cache() -> None:
+    _teams_cache.clear()
+
+
+def list_teams(scope: str = "all", limit: int = 80, team: str = "") -> dict:
+    key = f"{scope}:{limit}:{team}"
+    now = time.monotonic()
+    hit = _teams_cache.get(key)
+    if hit is not None and now - hit[0] < _CACHE_TTL:
+        return hit[1]
+    result = _list_teams_uncached(scope, limit, team)
+    _teams_cache[key] = (now, result)
+    return result
+
+
+def _list_teams_uncached(scope: str = "all", limit: int = 80, team: str = "") -> dict:
+    rows = repository.list_team_rows(scope, limit, team)
+    stage_name = repository.active_stage()
+    stage_ts = repository.get_stage_ts_snapshot_map(stage_name)
+    baseline_map = repository.get_regular_baseline_map(stage_name)
+    stage_display = repository.get_stage_display_map(stage_name)
+    cycle_signals = repository.get_stage_cycle_signal_map(stage_name)
     starters_by_team = repository.list_starters_by_team([row["team_id"] for row in rows])
+    is_msi = (scope or "").lower() == "msi"
     teams = []
     for row in rows:
         code = row["short_name"]
@@ -23,25 +51,54 @@ def list_teams(scope: str = "all", limit: int = 80) -> dict:
         tk_count = _tk_count(code)
         has_3d = bool(row["dim_1_value"] or row["dim_2_value"] or row["dim_3_value"])
         players = _starter_cards(starters_by_team.get(row["team_id"], []))
+        ts_row = stage_ts.get(code.upper())
+        baseline_row = baseline_map.get(code.upper())
+        display_row = stage_display.get(code.upper())
+        cycle_row = cycle_signals.get(code.upper())
         if has_profile and has_3d and tk_count:
             quality = "完整"
         elif has_profile or has_3d or tk_count:
             quality = "部分"
         else:
             quality = "资料不足"
+        # TS 唯一正源：ts_stage_snapshots 底表 + ts_stage_display 展示层。
+        seed_mu = row["final_seed_mu"] if is_msi else None
+        seed_sigma = row["seed_sigma"] if is_msi else None
+        seed_ts = row["seed_ts"] if is_msi else None
         teams.append({
             "short_name": code,
             "name": row["name"] or code,
             "team_id": row["team_id"],
             "region": row["region"] or "",
             "league_id": row["league_id"] or "",
-            "mu": row["mu"],
-            "sigma": row["sigma"],
-            "ts_score": round((row["mu"] or 25) - 3 * (row["sigma"] or 8.333), 3),
-            "odds": row["outright_odds_decimal"],
-            "seed_mu": row["final_seed_mu"],
-            "seed_sigma": row["seed_sigma"],
-            "seed_ts": row["seed_ts"],
+            "mu": ts_row["mu"] if ts_row else (row["mu"] or 25),
+            "sigma": ts_row["sigma"] if ts_row else (row["sigma"] or 8.333),
+            "ts_score": round(ts_row["ts"] if ts_row else (row["mu"] or 25) - 3 * (row["sigma"] or 8.333), 3),
+            "ts_stage": stage_name if ts_row else "legacy",
+            "ts_l1": ({"rank": ts_row["rank"], "tier": ts_row["tier"], "conclusion_score": ts_row["conclusion_score"]} if ts_row else None),
+            "ts_l2": ({"strength_score": ts_row["strength_score"], "stability_score": ts_row["stability_score"], "mu": ts_row["mu"], "sigma": ts_row["sigma"], "ts": ts_row["ts"], "matches": ts_row["matches"], "wins": ts_row["wins"]} if ts_row else None),
+            "ts_display": ({
+                "power_score": display_row["power_score"],
+                "volatility_score": display_row["volatility_score"],
+                "trend": display_row["trend"],
+                "momentum": display_row["momentum"],
+                "status": display_row["status"],
+                "cycle": ({
+                    "cycle_type": cycle_row["cycle_type"],
+                    "cycle_stage": cycle_row["cycle_stage"],
+                    "focus_signal": cycle_row["focus_signal"],
+                    "focus_priority": cycle_row["focus_priority"],
+                    "signal_reason": cycle_row["signal_reason"],
+                    "confirmation_needed": cycle_row["confirmation_needed"],
+                } if cycle_row else None),
+            } if display_row else None),
+            "ts_context": {"regular_baseline": (
+                {"available": True, "matches": baseline_row["matches"], "wins": baseline_row["wins"], "updated_at": baseline_row["updated_at"]}
+                if baseline_row else {"available": False}
+            )},
+            "seed_mu": seed_mu,
+            "seed_sigma": seed_sigma,
+            "seed_ts": seed_ts,
             "has_profile": has_profile,
             "has_3d": has_3d,
             "has_tk": tk_count > 0,
@@ -85,15 +142,23 @@ def get_msi() -> dict:
     }
 
 
+def get_ts_updates(team: str, limit: int = 20, days: int = 30) -> dict:
+    return repository.list_ts_updates(team, limit, days)
+
+
 def get_match_context(team_a: str, team_b: str, *, event: str = "") -> dict:
     row_a = repository.get_ts_team(team_a)
     row_b = repository.get_ts_team(team_b)
     if not row_a or not row_b:
         missing = [name for name, row in ((team_a, row_a), (team_b, row_b)) if not row]
         raise TeamsNotFound(f"TS 底表未找到队伍：{', '.join(missing)}")
+    display_map = repository.get_stage_display_map()
+    cycle_map = repository.get_stage_cycle_signal_map()
     prefer_msi_seed = _prefers_msi_seed(event)
-    context_a = _ts_team_context(row_a, prefer_msi_seed=prefer_msi_seed)
-    context_b = _ts_team_context(row_b, prefer_msi_seed=prefer_msi_seed)
+    context_a = _ts_team_context(row_a, prefer_msi_seed=prefer_msi_seed, display_row=display_map.get(str(row_a["short_name"]).upper()), cycle_row=cycle_map.get(str(row_a["short_name"]).upper()))
+    context_b = _ts_team_context(row_b, prefer_msi_seed=prefer_msi_seed, display_row=display_map.get(str(row_b["short_name"]).upper()), cycle_row=cycle_map.get(str(row_b["short_name"]).upper()))
+    if not context_a or not context_b:
+        raise TeamsNotFound(f"TS 底表未找到队伍：{', '.join(name for name, ctx in ((team_a, context_a), (team_b, context_b)) if not ctx)}")
     return {
         "event": "MSI" if prefer_msi_seed else (event or "当前队伍 TS"),
         "team_a": context_a,
@@ -147,7 +212,8 @@ def _prefers_msi_seed(event: str) -> bool:
     return normalized == "MSI" or "季中赛" in normalized
 
 
-def _ts_team_context(row, *, prefer_msi_seed: bool = False) -> dict | None:
+def _ts_team_context(row, *, prefer_msi_seed: bool = False, display_row: dict | None = None,
+                     cycle_row: dict | None = None) -> dict | None:
     if not row:
         return None
     has_seed = row["final_seed_mu"] is not None and row["seed_sigma"] is not None
@@ -168,17 +234,32 @@ def _ts_team_context(row, *, prefer_msi_seed: bool = False) -> dict | None:
         if (row["region"] or "") in {"LPL", "LCK"} and sigma <= 1.5
         else "中样本" if sigma <= 5.0 else "低样本"
     )
+    # 展示层（处理后的 0-100 百分制）随比赛上下文一起给消费者；原始 mu/sigma/ts
+    # 仅留在内部字段，用户界面一律使用 power_score/volatility_score 等展示值。
+    display = display_row or {}
     return {
         "team": row["short_name"],
         "display_name": row["name"] or row["short_name"],
         "region": row["region"] or "",
-        "odds": row["outright_odds_decimal"],
         "mu": round(mu, 3),
         "sigma": round(sigma, 3),
         "ts": round(ts, 3),
         "risk_gap": round(mu - ts, 3),
         "volatility_tier": volatility,
         "sample_confidence": confidence,
+        "power_score": display.get("power_score"),
+        "volatility_score": display.get("volatility_score"),
+        "trend": display.get("trend"),
+        "momentum": display.get("momentum"),
+        "status": display.get("status"),
+        "cycle": ({
+            "cycle_type": cycle_row.get("cycle_type"),
+            "cycle_stage": cycle_row.get("cycle_stage"),
+            "focus_signal": cycle_row.get("focus_signal"),
+            "focus_priority": cycle_row.get("focus_priority"),
+            "signal_reason": cycle_row.get("signal_reason"),
+            "confirmation_needed": cycle_row.get("confirmation_needed"),
+        } if cycle_row else None),
         "note": row["note"] or "",
         "source": "msi_seed" if use_seed else "team_ts",
     }
@@ -191,45 +272,53 @@ def _difference_line(label: str, value: float, strong_side: str, threshold: floa
 
 
 def _build_match_context(team_a: dict, team_b: dict) -> dict:
+    power_a = team_a.get("power_score")
+    power_b = team_b.get("power_score")
+    stability_a = team_a.get("volatility_score")
+    stability_b = team_b.get("volatility_score")
     mu_diff = round(team_a["mu"] - team_b["mu"], 3)
     sigma_diff = round(team_a["sigma"] - team_b["sigma"], 3)
     ts_diff = round(team_a["ts"] - team_b["ts"], 3)
+    # 用户界面只消费处理后的展示值：综合实力差 / 稳定性差。
+    power_diff = round((power_a or 0) - (power_b or 0), 1) if power_a is not None and power_b is not None else None
+    stability_diff = round((stability_a or 0) - (stability_b or 0), 1) if stability_a is not None and stability_b is not None else None
     stronger = team_a["team"] if mu_diff >= 0 else team_b["team"]
     weaker = team_b["team"] if mu_diff >= 0 else team_a["team"]
-    more_volatile = team_a["team"] if sigma_diff >= 0 else team_b["team"]
-    less_volatile = team_b["team"] if sigma_diff >= 0 else team_a["team"]
-    if abs(mu_diff) >= 4:
-        power_note = f"{stronger} 绝对实力明显领先，{weaker} 需要靠版本/BP/临场波动制造空间。"
-    elif abs(mu_diff) >= 2:
-        power_note = f"{stronger} 实力有优势，但不是碾压档，盘口不能只按强弱简单处理。"
+    if power_diff is not None and abs(power_diff) >= 25:
+        power_note = f"{stronger} 综合实力明显领先，{weaker} 需要靠版本/BP/临场波动制造空间。"
+    elif power_diff is not None and abs(power_diff) >= 10:
+        power_note = f"{stronger} 综合实力有优势，但不是碾压档，仍要结合版本、BP 和临场状态判断。"
     else:
-        power_note = "两队实力差不大，单场更看版本适配、BP 和当天状态。"
-    if abs(sigma_diff) >= 2.5:
-        volatility_note = f"{more_volatile} 波动明显更大，意味着上限/下限都更散；{less_volatile} 更偏稳定兑现。"
-    elif max(team_a["sigma"], team_b["sigma"]) >= 4.5:
-        volatility_note = "这场至少一边处于高波动区，日报里要提示爆冷/让盘风险，不要只看实力。"
+        power_note = "两队综合实力差不大，单场更看版本适配、BP 和当天状态。"
+    if stability_diff is not None and abs(stability_diff) >= 20:
+        more_stable = team_a["team"] if stability_diff >= 0 else team_b["team"]
+        less_stable = team_b["team"] if stability_diff >= 0 else team_a["team"]
+        volatility_note = f"{less_stable} 稳定性明显更低，上限/下限都更散；{more_stable} 更偏稳定兑现。"
+    elif (stability_a or 0) <= 20 or (stability_b or 0) <= 20:
+        volatility_note = "这场至少一边稳定性很低，日报里要提示爆冷风险，不要只看实力。"
     else:
-        volatility_note = "两边波动都不高，TS 参考价值相对稳定。"
-    market_note = "赔率只作市场位置参考：日报里重点对照实力差和波动差，判断市场有没有把强队热度或弱队爆冷空间打满。"
+        volatility_note = "两边稳定性都不差，TS 参考价值相对稳定。"
+
     daily_summary = (
-        f"TS参考：{team_a['team']} mu {_formatted(team_a['mu'])} / σ {_formatted(team_a['sigma'])} / TS {_formatted(team_a['ts'])}；"
-        f"{team_b['team']} mu {_formatted(team_b['mu'])} / σ {_formatted(team_b['sigma'])} / TS {_formatted(team_b['ts'])}。"
+        f"TS参考：{team_a['team']} 综合实力 {_formatted(power_a or 0)} / 稳定性 {_formatted(stability_a or 0)}；"
+        f"{team_b['team']} 综合实力 {_formatted(power_b or 0)} / 稳定性 {_formatted(stability_b or 0)}。"
         f"{power_note}{volatility_note}"
     )
     risk_note = (
-        f"关注点：{_difference_line('实力', mu_diff, stronger, 0.8)}；"
-        f"{_difference_line('波动', sigma_diff, more_volatile, 0.4)}；"
-        f"保守下界差 {_formatted(abs(ts_diff))} 偏向 {team_a['team'] if ts_diff >= 0 else team_b['team']}。"
+        f"关注点：{_difference_line('综合实力', power_diff or 0, stronger, 2.0)}；"
+        f"{_difference_line('稳定性', stability_diff or 0, (team_a['team'] if (stability_diff or 0) >= 0 else team_b['team']), 2.0)}；"
+        f"综合实力差 {_formatted(abs(power_diff or 0))} 偏向 {team_a['team'] if (power_diff or 0) >= 0 else team_b['team']}。"
     )
     return {
         "mu_diff": mu_diff,
         "sigma_diff": sigma_diff,
         "ts_diff": ts_diff,
+        "power_diff": power_diff,
+        "stability_diff": stability_diff,
         "stronger": stronger,
-        "more_volatile": more_volatile,
+        "more_volatile": team_b["team"] if (stability_diff or 0) < 0 else team_a["team"],
         "power_note": power_note,
         "volatility_note": volatility_note,
-        "market_note": market_note,
         "risk_note": risk_note,
         "daily_summary": daily_summary,
     }

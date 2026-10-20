@@ -93,7 +93,7 @@ class WorkflowConfigTests(unittest.TestCase):
         artifact_ids = [item["id"] for item in config["daily_content"]["artifacts"]]
         self.assertEqual(
             artifact_ids,
-            ["daily_report", "trading_report", "analyst_entry_copy"],
+            ["daily_report"],
         )
         self.assertEqual(config["market"]["results"], ["未结算", "赢", "输", "走水", "放弃"])
 
@@ -140,7 +140,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
                     "path": missing_path,
                 }
             }
-            matches = [{"date": "2026-07-14", "time": "17:00", "team_a": "A", "team_b": "B"}]
+            matches = [{"date": "2026-07-14", "time": "17:00", "team_a": "A", "team_b": "B", "stage": "S16全球总决赛"}]
             config = {"daily_content": {"allowed_roots": [directory], "artifacts": [
                 {"id": key, **meta} for key, meta in files.items()
             ]}}
@@ -156,9 +156,9 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
 
     def test_modules_use_isolated_workflow_contracts(self) -> None:
         from xiaoxue_api.modules.daily_content.public import resolve_date
-        from xiaoxue_api.modules.legacy_trades.service import load_config
+        from xiaoxue_api.modules.legacy_trades.service import list_trades
 
-        self.assertIn("放弃", load_config()["results"])
+        self.assertEqual(list_trades("lol", limit=1).get("source"), "trading_tk")
         self.assertEqual(resolve_date("2026-07-12"), "2026-07-12")
 
     def test_lineup_prepare_endpoint_exposes_contract(self) -> None:
@@ -181,76 +181,23 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ready"])
 
-    def test_market_review_preview_does_not_mutate_note(self) -> None:
+    def test_retired_market_review_writes_return_gone(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.core import database
 
-        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
-            database, "DB_PATH", str(Path(directory) / "test.db")
-        ):
-                with TestClient(main.app) as client:
-                    created = client.post(
-                        "/api/market-notes",
-                        json={"match_name": "T1 vs GEN", "review": "结果：未结算\n原始备注"},
-                    ).json()["record"]
-                    response = client.post(
-                        f"/api/market-notes/{created['id']}/review-preview",
-                        json={"result": "赢", "correct_points": "看对资源团"},
-                    )
-                    loaded = client.get("/api/market-notes?game=lol").json()["records"][0]
+        with TestClient(main.app) as client:
+            preview = client.post(
+                "/api/market-notes/retired/review-preview",
+                json={"result": "赢", "correct_points": "不应再写盘口表"},
+            )
+            committed = client.put(
+                "/api/market-notes/retired/review",
+                json={"result": "赢", "confirmed": True},
+            )
 
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("结果：赢", response.json()["review_text"])
-        self.assertEqual(loaded["review"], "结果：未结算\n原始备注")
-
-    def test_market_review_commit_requires_confirmation(self) -> None:
-        import main
-        from fastapi.testclient import TestClient
-        from xiaoxue_api.core import database
-
-        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
-            database, "DB_PATH", str(Path(directory) / "test.db")
-        ):
-                with TestClient(main.app) as client:
-                    created = client.post(
-                        "/api/market-notes", json={"match_name": "T1 vs GEN"}
-                    ).json()["record"]
-                    response = client.put(
-                        f"/api/market-notes/{created['id']}/review",
-                        json={"result": "赢", "confirmed": False},
-                    )
-
-        self.assertEqual(response.status_code, 400)
-        self.assertIn("确认", response.json()["detail"])
-
-    def test_confirmed_market_review_updates_only_market_note(self) -> None:
-        import main
-        from fastapi.testclient import TestClient
-        from xiaoxue_api.core import database
-
-        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
-            database, "DB_PATH", str(Path(directory) / "test.db")
-        ):
-                with TestClient(main.app) as client:
-                    created = client.post(
-                        "/api/market-notes",
-                        json={"match_name": "T1 vs GEN", "review": "结果：未结算\n原始备注"},
-                    ).json()["record"]
-                    response = client.put(
-                        f"/api/market-notes/{created['id']}/review",
-                        json={
-                            "result": "赢",
-                            "correct_points": "看对资源团",
-                            "destinations": ["market_notes", "team_trading_note"],
-                            "confirmed": True,
-                        },
-                    )
-                    loaded = client.get("/api/market-notes?game=lol").json()["records"][0]
-
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("结果：赢", loaded["review"])
-        self.assertFalse(response.json()["knowledge_write_allowed"])
+        self.assertEqual(preview.status_code, 410)
+        self.assertEqual(committed.status_code, 410)
+        self.assertIn("交易 TK", preview.json()["detail"])
 
     def test_health_reports_data_readiness_manifest(self) -> None:
         from xiaoxue_api.modules.platform.public import health
@@ -321,6 +268,9 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
             os.environ, {"XIAOXUE_READINESS_ROOT": directory}
+        ), mock.patch(
+            "xiaoxue_api.modules.platform.service.get_operating_state",
+            return_value={"state": "paused_by_user", "message": "钧钧已主动暂停"},
         ):
             payload = health()
 

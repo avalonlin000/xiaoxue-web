@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "current_event",
+    "name": "当前比赛",
+    "version": "1.0.0",
+    "purpose": "建立、读取、切换和暂停可丢弃的单场比赛上下文，并独立查询已导入的 ScoreGG 赛果。",
+    "examples": ["聊聊明天 HLE 打 GEN", "先放下这场，切到另一场", "查 HLE 打 T1 的赛果"],
+    "inputs": {"required": ["team_a", "team_b"], "optional": ["date", "event", "focus"]},
+    "effect": "temporary",
+    "reads": ["正式比赛事实", "临时比赛上下文"],
+    "writes": ["临时比赛上下文"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"long_term_write": False},
+    "settings": {},
+    "dependencies": ["database"],
+    "health": {"checks": ["database"], "reason_code": "database_unavailable"},
+    "tests": ["tests/test_match_desk_contract.py", "tests/test_match_run_api.py"],
+    "order": 130,
+}

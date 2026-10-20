@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 import re
+from uuid import uuid4
 
 from xiaoxue_api.modules.team_data.public import get_team_3d, list_teams
 
@@ -29,6 +30,7 @@ TRADING_TK_CATEGORY_LABELS = {
     "player_style": "选手特点", "roster": "换人", "lineup": "阵容",
     "market": "盘口", "execution": "执行", "general": "其他", "team": "队伍特点",
 }
+_TAG_PREFIXES = ("队伍:", "选手:", "赛区:", "版本:", "比赛:", "游戏:")
 DATE_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})")
 COMPACT_DATE_PATTERN = re.compile(r"(\d{4})(\d{2})(\d{2})")
 CONFIG_PATH = Path(__file__).with_name("config.json")
@@ -97,6 +99,43 @@ def normalize_team(value: str) -> str:
     raise EntryNotFound(f"队伍未找到或别名未确认：{raw}")
 
 
+def _explicit_teams_in_text(text: str) -> list[str]:
+    """Return only teams literally named in Junjun's words; never infer from tactics."""
+    raw = str(text or "")
+    if not raw:
+        return []
+    candidates: dict[str, set[str]] = {}
+    try:
+        for row in list_teams():
+            canonical = str(row.get("short_name") or row.get("team_id") or "").strip().upper()
+            if not canonical:
+                continue
+            candidates.setdefault(canonical, set()).update(
+                str(value or "").strip() for value in (row.get("short_name"), row.get("name"), row.get("team_id"))
+            )
+        for alias, canonical in _team_aliases().items():
+            if canonical:
+                candidates.setdefault(canonical.upper(), set()).add(alias)
+    except Exception:
+        return []
+    found = []
+    for canonical, aliases in candidates.items():
+        for alias in aliases:
+            if not alias:
+                continue
+            if re.fullmatch(r"[A-Za-z0-9._-]+", alias):
+                if len(alias) <= 2:
+                    matched = bool(re.search(rf"(?<![A-Za-z0-9]){re.escape(alias.upper())}(?![A-Za-z0-9])", raw))
+                else:
+                    matched = bool(re.search(rf"(?<![A-Za-z0-9]){re.escape(alias)}(?![A-Za-z0-9])", raw, re.I))
+            else:
+                matched = alias.casefold() in raw.casefold()
+            if matched:
+                found.append(canonical)
+                break
+    return sorted(set(found))
+
+
 def _extract_date(text: str) -> str:
     match = DATE_PATTERN.search(text or "")
     if match:
@@ -107,7 +146,13 @@ def _extract_date(text: str) -> str:
     return ""
 
 
+_TECHNICAL_POINTER = re.compile(r"^\s*@?/(?:tmp|home|usr|var)/\S+\s*$")
+_TECHNICAL_LOG_LINE = re.compile(r"^\s*(?:Traceback \(|File \".+\", line \d+|Exception:|Error:|INFO:|DEBUG:)" )
+_INTERNAL_EVIDENCE_LINE = re.compile(r"^\s*(?:[-*]\s*)?(?:证据|路径|文件)\s*[:：]\s*@?/(?:tmp|home|usr|var)/", re.I)
+
+
 def _clean_content(body: str) -> str:
+    """Return only human-readable TK text; never expose internal artifacts."""
     text = (body or "").strip()
     if text.startswith("---"):
         parts = text.split("---", 2)
@@ -123,8 +168,19 @@ def _clean_content(body: str) -> str:
             start = index + 1
             continue
         break
-    text = "\n".join(lines[start:]).strip()
-    return "" if text.startswith(("@/tmp/", "/tmp/")) else text
+
+    cleaned, in_code_block = [], False
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("```"):
+            in_code_block = not in_code_block
+            continue
+        if in_code_block or _TECHNICAL_POINTER.fullmatch(stripped):
+            continue
+        if _TECHNICAL_LOG_LINE.match(stripped) or _INTERNAL_EVIDENCE_LINE.match(stripped):
+            continue
+        cleaned.append(line)
+    return "\n".join(cleaned).strip()
 
 
 def _concept(filename: str, content: str) -> str:
@@ -138,7 +194,7 @@ def _concept(filename: str, content: str) -> str:
 
 
 def _frontmatter(content: str) -> dict:
-    fields = {"source": "", "team": "", "player": "", "tags": []}
+    fields = {"source": "", "team": "", "player": "", "tags": [], "type": ""}
     if not content.startswith("---"):
         return fields
     parts = content.split("---", 2)
@@ -163,6 +219,12 @@ def _library_record(document: dict) -> dict | None:
     if len(content) < 10:
         return None
     fields = _frontmatter(raw)
+    if fields.get("type") == "trading_note" or document["filename"].startswith("trading_tk_"):
+        record_type = "trading_tk"
+    elif "交易" in fields["tags"]:
+        record_type = "legacy_trade_label"
+    else:
+        record_type = "knowledge_tk"
     date = ""
     if raw.startswith("---"):
         parts = raw.split("---", 2)
@@ -191,6 +253,7 @@ def _library_record(document: dict) -> dict | None:
         "team": fields["team"],
         "player": fields["player"],
         "tags": fields["tags"],
+        "type": record_type,
         "source": fields["source"],
         "filename": document["filename"],
         "content_length": len(content),
@@ -214,7 +277,32 @@ def _period_matches(date: str, period: str, month: str) -> bool:
     return today.fromordinal(today.toordinal() - days + 1) <= item_date <= today
 
 
-def _strict_team_marker(filename: str, content: str, team: str) -> bool:
+def _document_game(content: str) -> str:
+    """读取文档 frontmatter 的「游戏:」标记；无标记或标记为 LOL 时返回 'LOL'。
+
+    tk 默认 LOL：瓦/CS 等条目通过 tags 里的「游戏:」标记区分，LOL 语境聚合（队伍列表、
+    统计、单场相关 TK）只匹配 LOL 条目；显式搜索（/api/tk/search）保持全量。
+    """
+    if not (content or "").startswith("---"):
+        return "LOL"
+    parts = content.split("---", 2)
+    if len(parts) < 3:
+        return "LOL"
+    tags_line = ""
+    for line in parts[1].splitlines():
+        if line.strip().lower().startswith("tags:"):
+            tags_line = line
+            break
+    match = re.search(r"游戏\s*[:：]\s*([^,\[\]，\n]+)", tags_line)
+    if not match:
+        return "LOL"
+    value = match.group(1).strip()
+    return "LOL" if not value or value.casefold() in ("lol", "英雄联盟") else value
+
+
+def _strict_team_marker(filename: str, content: str, team: str, game: str = "LOL") -> bool:
+    if _document_game(content).casefold() != game.casefold():
+        return False
     code = (team or "").strip().upper()
     if not code:
         return False
@@ -226,21 +314,23 @@ def _strict_team_marker(filename: str, content: str, team: str) -> bool:
     return bool(re.search(rf"(队伍|战队|简称|TEAM)\s*[:：/]\s*[^\n#|]*\b{re.escape(code)}\b", head))
 
 
-def _file_search(query: str, team: str, limit: int, *, strict_team: bool = False) -> list[dict]:
+def _file_search(query: str, team: str, limit: int, *, strict_team: bool = False, game: str | None = None) -> list[dict]:
     keywords = query.lower().split()
     team_code = (team or "").strip().upper()
     results = []
     for document in repository.list_documents():
         raw = document["content"]
+        if game and _document_game(raw).casefold() != game.casefold():
+            continue
         if team_code:
-            if strict_team and not _strict_team_marker(document["filename"], raw, team_code):
+            if strict_team and not _strict_team_marker(document["filename"], raw, team_code, game or "LOL"):
                 continue
             if not strict_team and team_code not in document["filename"].upper() and team_code not in raw[:500].upper():
                 continue
-        score = sum(1 for keyword in keywords if keyword in raw.lower())
+        clean = _clean_content(raw)
+        score = sum(1 for keyword in keywords if keyword in clean.casefold())
         if score == 0 and query.strip():
             continue
-        clean = _clean_content(raw)
         if len(clean) < MIN_CONTENT_LEN:
             continue
         fields = _frontmatter(raw)
@@ -268,7 +358,7 @@ def _file_search(query: str, team: str, limit: int, *, strict_team: bool = False
     return results[:limit]
 
 
-def search(query: str, team: str | None = None, limit: int = 20) -> dict:
+def search(query: str, team: str | None = None, limit: int = 20, game: str | None = None) -> dict:
     rag_query = f"{team} {query}" if team else query
     raws = repository.search_rag(rag_query, limit * 2)
     seen, merged = set(), []
@@ -277,6 +367,10 @@ def search(query: str, team: str | None = None, limit: int = 20) -> dict:
         filename = os.path.basename(key) if key else ""
         raw_text = raw.get("text", "") or ""
         text = _clean_content(raw_text)
+        if game and _document_game(raw_text).casefold() != game.casefold():
+            continue
+        if team and not _strict_team_marker(filename, raw_text, team, game or "LOL"):
+            continue
         if key in seen or filename in seen or len(text.strip()) < MIN_CONTENT_LEN:
             continue
         seen.add(key)
@@ -293,7 +387,7 @@ def search(query: str, team: str | None = None, limit: int = 20) -> dict:
             "tags": [],
             "filename": filename if filename.endswith(".md") else "",
         })
-    for item in _file_search(query, team or "", limit):
+    for item in _file_search(query, team or "", limit, strict_team=bool(team), game=game):
         if item["id"] in seen or item.get("filename") in seen:
             continue
         seen.add(item["id"])
@@ -319,7 +413,7 @@ def browse(period: str = "all", month: str = "", query: str = "", team: str = ""
         if not _period_matches(item["date"], period, month):
             continue
         raw = documents[item["filename"]]["content"]
-        folded = raw.casefold()
+        folded = _clean_content(raw).casefold()
         if words and not all(word in folded for word in words):
             continue
         if code and (item.get("team") or "").upper() != code and not _strict_team_marker(item["filename"], raw, code):
@@ -363,6 +457,17 @@ def get_entry(filename: str) -> dict:
     }
 
 
+def _clean_tags(values: list[str]) -> list[str]:
+    """Keep only directional/source labels; never persist lifecycle metadata."""
+    result = []
+    for raw in values:
+        tag = str(raw or "").strip()
+        if tag in {"交易", "钧钧口述", "B站", "公众号"} or tag.startswith(_TAG_PREFIXES):
+            if tag not in result:
+                result.append(tag)
+    return result
+
+
 def _markdown(data: dict, *, source: str = "手动录入", created: str | None = None) -> str:
     content = data.get("content", "")
     tags, team, player = data.get("tags", ""), data.get("team", ""), data.get("player", "")
@@ -372,25 +477,49 @@ def _markdown(data: dict, *, source: str = "手动录入", created: str | None =
     if player:
         tag_list.append(f"选手:{player}")
     if isinstance(tags, str) and tags:
-        tag_list.extend(item.strip() for item in tags.split(",") if item.strip())
+        tag_list.extend(_clean_tags(tags.split(",")))
     if not tag_list:
         tag_list.append("通用")
-    extra_lines = [f"{key}: {data[key]}" for key in ("type", "market", "scenario", "status", "team") if data.get(key)]
+    extra_lines = []
     extra = "\n" + "\n".join(extra_lines) if extra_lines else ""
     date_str = created or datetime.now().strftime("%Y-%m-%d")
     return f"---\nsource: {source}\nsource_type: manual\ntags: [{', '.join(tag_list)}]\ncreated: {date_str}{extra}\n---\n\n{content}\n"
 
 
 def create(data: dict) -> dict:
-    content = data.get("content", "")
+    content = _clean_content(str(data.get("content", "")))
     if not content or len(content.strip()) < 10:
         raise InvalidInput("内容太短")
     title = content.strip().split("\n")[0][:60]
     stem = re.sub(r"[^\w\u4e00-\u9fff\-]", "_", title)[:50].strip("_") or "untitled"
     filename = f"manual_{hash(content) % 10000}_{stem}.md"
-    path = repository.write_document(filename, _markdown(data, source=data.get("source", "手动录入")))
+    clean_data = {**data, "content": content}
+    path = repository.write_document(filename, _markdown(clean_data, source=data.get("source", "手动录入")))
     repository.request_reindex()
+    _invalidate_teams_cache()
     return {"ok": True, "filename": filename, "path": path}
+
+
+def remember_personal_note(text: str, explicit_tags: list[str] | None = None) -> dict:
+    """Write Junjun's words as an ordinary manual TK without inferring fields."""
+    content = _clean_content(str(text or ""))
+    if len(content) < 2:
+        raise InvalidInput("记录内容太短")
+    tag_seed = ",".join(_clean_tags(explicit_tags or []))
+    digest = hashlib.sha256(f"{content}\n{tag_seed}".encode("utf-8")).hexdigest()[:16]
+    filename = f"manual_{digest}.md"
+    teams = _explicit_teams_in_text(content)
+    explicit = [str(tag).strip() for tag in (explicit_tags or []) if str(tag).strip() == "交易" or re.fullmatch(r"(?:队伍|选手|赛区|版本|比赛|游戏):[^:]{1,80}", str(tag).strip())]
+    tags = ["钧钧口述", *explicit, *(f"队伍:{team}" for team in teams)]
+    path = repository.write_document(filename, _markdown(
+        {"content": content, "tags": ",".join(tags)}, source="钧钧口述",
+    ))
+    indexed = repository.request_reindex()
+    _invalidate_teams_cache()
+    return {
+        "ok": True, "filename": filename, "path": path, "content": content,
+        "source": "钧钧口述", "teams": teams, "indexed": indexed,
+    }
 
 
 def update(filename: str, data: dict) -> dict:
@@ -398,7 +527,7 @@ def update(filename: str, data: dict) -> dict:
     old = repository.read_document(safe)
     if not old:
         raise EntryNotFound("TK 未找到")
-    content = data.get("content", "")
+    content = _clean_content(str(data.get("content", "")))
     if not content or len(content.strip()) < 10:
         raise InvalidInput("内容太短")
     created = None
@@ -406,8 +535,10 @@ def update(filename: str, data: dict) -> dict:
         if line.strip().startswith("created:"):
             created = _extract_date(line.replace("created:", "").strip()) or None
             break
-    path = repository.write_document(safe, _markdown(data, source=data.get("source", "手动录入"), created=created))
+    clean_data = {**data, "content": content}
+    path = repository.write_document(safe, _markdown(clean_data, source=data.get("source", "手动录入"), created=created))
     repository.request_reindex()
+    _invalidate_teams_cache()
     return {"ok": True, "filename": safe, "path": path}
 
 
@@ -416,7 +547,17 @@ def delete(filename: str) -> dict:
     if not repository.delete_document(safe):
         raise EntryNotFound("TK 未找到")
     repository.request_reindex()
+    _invalidate_teams_cache()
     return {"ok": True}
+
+
+def _invalidate_teams_cache() -> None:
+    """TK 写入/删除后失效 fundamentals 列表缓存（延迟 import 防循环）。"""
+    try:
+        from xiaoxue_api.modules.fundamentals.public import invalidate_teams_cache
+    except ImportError:
+        return
+    invalidate_teams_cache()
 
 
 def _normalize_market(value: str) -> str:
@@ -485,14 +626,6 @@ def _render_trading_note(data: TradingNoteIn, team: str) -> dict:
     content = f"""## 交易 TK
 
 ### {title}
-```yaml
-team: {team}
-type: {TRADING_NOTE_TYPE}
-market: {market}
-scenario: {scenario}
-status: {status}
-source: junjun_manual
-```
 
 原话：{note}
 
@@ -578,16 +711,49 @@ def _general_trading_tk_payload(document: dict) -> dict | None:
     if scope not in TRADING_TK_SCOPES:
         return None
     category = meta.get("category") or "general"
+    status = (meta.get("status") or "candidate").lower()
+    status_label = {"candidate": "待验证", "confirmed": "已确认", "invalid": "已失效"}.get(status, status)
+    tags = ["交易", "交易 TK", status_label, category]
+    if meta.get("region"):
+        tags.append(str(meta.get("region")))
+    if meta.get("subject"):
+        tags.append(str(meta.get("subject")))
     return {
         "id": document["filename"], "filename": document["filename"],
         "scope": scope, "scope_label": TRADING_TK_SCOPE_LABELS[scope],
         "region": meta.get("region") or "", "subject": meta.get("subject") or "",
         "version_context": meta.get("version_context") or "",
         "category": category, "category_label": TRADING_TK_CATEGORY_LABELS.get(category, category), "statement": statement,
-        "context": _line_value(content, "适用范围"), "status": meta.get("status") or "candidate",
+        "context": _line_value(content, "适用范围"),
         "review_note": _line_value(content, "复查记录"),
+        "type": "trading_tk",
+        "status": status,
+        "tags": tags,
         "created_at": meta.get("created") or "", "updated_at": datetime.fromtimestamp(document["mtime"]).strftime("%Y-%m-%d %H:%M:%S"),
         "source_type": "scoped_trading_tk", "editable": True,
+    }
+
+
+def _tagged_trading_tk_payload(document: dict) -> dict | None:
+    """Read legacy trade-labeled ordinary TKs without upgrading them to trading TKs."""
+    content = document.get("content") or ""
+    meta = _general_trading_tk_meta(content)
+    labels = [item.strip() for item in (meta.get("tags") or "").strip("[]").split(",") if item.strip()]
+    if "交易" not in labels:
+        return None
+    def label(prefix: str) -> str:
+        return next((item.split(":", 1)[1].strip() for item in labels if item.startswith(prefix)), "")
+    team, player, region, version = label("队伍:"), label("选手:"), label("赛区:"), label("版本:")
+    game = label("游戏:") or "LOL"
+    scope, subject = ("team", team) if team else (("player", player) if player else (("region", "") if region else ("global", "")))
+    return {
+        "id": document["filename"], "filename": document["filename"], "scope": scope,
+        "scope_label": TRADING_TK_SCOPE_LABELS[scope], "region": region, "subject": subject,
+        "version_context": version, "statement": _clean_content(content), "context": "", "tags": labels,
+        "game": game,
+        "created_at": meta.get("created") or "", "updated_at": datetime.fromtimestamp(document["mtime"]).strftime("%Y-%m-%d %H:%M:%S"),
+        "type": "legacy_trade_label",
+        "source_type": "tagged_trading_tk", "editable": True,
     }
 
 
@@ -650,55 +816,35 @@ status: {status}
 
 
 def create_general_trading_tk(values: dict) -> dict:
-    category = _single_line(values.get("category") or "general", 30).lower()
-    if category not in GENERAL_TRADING_TK_CATEGORIES:
-        raise InvalidInput("交易 TK 分类不支持")
-    scope = _normalize_trading_scope(values.get("scope") or "global")
-    region = _normalize_trading_region(values.get("region"))
-    subject = _normalize_trading_subject(values.get("subject"))
-    version_context = _single_line(values.get("version_context"), 80)
-    if scope == "region" and not region:
-        raise InvalidInput("赛区交易 TK 必须写明赛区")
-    if scope in {"team", "player"} and not subject:
-        raise InvalidInput("队伍或选手交易 TK 必须写明对象")
+    """Write a distinct, reviewable trading TK in the shared TK library."""
     statement = _single_line(values.get("statement"), 500)
-    source_command = _single_line(values.get("source_command"), 1000)
-    if len(statement) < 4:
-        raise InvalidInput("交易 TK 内容太短")
-    if not source_command:
-        raise InvalidInput("用户原始指令不能为空")
     context = _single_line(values.get("context"), 500)
+    if len(statement) < 2:
+        raise InvalidInput("记录内容太短")
+    scope = _normalize_trading_scope(values.get("scope") or "global")
+    region = _normalize_trading_region(values.get("region") or "")
+    subject = _normalize_trading_subject(values.get("subject") or "")
+    version_context = _single_line(values.get("version_context") or "", 80)
+    category = _single_line(values.get("category") or "general", 40).lower()
     filename = _general_trading_tk_filename(statement, scope, region, subject, version_context)
-    existing_document = repository.read_document(filename)
-    if not existing_document and scope == "global" and not region and not subject and not version_context:
-        legacy_filename = _legacy_general_trading_tk_filename(statement)
-        existing_document = repository.read_document(legacy_filename)
-        if existing_document:
-            filename = legacy_filename
-    existing = _general_trading_tk_payload(existing_document) if existing_document else None
-    now = datetime.now().strftime("%Y-%m-%d")
+    existing = repository.read_document(filename)
+    if existing:
+        return {"ok": True, "filename": filename, "item": _general_trading_tk_payload(existing), "indexed": False, "idempotent": True}
+    created_at = datetime.now().strftime("%Y-%m-%d")
     rendered = _render_general_trading_tk({
-        "category": category,
-        "scope": scope, "region": region, "subject": subject, "version_context": version_context,
-        "statement": statement,
-        "context": context or (existing or {}).get("context", ""),
-        "status": (existing or {}).get("status", "candidate"),
-        "review_note": (existing or {}).get("review_note", ""),
-        "source_command": source_command,
-        "created_at": (existing or {}).get("created_at") or now,
+        "statement": statement, "context": context, "scope": scope, "region": region,
+        "subject": subject, "version_context": version_context, "category": category,
+        "status": "candidate", "review_note": "尚未复查", "created_at": created_at,
+        "source_command": _single_line(values.get("source_command") or "", 500),
     })
-    repository.write_document(filename, rendered)
+    path = repository.write_document(filename, rendered)
     indexed = repository.request_reindex()
-    document = repository.read_document(filename)
-    return {
-        "ok": True, "item": _general_trading_tk_payload(document), "indexed": indexed,
-        "boundary": "写入现有 TK/Wiki 正源，作为统一交易 TK，不建立第二套规律库",
-    }
+    return {"ok": True, "filename": filename, "path": path, "item": _general_trading_tk_payload(repository.read_document(filename)), "indexed": indexed}
 
 
 def list_general_trading_tk(
     query: str = "", status: str = "all", limit: int = 100, *, scope: str = "all",
-    region: str = "", subject: str = "", version_context: str = "",
+    region: str = "", subject: str = "", version_context: str = "", game: str = "",
 ) -> dict:
     clean_query = _single_line(query, 100).casefold()
     clean_status = _single_line(status or "all", 20).lower()
@@ -712,11 +858,14 @@ def list_general_trading_tk(
     clean_region = _normalize_trading_region(region)
     clean_subject = _normalize_trading_subject(subject)
     clean_version = _single_line(version_context, 80)
+    clean_game = _single_line(game or "", 30)
     bounded = max(1, min(int(limit or 100), 200))
     items = []
     for document in sorted(repository.list_documents(), key=lambda item: item["mtime"], reverse=True):
         for item in _unified_trading_tk_payloads(document):
-            if clean_status != "all" and item["status"] != clean_status:
+            if clean_game and str(item.get("game") or "LOL").casefold() != clean_game.casefold():
+                continue
+            if clean_status != "all" and item.get("status") != clean_status:
                 continue
             if clean_scope != "all" and item["scope"] != clean_scope:
                 continue
@@ -726,7 +875,7 @@ def list_general_trading_tk(
                 continue
             if clean_version and item["version_context"].casefold() != clean_version.casefold():
                 continue
-            haystack = " ".join((item["statement"], item["context"], item["category"], item["scope"], item["region"], item["subject"], item["version_context"])).casefold()
+            haystack = " ".join((item["statement"], item["context"], item.get("category", ""), item["scope"], item["region"], item["subject"], item["version_context"], " ".join(item.get("tags") or []))).casefold()
             if clean_query and clean_query not in haystack:
                 continue
             items.append(item)
@@ -740,15 +889,18 @@ def list_general_trading_tk(
     }
 
 
-def list_match_trading_tk(region: str, teams: list[str], players: list[str], limit: int = 12) -> dict:
+def list_match_trading_tk(region: str, teams: list[str], players: list[str], limit: int = 12, *, version_context: str = "") -> dict:
     clean_region = _normalize_trading_region(region)
+    clean_version = _single_line(version_context, 80)
     team_set = {str(item or "").strip().casefold() for item in teams if str(item or "").strip()}
     player_set = {str(item or "").strip().casefold() for item in players if str(item or "").strip()}
     rank = {"global": 0, "region": 1, "team": 2, "player": 3}
     items = []
     for document in repository.list_documents():
         for item in _unified_trading_tk_payloads(document):
-            if item["status"] == "invalid":
+            if str(item.get("game") or "LOL") != "LOL":
+                continue
+            if clean_version and item["version_context"] and item["version_context"].casefold() != clean_version.casefold():
                 continue
             if item["scope"] == "region" and item["region"].casefold() != clean_region.casefold():
                 continue
@@ -759,7 +911,7 @@ def list_match_trading_tk(region: str, teams: list[str], players: list[str], lim
             items.append(item)
     items.sort(key=lambda item: (rank[item["scope"]], item.get("updated_at") or "", item["filename"]), reverse=False)
     return {
-        "region": clean_region, "teams": sorted(team_set), "players": sorted(player_set),
+        "region": clean_region, "teams": sorted(team_set), "players": sorted(player_set), "version_context": clean_version,
         "call_order": ["全局", "赛区", "队伍/选手"], "items": items[:max(1, min(int(limit or 12), 30))],
         "boundary": "只找与本场有关的交易 TK；待验证只作提醒，是否采用由钧钧确认。",
     }
@@ -821,10 +973,13 @@ def _trading_notes_from_content(content: str, team: str = "") -> list[dict]:
             if stripped.startswith(("日报提示：", "日报提示:")):
                 daily_hint = stripped.split("：", 1)[-1] if "：" in stripped else stripped.split(":", 1)[-1]
         market = meta.get("market", "")
+        status = (meta.get("status") or "active").strip().lower()
+        if "已过期作废" in f"{titles[-1] if titles else ''}\n{original}\n{daily_hint}":
+            status = "inactive"
         notes.append({
             "team": code, "title": titles[-1].strip() if titles else f"{code} 交易 TK",
             "market": market, "market_label": labels.get(market, market),
-            "scenario": meta.get("scenario", ""), "status": (meta.get("status") or "active").strip().lower(),
+            "scenario": meta.get("scenario", ""), "status": status,
             "source": meta.get("source", ""), "original": _strip_team_prefix(original, code),
             "daily_hint": _strip_team_prefix(daily_hint, code),
         })
@@ -835,7 +990,6 @@ def _legacy_team_trading_tk_payloads(document: dict) -> list[dict]:
     """Expose old team trading notes in the unified view without rewriting them."""
     content = document.get("content") or ""
     meta = _general_trading_tk_meta(content)
-    status_map = {"active": "confirmed", "inactive": "invalid", "invalid": "invalid"}
     updated_at = datetime.fromtimestamp(document["mtime"]).strftime("%Y-%m-%d %H:%M:%S")
     items = []
     for note in _trading_notes_from_content(content):
@@ -849,7 +1003,7 @@ def _legacy_team_trading_tk_payloads(document: dict) -> list[dict]:
             "region": "", "subject": team, "version_context": "",
             "category": "market", "category_label": TRADING_TK_CATEGORY_LABELS["market"],
             "statement": f"{team}：{original}", "context": note.get("daily_hint") or "原有队伍交易备注",
-            "status": status_map.get(note.get("status"), "candidate"), "review_note": "原有队伍交易备注",
+            "tags": ["交易", f"队伍:{team}"],
             "created_at": meta.get("created") or "", "updated_at": updated_at,
             "source_type": "legacy_team_trading_note", "editable": False,
         })
@@ -857,18 +1011,23 @@ def _legacy_team_trading_tk_payloads(document: dict) -> list[dict]:
 
 
 def _unified_trading_tk_payloads(document: dict) -> list[dict]:
+    tagged = _tagged_trading_tk_payload(document)
+    if tagged:
+        return [tagged]
     scoped = _general_trading_tk_payload(document)
     return [scoped] if scoped else _legacy_team_trading_tk_payloads(document)
 
 
 def _scoped_team_trading_note(item: dict, team: str) -> dict | None:
+    if str(item.get("game") or "LOL") != "LOL":
+        return None
     if item.get("scope") != "team" or item.get("subject", "").casefold() != team.casefold():
         return None
-    status = {"candidate": "candidate", "confirmed": "active", "invalid": "inactive"}.get(item.get("status"), "candidate")
+    status = item.get("status") or "active"
     return {
         "team": team, "title": f"{team} 交易 TK · {item.get('statement', '')}",
         "market": "", "market_label": "", "scenario": item.get("category_label") or item.get("category") or "",
-        "status": status, "source": "junjun_manual", "original": item.get("statement") or "",
+        "source": "junjun_manual", "original": item.get("statement") or "",
         "daily_hint": item.get("context") or "", "filename": item.get("filename") or "",
         "source_type": "scoped_trading_tk",
     }
@@ -879,9 +1038,11 @@ def list_team_trading_notes(team: str, status: str = "active", limit: int = 20) 
     wanted = (status or "").strip().lower()
     notes = []
     for document in sorted(repository.list_documents(), key=lambda item: item["mtime"], reverse=True):
-        scoped = _scoped_team_trading_note(_general_trading_tk_payload(document) or {}, code)
+        scoped = _scoped_team_trading_note(
+            _general_trading_tk_payload(document) or _tagged_trading_tk_payload(document) or {}, code,
+        )
         if scoped:
-            if not wanted or wanted == "all" or scoped["status"] == wanted:
+            if not wanted or wanted in {"all", "active"}:
                 notes.append(scoped)
             if len(notes) >= limit:
                 break
@@ -889,8 +1050,8 @@ def list_team_trading_notes(team: str, status: str = "active", limit: int = 20) 
         if not _strict_team_marker(document["filename"], document["content"], code):
             continue
         for note in _trading_notes_from_content(document["content"], code):
-            if wanted and wanted != "all" and note["status"] != wanted:
-                continue
+            # Legacy status values are intentionally not exposed or filtered.
+            note.pop("status", None)
             note["filename"] = document["filename"]
             note["source_type"] = "tk_file"
             notes.append(note)
@@ -936,11 +1097,13 @@ def count_team_entries(team: str) -> int:
     code = (team or "").strip().upper()
     if not code:
         return 0
-    return sum(
-        1
-        for document in repository.list_documents()
-        if code in document["filename"].upper() or code in document["content"][:800].upper()
-    )
+    count = 0
+    for document in repository.list_documents():
+        if _document_game(document["content"]) != "LOL":
+            continue
+        if code in document["filename"].upper() or code in document["content"][:800].upper():
+            count += 1
+    return count
 
 
 def search_team_entries(query: str, team: str, limit: int = 20) -> list[dict]:

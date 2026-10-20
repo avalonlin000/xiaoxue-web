@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "champion_static",
+    "name": "英雄版本资料",
+    "version": "2.0.0",
+    "purpose": "从本地完整快照读取英雄技能、属性、标签和版本静态资料，并支持安全模糊匹配。",
+    "examples": ["查剑姬和鳄鱼的技能机制", "读取当前版本英雄资料"],
+    "inputs": {"required": ["champion"], "optional": ["version"]},
+    "effect": "read",
+    "reads": ["Data Dragon public champion data", "local champion cache"],
+    "writes": ["local cache only"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"source": "local champion snapshot refreshed from ddragon.leagueoflegends.com", "network": False},
+    "settings": {},
+    "dependencies": [],
+    "health": {"checks": [], "reason_code": "champion_static_unavailable"},
+    "tests": [],
+    "order": 134,
+}

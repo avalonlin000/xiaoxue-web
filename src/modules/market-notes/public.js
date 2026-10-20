@@ -75,7 +75,7 @@ export function createMarketNotesModule(options = {}) {
       try {
         const result = await dependencies.api.create(body);
         view.clearForm();
-        view.setMessage('已保存原始记录；赛后直接跟小雪讨论复盘', 'success');
+        view.setMessage('已写入盘口交易 TK；后续复盘直接跟小雪讨论', 'success');
         await actions.load();
         return result;
       } catch (error) {
@@ -84,12 +84,12 @@ export function createMarketNotesModule(options = {}) {
       }
     },
     async deleteRecord(id) {
-      if (!dependencies.confirmDelete('删除这条盘口记录？')) return false;
-      requireView().setMessage('删除中…');
+      if (!dependencies.confirmDelete('把这条盘口判断标记为失效？原文会保留，不做硬删除。')) return false;
+      requireView().setMessage('正在标记…');
       try {
         await dependencies.api.delete(id);
         await actions.load();
-        view.setMessage('已删除', 'success');
+        view.setMessage('已标记失效', 'success');
         return true;
       } catch (error) {
         view.setMessage(error.message || '删除失败', 'error');

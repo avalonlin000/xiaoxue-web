@@ -14,7 +14,7 @@ async def analyze(team: str, analyst: str = "") -> dict:
     async def zhongnian():
         if analyst and analyst != "中年电竞人":
             return None
-        framework = repository.read_skill("zhongnian-esports-coach")
+        framework = repository.read_skill("esports/analyst-lenses/references/zhongnian.md")
         system = f"""你是「中年电竞人」——一位资深LOL教练，擅长BP评估、选手状态判断、体系有效性检验。
 你的分析框架如下（必须严格遵循每一条）：
 {framework}
@@ -24,7 +24,7 @@ async def analyze(team: str, analyst: str = "") -> dict:
     async def xinyu():
         if analyst and analyst != "心语悦无言":
             return None
-        framework = repository.read_skill("xinyu-tactical-analyst")
+        framework = repository.read_skill("esports/analyst-lenses/references/xinyu.md")
         system = f"""你是「心语悦无言」——一位LOL战术分析师，擅长体系框架拆解、阵容构建分析、回合概念建模。
 你的分析框架如下（必须严格遵循每一条）：
 {framework}

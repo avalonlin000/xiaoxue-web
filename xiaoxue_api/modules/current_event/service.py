@@ -1,12 +1,17 @@
 from __future__ import annotations
 
+import json
 import re
 import sqlite3
-from datetime import date
+import uuid
+from datetime import date, datetime
+from pathlib import Path
 
 from xiaoxue_api.modules.fundamentals.public import get_match_context
 from xiaoxue_api.modules.team_data.public import get_profile_bundle, list_schedules
 from xiaoxue_api.modules.tk_knowledge.public import list_match_trading_tk, list_team_trading_notes
+from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
+from xiaoxue_api.modules.gol_gg.public import series_facts as gol_series_facts
 
 from xiaoxue_api.modules.current_event import repository
 
@@ -14,27 +19,38 @@ from xiaoxue_api.modules.current_event import repository
 RUN_MODES = {"virtual_pre", "live", "post_review"}
 RUN_PHASES = {"fact_check", "trend", "virtual_judgment", "live_update", "post_review", "complete"}
 FACT_STATUSES = {"active", "stale", "excluded", "needs_review", "missing", "user_override"}
-TRADE_SECTION_LABELS = {
-    "version": "版本与环境",
-    "team": "队伍与选手",
-    "trend": "已采用规律",
-    "matchup": "本场适用性",
-    "lineup": "阵容条件",
-    "branches": "条件分支",
-    "market": "市场对照",
-    "plan": "当前交易计划",
-    "entry": "入场信号",
-    "exit": "退出条件",
-    "execution": "实际执行",
-    "review": "复盘结论",
+FACT_STATUS_LABELS = {
+    "active": "采用", "stale": "待更新", "excluded": "排除",
+    "needs_review": "待确认", "missing": "缺失", "user_override": "用户覆盖",
 }
+MATCH_RUN_ENTRY_META = {
+    "version": {"label": "版本与环境", "stage": "pre", "purpose": "确认本场适用的版本和比赛环境。"},
+    "team": {"label": "队伍与选手", "stage": "pre", "purpose": "确认双方队伍、选手和当前打法背景。"},
+    "trend": {"label": "已采用规律", "stage": "pre", "purpose": "记录已经确认要放进本场的规律。"},
+    "matchup": {"label": "本场适用性", "stage": "pre", "purpose": "判断已有认识在这场如何延续或被破坏。"},
+    "lineup": {"label": "阵容条件", "stage": "live", "purpose": "记录 BP 和首发是否支持原判断。"},
+    "branches": {"label": "条件分支", "stage": "pre", "purpose": "写清不同剧本出现时怎么处理。"},
+    "market": {"label": "市场对照", "stage": "pre", "purpose": "对照市场共识、分歧和仍未知的部分。"},
+    "plan": {"label": "当前交易计划", "stage": "pre", "purpose": "保留原计划和不碰条件。"},
+    "entry": {"label": "入场信号", "stage": "pre", "purpose": "记录什么现象出现后才考虑执行。"},
+    "exit": {"label": "退出条件", "stage": "pre", "purpose": "记录判断失效或需要退出的条件。"},
+    "execution": {"label": "实际执行", "stage": "live", "purpose": "记录比赛中实际做了什么。"},
+    "review": {"label": "复盘结论", "stage": "post", "purpose": "对照实际发生、判断和执行，留下下次校准。"},
+}
+TRADE_SECTION_LABELS = {section: meta["label"] for section, meta in MATCH_RUN_ENTRY_META.items()}
 MATCH_RUN_FOCUS_LABELS = {
     "overview": "单场底稿",
     **TRADE_SECTION_LABELS,
 }
 TRADE_SECTION_ORDER = tuple(TRADE_SECTION_LABELS)
+MATCH_RUN_STAGE_META = {
+    "pre": {"label": "赛前", "purpose": "判断基础、主要矛盾、计划和不碰条件。"},
+    "live": {"label": "赛中", "purpose": "对照 BP、首发、比赛和市场变化，记录实际执行。"},
+    "post": {"label": "赛后", "purpose": "回看实际发生、判断与执行，并留下可复用候选。"},
+}
 KNOWLEDGE_TARGETS = {"team", "player", "version", "trading_method"}
 KNOWLEDGE_CANDIDATE_STATUSES = {"pending", "ignored", "applied"}
+TRADING_METHODS_PATH = Path(__file__).resolve().parents[3] / "config" / "trading-methods.json"
 
 
 def get_current_event() -> dict:
@@ -42,10 +58,48 @@ def get_current_event() -> dict:
     return build_current_event(config, repository.read_plan(config.get("plan_path", "")))
 
 
+def get_current_event_scope_leagues() -> list[str]:
+    """当前赛事在赛程里的范围（schedules.stage 匹配列表）；未配置时不过滤。"""
+    try:
+        config = repository.load_event_config()
+    except (OSError, ValueError, TypeError):
+        return []
+    return [str(item).strip() for item in (config.get("leagues") or []) if str(item).strip()]
+
+
+def match_in_current_event_scope(match: dict, leagues: list[str] | None = None) -> bool:
+    """判断一条赛程是否属于当前赛事范围；空范围视为全部属于。"""
+    scope = get_current_event_scope_leagues() if leagues is None else leagues
+    if not scope:
+        return True
+    stage = str(match.get("stage") or "")
+    return any(league.casefold() in stage.casefold() for league in scope)
+
+
+def get_trading_methods() -> dict:
+    from .judgment import catalogue
+    return catalogue(TRADING_METHODS_PATH)
+
+
+def get_judgment_context(**values) -> dict:
+    from .judgment import context
+    return context(values, get_trading_methods())
+
+
+def discuss_judgment(**values) -> dict:
+    from .judgment import discuss
+    return discuss(values, get_trading_methods())
+
+
 def get_current_event_dashboard(date_value: str = "today", limit: int = 12) -> dict:
     selected_date = _resolve_date(date_value)
     bounded_limit = max(1, min(int(limit or 12), 30))
-    matches = list_schedules({"date_from": selected_date, "date_to": selected_date}, bounded_limit)
+    leagues = get_current_event_scope_leagues()
+    matches = [
+        match
+        for match in list_schedules({"date_from": selected_date, "date_to": selected_date}, bounded_limit)
+        if match_in_current_event_scope(match, leagues)
+    ]
     return {
         "context": get_current_event(),
         "date": selected_date,
@@ -61,25 +115,71 @@ def get_match_desk(
         "team_a": team_a, "team_b": team_b, "event": event, "match_date": match_date,
         "match_time": match_time, "match_format": match_format, "game": game,
     })
+    # 调用方没给时间（或缺省为“今天”）时，用数据库里的真实赛程补全日期/时间/赛制/赛事，
+    # 避免把缺省值当成“今天 00:00”生成一个与真实赛程不符的幽灵场次。
+    if not identity["match_time"]:
+        schedule = repository.find_schedule_for_pair(identity["team_a"], identity["team_b"])
+        if schedule:
+            identity = normalize_match_identity({
+                **identity,
+                "match_date": schedule["date"] or identity["match_date"],
+                "match_time": schedule["time_bjt"] or identity["match_time"],
+                "match_format": schedule["format"] or identity["match_format"],
+                "event": schedule["stage"] or identity["event"],
+            })
     side_a = identity["team_a"]
     side_b = identity["team_b"]
 
-    quantitative = get_match_context(side_a, side_b, event=event)
+    try:
+        quantitative = {"available": True, **get_match_context(side_a, side_b, event=event)}
+    except LookupError as exc:
+        quantitative = {
+            "available": False,
+            "reason": str(exc),
+            "boundary": "TS 底表暂缺，不影响读取其他已有单场、队伍和 TK 资料。",
+        }
     team_a_evidence = _team_evidence(side_a)
     team_b_evidence = _team_evidence(side_b)
+    match_run = get_match_run(identity)
+    from .collection import get_prepared_materials
+    try:
+        materials = get_prepared_materials(identity)
+    except (OSError, ValueError):
+        materials = {"task": None, "result": None, "notice": "比赛资料暂时无法读取，其他依据仍可查看。"}
+    if match_run.get("mode") == "virtual_pre" and not match_run.get("result_unlocked"):
+        materials = {"task": None, "result": None, "notice": "赛前回放不采用赛后收集资料。"}
     return {
         "match": _identity_payload(identity),
+        "series_context": _series_context(identity),
         "quantitative": quantitative,
         "team_a": team_a_evidence,
         "team_b": team_b_evidence,
         "trading_framework": _match_trading_framework(identity, team_a_evidence, team_b_evidence),
+        "trade_plan": _trade_plan(identity, _match_trading_framework(identity, team_a_evidence, team_b_evidence)),
         "trading_notes": {
             "team_a": _trading_notes(side_a),
             "team_b": _trading_notes(side_b),
         },
         "boundary": "只汇总当前事实；方向、处理和变化条件由小雪在交易讨论中给出，不自动写交易或长期知识。",
         "workspace": get_match_workspace(identity),
-        "match_run": get_match_run(identity),
+        "match_run": match_run,
+        "prepared_materials": materials,
+    }
+
+
+def _series_context(identity: dict) -> dict:
+    """Describe how existing evidence is read for the scheduled series."""
+    if str(identity.get("match_format") or "").upper() != "BO5":
+        return {"format": identity.get("match_format") or "", "is_bo5": False, "items": []}
+    return {
+        "format": "BO5",
+        "is_bo5": True,
+        "title": "BO5 赛前资料",
+        "items": [
+            "常规赛 TS 是基础实力基线，后续系列赛结果只在其后连续校正。",
+            "队伍画像与交易 TK 用来检查既有赢法在连续对抗中的适用条件。",
+            "BP、首发和赛中变化出现后，只校正原赛前判断，不自动写入长期资料。",
+        ],
     }
 
 
@@ -156,33 +256,21 @@ def get_match_run(values: dict) -> dict:
         return {
             "exists": False,
             "match": _identity_payload(identity),
-            "guide": {
-                "focus": "overview",
-                "focus_label": "单场底稿",
-                "can_jump": True,
-                "modules": [
-                    {"id": item, "label": label}
-                    for item, label in TRADE_SECTION_LABELS.items()
-                ],
-            },
+            "guide": _empty_run_guide(),
         }
     return _match_run_payload(row)
 
 
 def get_active_match_run() -> dict:
     row = repository.get_active_match_run()
-    if not row:
+    if row and _run_has_finished_result(row):
+        # Hide a finished session in this read projection; only explicit user
+        # actions may change the saved activity state.
+        row = None
+    if not row or row["activity_status"] != "active":
         return {
             "exists": False,
-            "guide": {
-                "focus": "overview",
-                "focus_label": "单场底稿",
-                "can_jump": True,
-                "modules": [
-                    {"id": item, "label": label}
-                    for item, label in TRADE_SECTION_LABELS.items()
-                ],
-            },
+            "guide": _empty_run_guide(),
         }
     return _match_run_payload(row)
 
@@ -215,8 +303,7 @@ def save_match_trade_entry(values: dict) -> dict:
     content = _limited_text(values.get("content"), TRADE_SECTION_LABELS[section], 1200)
     if not content:
         raise ValueError(f"{TRADE_SECTION_LABELS[section]}不能为空")
-    if section == "trend" and values.get("confirmed_by_user") is not True:
-        raise ValueError("采用通用交易 TK 必须经过用户确认")
+
     repository.activate_match_run(row["id"], focus=section)
     repository.upsert_match_run_entry(row["id"], section, content)
     return _match_run_payload(repository.get_match_run_by_identity(identity))
@@ -258,7 +345,7 @@ def update_knowledge_candidate_status(candidate_id: int, status: str) -> dict:
         raise ValueError("候选状态不支持")
     row = repository.update_knowledge_candidate_status(int(candidate_id), clean_status)
     if not row:
-        raise LookupError("阶段整理候选不存在")
+        raise LookupError("沉淀候选不存在")
     return {"ok": True, "candidate": _knowledge_candidate_payload(row)}
 
 
@@ -270,8 +357,11 @@ def update_match_run_fact(values: dict) -> dict:
     except (TypeError, ValueError) as exc:
         raise ValueError("要修改哪条依据不明确") from exc
     status = _limited_text(values.get("status"), "依据状态", 30).lower()
+    label_to_status = {label: key for key, label in FACT_STATUS_LABELS.items()}
+    status = label_to_status.get(status, status)
     if status not in FACT_STATUSES:
-        raise ValueError("依据状态只支持采用、待更新、排除、待确认、缺失或用户覆盖")
+        options = "、".join(f"{key}（{label}）" for key, label in FACT_STATUS_LABELS.items())
+        raise ValueError(f"依据状态只支持：{options}")
     value = _limited_text(values.get("value"), "依据内容", 800)
     reason = _limited_text(values.get("reason"), "修改原因", 300)
     if not value or not reason:
@@ -288,8 +378,7 @@ def advance_match_run(values: dict) -> dict:
     phase = _limited_text(values.get("phase"), "流程阶段", 40).lower()
     if phase not in RUN_PHASES:
         raise ValueError("流程阶段不支持")
-    if row["mode"] == "virtual_pre" and phase in {"post_review", "complete"} and not row["result_unlocked"]:
-        raise ValueError("赛前模拟尚未解封赛果；明确说“解封赛果”后才能进入复盘")
+
     updated = repository.update_match_run_state(row["id"], phase=phase)
     return _match_run_payload(updated)
 
@@ -319,15 +408,12 @@ def get_score_match_evidence(values: dict) -> dict:
     view = _limited_text(values.get("view") or "pre", "查看阶段", 20).lower()
     if view not in {"pre", "post"}:
         raise ValueError("查看阶段只支持 pre 或 post")
-    row = _require_match_run(identity)
-    if view == "post" and row["mode"] == "virtual_pre" and not row["result_unlocked"]:
-        raise ValueError("赛果仍封存；明确说“解封赛果”后才能查看赛后资料")
-
+    cutoff_at = _cutoff_at(identity)
     schedule = repository.get_score_schedule(identity)
     score_match = {
         "schedule": _score_schedule_payload(schedule),
-        "team_a_form": _score_form_payload(repository.list_score_team_form(identity["team_a"], row["cutoff_at"]), identity["team_a"]),
-        "team_b_form": _score_form_payload(repository.list_score_team_form(identity["team_b"], row["cutoff_at"]), identity["team_b"]),
+        "team_a_form": _score_form_payload(repository.list_score_team_form(identity["team_a"], cutoff_at), identity["team_a"]),
+        "team_b_form": _score_form_payload(repository.list_score_team_form(identity["team_b"], cutoff_at), identity["team_b"]),
     }
     if view == "post":
         score_match["result"] = _score_result_payload(repository.get_score_result(identity))
@@ -336,17 +422,106 @@ def get_score_match_evidence(values: dict) -> dict:
         "view": view,
         "source": "ScoreGG 导入库（只读）",
         "score_match": score_match,
+        "boundary": "独立只读 ScoreGG 事实查询；不读取或改变任何交易推演状态。",
+    }
+
+
+def get_score_match_result(values: dict) -> dict:
+    """Read one imported ScoreGG result without opening a trade run.
+
+    Virtual-pre result sealing remains exclusive to ``get_score_match_evidence``.
+    This public result lookup never creates, activates, unlocks, or changes a
+    match run, workspace, trading note, or long-term knowledge.
+    """
+    identity = _resolve_run_identity(values)
+    result = repository.get_score_result(identity)
+    return {
+        "match": _identity_payload(identity),
+        "source": "ScoreGG 导入库（只读）",
+        "result": _score_result_payload(result),
+        "status": "completed" if result else "not_found",
+        "boundary": "独立只读赛果查询；不读取或改变任何交易推演状态。",
+    }
+
+
+def get_gol_series_evidence(values: dict, game_id: int) -> dict:
+    """Fetch an explicitly requested Gol.gg series without changing match state.
+
+    Gol.gg has no stable public match-id mapping from ScoreGG, so callers pass
+    a page id discovered from Gol.gg.  This avoids silently matching a similarly
+    named historical series to the current event.
+    """
+    identity = _resolve_run_identity(values)
+    evidence = gol_series_facts(game_id)
+    observed = sorted({item.get("team") or "" for game in evidence.get("games", []) for item in game.get("teams", []) if item.get("team")})
+    expected = {str(identity["team_a"]).casefold(), str(identity["team_b"]).casefold()}
+    observed_folded = {item.casefold() for item in observed}
+    conflict = bool(observed_folded and not expected.issubset(observed_folded))
+    return {
+        "status": "conflict" if conflict else "ok",
+        "match": _identity_payload(identity),
+        "source": "Gol.gg 公开逐局页面（按需只读）",
+        "gol_series": evidence,
+        "association": {
+            "mode": "explicit_game_id", "observed_teams": observed,
+            "conflict": conflict,
+            "note": "Gol.gg 与 ScoreGG 没有可验证的统一比赛 ID；这是明确指定页面的局级事实，不自动写入或覆盖 ScoreGG。",
+        },
+        "boundary": "仅提供可追溯逐局事实；不改 TS、赛果正源、交易推演、TK 或长期资料。",
+    }
+
+
+def list_score_match_results(team: str = "", date_from: str = "", date_to: str = "", limit: int = 20) -> dict:
+    """Read a bounded, filterable collection of completed ScoreGG results."""
+    clean_team = _limited_text(team, "队伍", 40) if str(team or "").strip() else ""
+    clean_from = _resolve_date(date_from) if str(date_from or "").strip() else ""
+    clean_to = _resolve_date(date_to) if str(date_to or "").strip() else ""
+    if clean_from and clean_to and clean_from > clean_to:
+        raise ValueError("开始日期不能晚于结束日期")
+    try:
+        clean_limit = max(1, min(int(limit), 50))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("limit 必须是整数") from exc
+    rows = repository.list_score_results(team=clean_team, date_from=clean_from, date_to=clean_to, limit=clean_limit)
+    results = [{
+        "match_id": row["match_id"], "team_a": row["team_a_id"], "team_b": row["team_b_id"],
+        "winner": row["winner"], "score_a": row["score_a"], "score_b": row["score_b"],
+        "match_time": row["match_time"], "event": row["league_id"], "format": row["game_format"],
+        "stage": row["stage"], "updated_at": row["updated_at"],
+    } for row in rows]
+    return {
+        "source": "ScoreGG 导入库（只读）", "filters": {
+            "team": clean_team, "date_from": clean_from, "date_to": clean_to, "limit": clean_limit,
+        }, "results": results, "status": "ok" if results else "empty",
+        "boundary": "批量只读赛果查询；不读取或改变任何交易推演状态。",
     }
 
 
 def get_match_run_review(values: dict) -> dict:
     identity = _resolve_run_identity(values)
-    row = _require_match_run(identity)
-    if row["mode"] == "virtual_pre" and not row["result_unlocked"]:
-        raise ValueError("先明确说“解封赛果”，再开始赛后复盘")
+    row = repository.get_match_run_by_identity(identity)
+    if not row:
+        return {
+            "exists": False,
+            "match": _identity_payload(identity),
+            "reason": "这场没有赛前推演记录，无法进行推演复盘。",
+            "score_evidence": get_score_match_evidence({**identity, "view": "post"}),
+        }
+
     payload = _match_run_payload(row)
     payload["score_evidence"] = get_score_match_evidence({**identity, "view": "post"})
     return payload
+
+
+def _run_has_finished_result(row) -> bool:
+    if row["game"] != "lol":
+        return False  # LOL results must never close another game's active run.
+    cutoff_at = str(row["cutoff_at"] or "").strip()
+    try:
+        has_started = bool(cutoff_at) and datetime.fromisoformat(cutoff_at) <= datetime.now()
+    except ValueError:
+        has_started = False
+    return has_started and repository.get_score_result(dict(row)) is not None
 
 
 def _normalize_run_mode(value) -> str:
@@ -370,6 +545,8 @@ def _normalize_match_run_focus(value, *, required: bool = False) -> str | None:
 def _resolve_run_identity(values: dict) -> dict:
     """Complete a chat-provided matchup from its ScoreGG schedule before storing it."""
     identity = normalize_match_identity(values)
+    if identity["game"] != "lol":
+        return identity  # Never resolve another game's teams through LOL schedules.
     if identity["match_time"] and identity["match_format"] and identity["event"]:
         return identity
     schedule = repository.get_score_schedule(identity)
@@ -390,6 +567,20 @@ def _cutoff_at(identity: dict) -> str:
     return f"{identity['match_date']} {time_value}:00"
 
 
+def _kickoff_at(identity: dict):
+    """真实开赛时刻；比赛时间未知时返回 None。
+
+    不能用缺省 00:00 当作“已开赛”，否则当天还没排定时间的比赛会被误判为已开始并锁死空计划。
+    """
+    time_value = str(identity.get("match_time") or "").strip()
+    if not time_value:
+        return None
+    try:
+        return datetime.fromisoformat(f"{identity['match_date']} {time_value}:00")
+    except ValueError:
+        return None
+
+
 def _require_match_run(identity: dict):
     row = repository.get_match_run_by_identity(identity)
     if not row:
@@ -408,6 +599,14 @@ def _match_run_key(identity: dict) -> str:
 def _collect_run_facts(identity: dict, cutoff_at: str, mode: str) -> list[dict]:
     """Make a small, inspectable ledger instead of one opaque diagnosis paragraph."""
     facts: list[dict] = []
+    if identity.get("game", "lol") != "lol":
+        return [{
+            "fact_code": "E01", "kind": "qualitative", "label": "比赛资料缺口",
+            "value": "尚未接入该游戏的自动赛程、首发、价格和赛果；不采用 LOL 数据",
+            "source": "coverage", "source_ref": identity["game"], "as_of": "",
+            "status": "missing", "affects": "情境应用",
+            "action": "补充带来源和取得时间的本场依据；不承诺实时价格或后台监测。",
+        }]
     schedule = repository.get_score_schedule(identity)
     if schedule:
         facts.append({
@@ -438,12 +637,12 @@ def _collect_run_facts(identity: dict, cutoff_at: str, mode: str) -> list[dict]:
         three_d = evidence.get("three_dimensional") or {}
         d3_value = "；".join(
             f"{item['label']}：{item['value']}" for item in (three_d.get("items") or []) if item.get("value")
-        ) or three_d.get("version_understanding") or "未录入三维资料"
+        ) or three_d.get("version_understanding") or "未录入风格/版本理解"
         d3_status, d3_action = "active", _source_time_action(three_d.get("updated_at") or "")
-        if not d3_value or d3_value == "未录入三维资料":
+        if not d3_value or d3_value == "未录入风格/版本理解":
             d3_status, d3_action = "missing", "补一条本场相关的风格或版本观察。"
         facts.append({
-            "fact_code": f"E{base + 2:02d}", "kind": "qualitative", "label": f"{team} 三维 / 版本理解",
+            "fact_code": f"E{base + 2:02d}", "kind": "qualitative", "label": f"{team} 风格 / 版本理解",
             "value": d3_value, "source": "team_3d", "source_ref": team,
             "as_of": three_d.get("updated_at") or "", "status": d3_status, "affects": "风格与版本适配",
             "action": d3_action,
@@ -458,7 +657,7 @@ def _collect_run_facts(identity: dict, cutoff_at: str, mode: str) -> list[dict]:
             "action": "这是已有交易备注；是否用于这场由你决定。" if notes else "这场没有可直接套用的交易备注。",
         })
 
-        form = repository.list_score_team_form(team, cutoff_at)
+        form = repository.list_score_team_form(team, cutoff_at, match_format=identity["match_format"], league_id=identity["event"])
         facts.append({
             "fact_code": f"E{base + 4:02d}", "kind": "quantitative", "label": f"{team} 赛前近况",
             "value": _score_form_text(form, team), "source": "scoregg_form", "source_ref": team,
@@ -522,8 +721,10 @@ def _run_fact_payload(row) -> dict:
 
 
 def _run_entry_payload(row) -> dict:
+    metadata = MATCH_RUN_ENTRY_META.get(row["section"], {})
     return {
         "section": row["section"], "label": TRADE_SECTION_LABELS.get(row["section"], row["section"]),
+        "stage": metadata.get("stage", "pre"), "purpose": metadata.get("purpose", ""),
         "content": row["content"], "updated_at": row["updated_at"],
     }
 
@@ -542,10 +743,40 @@ def _run_guide(row, facts: list[dict] | None = None) -> dict:
         "focus": focus,
         "focus_label": MATCH_RUN_FOCUS_LABELS[focus],
         "can_jump": True,
+        "stages": _run_stage_groups(),
         "modules": [
-            {"id": item, "label": label}
-            for item, label in TRADE_SECTION_LABELS.items()
+            {"id": item, "label": meta["label"], "stage": meta["stage"], "purpose": meta["purpose"]}
+            for item, meta in MATCH_RUN_ENTRY_META.items()
         ],
+    }
+
+
+def _empty_run_guide() -> dict:
+    return {
+        "focus": "overview",
+        "focus_label": "单场底稿",
+        "can_jump": True,
+        "stages": _run_stage_groups(),
+        "modules": [
+            {"id": item, "label": meta["label"], "stage": meta["stage"], "purpose": meta["purpose"]}
+            for item, meta in MATCH_RUN_ENTRY_META.items()
+        ],
+    }
+
+
+def _run_stage_groups() -> dict:
+    return {
+        stage: {
+            "id": stage,
+            "label": stage_meta["label"],
+            "purpose": stage_meta["purpose"],
+            "modules": [
+                {"id": section, "label": entry_meta["label"], "stage": stage, "purpose": entry_meta["purpose"]}
+                for section, entry_meta in MATCH_RUN_ENTRY_META.items()
+                if entry_meta["stage"] == stage
+            ],
+        }
+        for stage, stage_meta in MATCH_RUN_STAGE_META.items()
     }
 
 
@@ -625,15 +856,34 @@ def _ts_text(quantitative: dict) -> str:
 def build_current_event(config: dict, plan: dict | None) -> dict:
     content = str((plan or {}).get("content") or "").strip()
     title = _title(content) if content else ""
+    other_stage = bool(content and re.search(r"(?:世界赛|Worlds|S16)", str(config.get("event") or ""), re.I)
+                       and re.search(r"第三赛段|(?:MSI|EWC).*预案", title, re.I)
+                       and not re.search(r"世界赛|Worlds|S16", title, re.I))
+    status = "historical" if other_stage else "ready" if content else "not_created"
+    framework = {
+        "status": status,
+        "title": title or "当前赛段框架",
+        "summary": _plan_summary(content) if content else "当前还没有可用的赛段框架。",
+        "content": content,
+        "updated_at": (plan or {}).get("updated_at", ""),
+        "boundary": "这是其他赛事的历史预案，保留查阅，不作为本届当前框架。" if other_stage else "它是阶段背景，不是每场必须照抄；需要更新时再和小雪讨论并确认。",
+    }
     return {
         "event": config.get("event", "当前赛事"),
+        "confirmed_teams": config.get("confirmed_teams") or config.get("participants") or [],
+        "participants_verified": config.get("participants_verified") is True,
+        "participant_sources": config.get("participant_sources") or [],
+        "aliases": config.get("aliases") or [],
+        "source_hints": config.get("source_hints") or [],
+        "team_aliases": config.get("team_aliases") or {},
         "phase": config.get("phase", ""),
         "knowledge_query": config.get("knowledge_query", config.get("event", "")),
-        "plan_status": "ready" if content else "not_created",
+        "plan_status": status,
         "plan_title": title,
         "plan_content": content,
         "plan_updated_at": (plan or {}).get("updated_at", ""),
         "plan_boundary": "完整预案只在与小雪确认后写入；工作台不自动生成。",
+        "stage_framework": framework,
     }
 
 
@@ -650,11 +900,11 @@ def _resolve_date(value: str) -> str:
 def normalize_match_identity(values: dict) -> dict:
     team_a = _clean_team(values.get("team_a"), "队伍A").upper()
     team_b = _clean_team(values.get("team_b"), "队伍B").upper()
-    if team_a == team_b:
-        raise ValueError("两边队伍不能相同")
+    if is_unresolved_matchup(team_a, team_b):
+        raise ValueError("对阵未定：双方队伍尚未产生，不能作为具体比赛处理")
     game = _limited_text(values.get("game") or "lol", "项目", 20).lower()
-    if game != "lol":
-        raise ValueError("当前只支持 LOL 比赛工作台")
+    if game not in {"lol", "valorant", "cs2"}:
+        raise ValueError("单场记录支持 lol、valorant、cs2")
     event = _limited_text(values.get("event"), "赛事", 120)
     match_date = _resolve_date(values.get("match_date") or "today")
     match_time = _normalize_match_time(values.get("match_time"))
@@ -737,15 +987,49 @@ def _clean_team(value: str, label: str) -> str:
     return team
 
 
+PLACEHOLDER_TEAM_TOKENS = {"tbd", "tba", "待定", "未知", "n/a", "na", "-"}
+
+
+def is_unresolved_matchup(team_a: str, team_b: str) -> bool:
+    """对阵未定：赛程已排期但双方队伍还没产生（TBD 占位、缺一边或两边同名）。
+
+    这类行是正常赛程数据（例如 S16 总决赛名额待定），不是错误数据；
+    它们可以被列出，但不能进入任何需要真实对阵的链路。
+    """
+    left = str(team_a or "").strip().casefold()
+    right = str(team_b or "").strip().casefold()
+    if not left or not right:
+        return True
+    if left in PLACEHOLDER_TEAM_TOKENS or right in PLACEHOLDER_TEAM_TOKENS:
+        return True
+    return left == right
+
+
 def _match_summary(match: dict) -> dict:
     team_a = str(match.get("team_a") or "").strip()
     team_b = str(match.get("team_b") or "").strip()
+    if is_unresolved_matchup(team_a, team_b):
+        return {
+            "match": match,
+            "pending": True,
+            "pending_reason": "对阵未定：赛程已排期，双方队伍待产生",
+            "ts": {"available": False, "reason": "对阵未定，暂不读取两队实力"},
+            "trade_plan": None,
+        }
+    identity = normalize_match_identity({
+        "team_a": team_a, "team_b": team_b, "event": match.get("stage") or match.get("region") or "",
+        "match_date": match.get("date") or "today", "match_time": match.get("time") or "",
+        "match_format": match.get("format") or "",
+    })
     try:
         quantitative = get_match_context(team_a, team_b, event=match.get("stage") or match.get("region") or "")
         ts = {"available": True, **quantitative}
     except LookupError as exc:
         ts = {"available": False, "reason": str(exc)}
-    return {"match": match, "ts": ts}
+    return {
+        "match": match, "pending": False, "ts": ts,
+        "trade_plan": _trade_plan(identity, _match_trading_framework(identity)),
+    }
 
 
 def _team_evidence(team: str) -> dict:
@@ -791,6 +1075,422 @@ def _event_region(event: str) -> str:
     return ""
 
 
+PLAN_MARKETS = {
+    "team": {"label": "队伍", "directions": {"做多", "做空"}},
+    "kills": {"label": "人头", "directions": {"做大", "做小"}},
+    "duration": {"label": "时间", "directions": {"做大", "做小"}},
+}
+
+
+def _parse_trade_plan_text(content: str, identity: dict) -> list[dict]:
+    """Keep the first-slice text endpoint compatible without using it in the UI."""
+    result: list[dict] = []
+    text = str(content or "").strip()
+    teams = (identity["team_a"], identity["team_b"])
+    subject = next((team for team in teams if team.casefold() in text.casefold()), "本场")
+    lowered = text.casefold()
+    if "人头" in text and any(token in text for token in ("大", "多")):
+        result.append({"market": "kills", "team": "", "direction": "做大", "statement": text})
+    elif "人头" in text and any(token in text for token in ("小", "少")):
+        result.append({"market": "kills", "team": "", "direction": "做小", "statement": text})
+    elif ("时间" in text or "时长" in text) and any(token in text for token in ("大", "长", "久", "拖")):
+        result.append({"market": "duration", "team": "", "direction": "做大", "statement": text})
+    elif ("时间" in text or "时长" in text) and any(token in text for token in ("小", "短", "快")):
+        result.append({"market": "duration", "team": "", "direction": "做小", "statement": text})
+    elif any(token in lowered for token in ("做空", "看空", "发挥差", "容易送")):
+        result.append({"market": "team", "team": subject, "direction": "做空", "statement": text})
+    elif any(token in lowered for token in ("做多", "看多", "发挥好", "稳定", "变强", "强势")):
+        result.append({"market": "team", "team": subject, "direction": "做多", "statement": text})
+    return result
+
+
+def save_trade_plan_manual(values: dict) -> dict:
+    """Compatibility for an earlier text-only client; the current UI is structured."""
+    identity = normalize_match_identity(values)
+    content = _required_limited_text(values.get("content"), "本场补充", 500)
+    parsed = _parse_trade_plan_text(content, identity)
+    if not parsed:
+        raise ValueError("本场补充请使用队伍做多/做空、人头做大/做小或时间做大/做小")
+    plan = None
+    for item in parsed:
+        plan = create_trade_plan_item({**identity, **item, "statement": content})
+    return plan or _trade_plan(identity, _match_trading_framework(identity))
+
+
+def create_trade_plan_item(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    auto = _auto_trade_plan(_match_trading_framework(identity), identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    plan = _trade_plan_from_row(identity, auto, row)
+    _require_editable_trade_plan(plan)
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    item = _normalize_trade_plan_item(values, identity, item_id=f"manual-{uuid.uuid4().hex[:12]}", origin="manual")
+    manual["items"].append(item)
+    manual["order"] = _ordered_ids(plan["final"].get("items") or [], manual["order"])
+    manual["order"].append(item["id"])
+    return _store_draft_trade_plan(identity, auto, manual)
+
+
+def update_trade_plan_item(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    item_id = _trade_plan_item_id(values.get("item_id"))
+    auto = _auto_trade_plan(_match_trading_framework(identity), identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    plan = _trade_plan_from_row(identity, auto, row)
+    _require_editable_trade_plan(plan)
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    auto_item = next((item for item in auto["items"] if item["id"] == item_id), None)
+    if auto_item:
+        replacement = _normalize_trade_plan_item(values, identity, item_id=item_id, origin="auto", source=auto_item.get("source"))
+        manual["overrides"][item_id] = {"mode": "replace", "item": replacement}
+    else:
+        index = next((index for index, item in enumerate(manual["items"]) if item["id"] == item_id), None)
+        if index is None:
+            raise LookupError("本场方案不存在")
+        manual["items"][index] = _normalize_trade_plan_item(values, identity, item_id=item_id, origin="manual")
+    return _store_draft_trade_plan(identity, auto, manual)
+
+
+def delete_trade_plan_item(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    item_id = _trade_plan_item_id(values.get("item_id"))
+    auto = _auto_trade_plan(_match_trading_framework(identity), identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    plan = _trade_plan_from_row(identity, auto, row)
+    _require_editable_trade_plan(plan)
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    if any(item["id"] == item_id for item in auto["items"]):
+        manual["overrides"][item_id] = {"mode": "delete"}
+    else:
+        before = len(manual["items"])
+        manual["items"] = [item for item in manual["items"] if item["id"] != item_id]
+        if len(manual["items"]) == before:
+            raise LookupError("本场方案不存在")
+    manual["order"] = [value for value in manual["order"] if value != item_id]
+    return _store_draft_trade_plan(identity, auto, manual)
+
+
+def restore_trade_plan_item(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    item_id = _trade_plan_item_id(values.get("item_id"))
+    auto = _auto_trade_plan(_match_trading_framework(identity), identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    plan = _trade_plan_from_row(identity, auto, row)
+    _require_editable_trade_plan(plan)
+    if not any(item["id"] == item_id for item in auto["items"]):
+        raise ValueError("只有自动方案可以恢复")
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    manual["overrides"].pop(item_id, None)
+    return _store_draft_trade_plan(identity, auto, manual)
+
+
+def reorder_trade_plan_item(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    item_id = _trade_plan_item_id(values.get("item_id"))
+    movement = _limited_text(values.get("movement"), "排序方向", 10).lower()
+    if movement not in {"up", "down"}:
+        raise ValueError("排序方向只支持 up 或 down")
+    auto = _auto_trade_plan(_match_trading_framework(identity), identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    plan = _trade_plan_from_row(identity, auto, row)
+    _require_editable_trade_plan(plan)
+    current_ids = [item["id"] for item in plan["final"].get("items") or []]
+    if item_id not in current_ids:
+        raise LookupError("本场方案不存在或已删除")
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    order = _ordered_ids(plan["final"].get("items") or [], manual["order"])
+    index = order.index(item_id)
+    target = index - 1 if movement == "up" else index + 1
+    if 0 <= target < len(order):
+        order[index], order[target] = order[target], order[index]
+    manual["order"] = order
+    return _store_draft_trade_plan(identity, auto, manual)
+
+
+def _trade_plan(identity: dict, framework: dict) -> dict:
+    """Build the daily/individual pre-match plan from current TK, with no odds dependency."""
+    auto = _auto_trade_plan(framework, identity)
+    row = repository.get_trade_plan(identity["match_key"])
+    return _trade_plan_from_row(identity, auto, row)
+
+
+def _trade_plan_from_row(identity: dict, fresh_auto: dict, row) -> dict:
+    """Project plans without writes; explicit editing stores the pre-match basis."""
+    manual = _manual_trade_plan(row["manual_plan"] if row else {})
+    now = datetime.now()
+    kickoff = _kickoff_at(identity)
+    started = bool(kickoff and kickoff <= now)
+    raw_frozen = _json_object(row["frozen_plan"] if row else {})
+    if row and (row["state"] == "locked" or raw_frozen):
+        frozen = _frozen_trade_plan(raw_frozen)
+        return _trade_plan_payload("locked", frozen["auto"], frozen["manual"], frozen["final"], frozen_at=frozen.get("frozen_at", ""), snapshot_missing=bool(frozen.get("snapshot_missing")))
+    if started:
+        if not row:
+            frozen = {"auto": {"items": []}, "manual": _empty_manual_trade_plan(), "final": {"items": []}, "frozen_at": now.strftime("%Y-%m-%d %H:%M:%S"), "snapshot_missing": True}
+        else:
+            stored_auto = _auto_trade_plan_from_storage(row["auto_plan"])
+            frozen_manual = manual
+            frozen = {
+                "auto": stored_auto,
+                "manual": frozen_manual,
+                "final": _compose_trade_plan(stored_auto, frozen_manual),
+                "frozen_at": now.strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        return _trade_plan_payload("locked", frozen["auto"], frozen["manual"], frozen["final"], frozen_at=frozen["frozen_at"], snapshot_missing=bool(frozen.get("snapshot_missing")))
+    final = _compose_trade_plan(fresh_auto, manual)
+    return _trade_plan_payload("draft", fresh_auto, manual, final)
+
+
+def _store_draft_trade_plan(identity: dict, auto: dict, manual: dict) -> dict:
+    final = _compose_trade_plan(auto, manual)
+    repository.upsert_trade_plan({**identity, "auto_plan": auto, "manual_plan": manual, "frozen_plan": {}, "state": "draft"})
+    return _trade_plan_payload("draft", auto, manual, final)
+
+
+def _auto_trade_plan(framework: dict, identity: dict) -> dict:
+    items: list[dict] = []
+    for source in framework.get("items") or []:
+        statement = str(source.get("statement") or "").strip()
+        context = str(source.get("context") or "").strip()
+        text = f"{statement} {context}"
+        if not statement:
+            continue
+        subject = str(source.get("subject") or "").strip().upper()
+        market, direction = _auto_market_direction(text)
+        if not market or not direction:
+            continue
+        if market == "team" and subject not in {identity["team_a"], identity["team_b"]}:
+            continue
+        key = str(source.get("id") or source.get("filename") or f"{subject}|{statement}")
+        item_id = "auto-" + uuid.uuid5(uuid.NAMESPACE_URL, key).hex[:16]
+        items.append({
+            "id": item_id, "origin": "auto", "market": market, "team": subject if market == "team" else "",
+            "direction": direction, "statement": statement,
+            "source": {
+                "tk_id": str(source.get("id") or source.get("filename") or ""),
+                "statement": statement, "scope_label": str(source.get("scope_label") or "交易 TK"),
+                "updated_at": str(source.get("updated_at") or ""),
+            },
+        })
+    return {"items": items}
+
+
+def _auto_market_direction(text: str) -> tuple[str, str]:
+    lowered = text.casefold()
+    if re.search(r"(?:大|多)\s*人头|人头\s*(?:做)?(?:大|多)", text):
+        return "kills", "做大"
+    if re.search(r"(?:小|少)\s*人头|人头\s*(?:做)?(?:小|少)", text):
+        return "kills", "做小"
+    if re.search(r"时间\s*(?:做)?大|时长\s*(?:做)?大", text):
+        return "duration", "做大"
+    if re.search(r"时间\s*(?:做)?小|时长\s*(?:做)?小", text):
+        return "duration", "做小"
+    if any(token in lowered for token in ("做空", "看空", "发挥差", "容易送", "不稳定", "下滑")):
+        return "team", "做空"
+    if any(token in lowered for token in ("做多", "看多", "发挥好", "稳定", "变强", "强势")):
+        return "team", "做多"
+    return "", ""
+
+
+def _json_object(value) -> dict:
+    if isinstance(value, dict):
+        return value
+    try:
+        parsed = json.loads(value or "{}")
+    except (TypeError, ValueError, json.JSONDecodeError):
+        parsed = {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _auto_trade_plan_from_storage(value) -> dict:
+    raw = _json_object(value)
+    if isinstance(raw.get("items"), list):
+        return {"items": [item for item in raw["items"] if isinstance(item, dict)]}
+    # First-slice compatibility: preserve existing category arrays as automatic items.
+    items: list[dict] = []
+    for market in PLAN_MARKETS:
+        for index, legacy in enumerate(raw.get(market) or []):
+            if not isinstance(legacy, dict):
+                continue
+            source_statement = str(legacy.get("statement") or "")
+            item_id = f"auto-legacy-{market}-{index}-{uuid.uuid5(uuid.NAMESPACE_URL, source_statement or str(index)).hex[:12]}"
+            items.append({
+                "id": item_id, "origin": "auto", "market": market, "team": str(legacy.get("team") or ""),
+                "direction": str(legacy.get("direction") or ""), "statement": source_statement,
+                "source": {"tk_id": "", "statement": source_statement, "scope_label": "交易 TK", "updated_at": ""},
+            })
+    return {"items": items}
+
+
+def _empty_manual_trade_plan() -> dict:
+    return {"items": [], "overrides": {}, "order": []}
+
+
+def _manual_trade_plan(value) -> dict:
+    raw = _json_object(value)
+    manual = _empty_manual_trade_plan()
+    if isinstance(raw.get("items"), list):
+        manual["items"] = [item for item in raw["items"] if isinstance(item, dict) and str(item.get("id") or "")]
+    else:
+        # Preserve first-slice manual entries while converting them into normal item rows.
+        for market in PLAN_MARKETS:
+            for index, legacy in enumerate(raw.get(market) or []):
+                if not isinstance(legacy, dict):
+                    continue
+                manual["items"].append({
+                    "id": f"manual-legacy-{market}-{index}", "origin": "manual", "market": market,
+                    "team": str(legacy.get("team") or ""), "direction": str(legacy.get("direction") or ""),
+                    "statement": str(legacy.get("statement") or ""), "source": {},
+                })
+        for index, note in enumerate(raw.get("notes") or []):
+            manual["items"].append({
+                "id": f"manual-legacy-note-{index}", "origin": "manual", "market": "note", "team": "",
+                "direction": "", "statement": str(note or ""), "source": {},
+            })
+    if isinstance(raw.get("overrides"), dict):
+        manual["overrides"] = {str(key): value for key, value in raw["overrides"].items() if isinstance(value, dict)}
+    if isinstance(raw.get("order"), list):
+        manual["order"] = [str(value) for value in raw["order"] if str(value)]
+    return manual
+
+
+def _frozen_trade_plan(value: dict) -> dict:
+    raw = _json_object(value)
+    if "auto" in raw or "manual" in raw:
+        auto = _auto_trade_plan_from_storage(raw.get("auto"))
+        manual = _manual_trade_plan(raw.get("manual"))
+        final = raw.get("final") if isinstance(raw.get("final"), dict) else _compose_trade_plan(auto, manual)
+        if not isinstance(final.get("items"), list):
+            final = _compose_trade_plan(auto, manual)
+        return {"auto": auto, "manual": manual, "final": final, "frozen_at": str(raw.get("frozen_at") or ""), "snapshot_missing": bool(raw.get("snapshot_missing"))}
+    # Old frozen rows stored only the final category arrays.
+    auto = _auto_trade_plan_from_storage(raw)
+    manual = _empty_manual_trade_plan()
+    return {"auto": auto, "manual": manual, "final": _compose_trade_plan(auto, manual), "frozen_at": ""}
+
+
+def _compose_trade_plan(auto: dict, manual: dict) -> dict:
+    effective: list[dict] = []
+    for base in auto.get("items") or []:
+        override = manual.get("overrides", {}).get(base.get("id"), {})
+        if override.get("mode") == "delete":
+            continue
+        item = dict(override.get("item") or base) if override.get("mode") == "replace" else dict(base)
+        item["origin"] = "auto"
+        item["source"] = dict(base.get("source") or item.get("source") or {})
+        effective.append(item)
+    effective.extend(dict(item) for item in manual.get("items") or [])
+    order = _ordered_ids(effective, manual.get("order") or [])
+    positions = {item_id: index for index, item_id in enumerate(order)}
+    effective.sort(key=lambda item: positions.get(item.get("id"), len(positions)))
+    for index, item in enumerate(effective, start=1):
+        item["position"] = index
+    grouped = {market: [item for item in effective if item.get("market") == market] for market in PLAN_MARKETS}
+    return {"items": effective, **grouped}
+
+
+def _ordered_ids(items: list[dict], saved_order: list[str]) -> list[str]:
+    current_ids = [str(item.get("id") or "") for item in items if str(item.get("id") or "")]
+    order = [item_id for item_id in saved_order if item_id in current_ids]
+    order.extend(item_id for item_id in current_ids if item_id not in order)
+    return order
+
+
+def _trade_plan_payload(state: str, auto: dict, manual: dict, final: dict, *, frozen_at: str = "", snapshot_missing: bool = False) -> dict:
+    overrides = manual.get("overrides") or {}
+    auto_items = []
+    for base in auto.get("items") or []:
+        item = dict(base)
+        override = overrides.get(item.get("id"), {})
+        item["manual_state"] = "deleted" if override.get("mode") == "delete" else ("edited" if override.get("mode") == "replace" else "automatic")
+        if override.get("mode") == "replace":
+            item["effective"] = dict(override.get("item") or {})
+        auto_items.append(item)
+    return {
+        "state": state, "locked": state == "locked", "can_edit": state != "locked",
+        "auto": {"items": auto_items}, "manual": {"items": manual.get("items") or []}, "final": final,
+        "frozen_at": frozen_at, "snapshot_missing": snapshot_missing,
+        "empty_reason": "没有可直接生成的交易 TK" if not auto_items else "",
+        "updated_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+
+
+def _normalize_trade_plan_item(values: dict, identity: dict, *, item_id: str, origin: str, source: dict | None = None) -> dict:
+    market = _limited_text(values.get("market"), "方案类型", 20).lower()
+    if market not in PLAN_MARKETS:
+        raise ValueError("方案类型只支持队伍、人头或时间")
+    direction = _limited_text(values.get("direction"), "方案方向", 20)
+    if direction not in PLAN_MARKETS[market]["directions"]:
+        raise ValueError(f"{PLAN_MARKETS[market]['label']}方向不支持")
+    team = _limited_text(values.get("team"), "队伍", 40).upper()
+    if market == "team":
+        if team not in {identity["team_a"], identity["team_b"]}:
+            raise ValueError("队伍方案只能选择本场双方")
+    else:
+        team = ""
+    statement = _limited_text(values.get("statement"), "说明", 240)
+    return {"id": item_id, "origin": origin, "market": market, "team": team, "direction": direction, "statement": statement, "source": dict(source or {})}
+
+
+def _trade_plan_item_id(value) -> str:
+    item_id = _required_limited_text(value, "方案", 80)
+    if not re.fullmatch(r"(?:auto|manual)-[A-Za-z0-9-]+", item_id):
+        raise ValueError("方案标识无效")
+    return item_id
+
+
+def _require_editable_trade_plan(plan: dict) -> None:
+    if plan.get("state") == "locked":
+        raise ValueError("比赛已开始，赛前方案已锁定")
+
+
+def get_trade_plan_review(values: dict) -> dict:
+    identity = normalize_match_identity(values)
+    plan = _trade_plan(identity, _match_trading_framework(identity))
+    if plan["state"] != "locked":
+        return {"status": "pre_match", "match": _identity_payload(identity), "plan": plan, "items": [], "tk_suggestions": [], "reason": "比赛尚未开始，赛后复盘会在最终赛前方案锁定后生成。"}
+    if plan.get("snapshot_missing"):
+        return {"status": "unavailable", "match": _identity_payload(identity), "plan": plan, "items": [], "tk_suggestions": [], "reason": "开赛前没有保存方案，无法把现在的交易 TK 当作当时使用的方案。"}
+    result = _score_result_payload(repository.get_score_result(identity))
+    if not result or result.get("status") != "completed":
+        return {"status": "waiting_result", "match": _identity_payload(identity), "plan": plan, "result": result, "items": [], "tk_suggestions": [], "reason": "赛果尚未导入；不会猜测人头或时长结果。"}
+    items = [_review_trade_plan_item(item, result) for item in plan["final"].get("items") or []]
+    suggestions = [_tk_suggestion(item) for item in items if item.get("source", {}).get("tk_id")]
+    return {
+        "status": "ok", "match": _identity_payload(identity), "plan": plan, "result": result,
+        "items": items, "tk_suggestions": suggestions,
+        "boundary": "建议只供复盘；不会自动修改或删除任何长期交易 TK。",
+    }
+
+
+def _review_trade_plan_item(item: dict, result: dict) -> dict:
+    reviewed = dict(item)
+    if item.get("market") == "team":
+        winner = str(result.get("winner") or "").upper()
+        if not winner:
+            outcome, reason = "no_data", "没有可靠队伍赛果"
+        else:
+            won = winner == item.get("team")
+            matched = won if item.get("direction") == "做多" else not won
+            outcome, reason = ("matched", "与系列赛赛果一致") if matched else ("missed", "与系列赛赛果相反")
+    else:
+        outcome, reason = "no_data", "没有可靠人头/时长赛果，未作猜测"
+    reviewed["outcome"] = outcome
+    reviewed["review_reason"] = reason
+    return reviewed
+
+
+def _tk_suggestion(item: dict) -> dict:
+    if item.get("outcome") == "matched":
+        recommendation, reason = "建议保留", "本场方向与赛果一致"
+    elif item.get("outcome") == "missed":
+        recommendation, reason = "建议删除", "本场方向与赛果相反"
+    else:
+        recommendation, reason = "暂不建议调整", item.get("review_reason") or "缺少可靠赛果"
+    source = item.get("source") or {}
+    return {"item_id": item.get("id"), "statement": source.get("statement") or item.get("statement") or "交易 TK", "recommendation": recommendation, "reason": reason}
+
+
 def _match_trading_framework(identity: dict, team_a_evidence: dict | None = None, team_b_evidence: dict | None = None) -> dict:
     """Return only the already-recorded TK that can matter to this matchup.
 
@@ -798,6 +1498,8 @@ def _match_trading_framework(identity: dict, team_a_evidence: dict | None = None
     later should be visible when a paused match is reopened, without turning a
     reminder into an adopted trend inside the match thread.
     """
+    if identity.get("game", "lol") != "lol":
+        return {"available": False, "items": [], "boundary": "其他游戏 TK 从正式 TK 查询读取；不混用 LOL 画像与版本理解"}
     side_a = identity["team_a"]
     side_b = identity["team_b"]
     try:
@@ -809,7 +1511,17 @@ def _match_trading_framework(identity: dict, team_a_evidence: dict | None = None
         player.get("name") or player.get("player_name") or ""
         for player in [*(evidence_a.get("starters") or []), *(evidence_b.get("starters") or [])]
     ]
-    return list_match_trading_tk(_event_region(identity.get("event") or ""), [side_a, side_b], players, limit=8)
+    version_context = ""
+    try:
+        title = ((get_global_version_understanding().get("data") or {}).get("current_mainline") or {}).get("title") or ""
+        match = re.search(r"\b(\d+\.\d+)\b", str(title))
+        version_context = match.group(1) if match else ""
+    except (LookupError, OSError, RuntimeError, ValueError, sqlite3.Error):
+        pass
+    return list_match_trading_tk(
+        _event_region(identity.get("event") or ""), [side_a, side_b], players, limit=8,
+        version_context=version_context,
+    )
 
 
 def _title(content: str) -> str:
@@ -818,3 +1530,24 @@ def _title(content: str) -> str:
         if stripped.startswith("#"):
             return stripped.lstrip("#").strip()
     return "当前交易预案"
+
+
+def _plan_summary(content: str) -> str:
+    """Take a short human summary from the existing plan without rewriting its body."""
+    lines = content.splitlines()
+    for index, line in enumerate(lines):
+        if line.strip().startswith("##") and "核心判断" in line:
+            candidates = []
+            for candidate in lines[index + 1:]:
+                stripped = candidate.strip()
+                if stripped.startswith("##"):
+                    break
+                if not stripped or stripped.startswith(">") or stripped.startswith("-"):
+                    continue
+                candidates.append(stripped)
+                if len(" ".join(candidates)) >= 180:
+                    break
+            if candidates:
+                return " ".join(candidates)[:220]
+    fallback = [line.strip(" -*#>") for line in lines if line.strip() and not line.strip().startswith(("#", ">", "-"))]
+    return " ".join(fallback)[:220] or "当前赛段框架已建立，可展开查看全文。"

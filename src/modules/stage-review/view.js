@@ -3,7 +3,7 @@ const TARGET_LABELS = {
 };
 
 export function createStageReviewView(root) {
-  if (!root) throw new Error('阶段整理入口不存在');
+  if (!root) throw new Error('沉淀候选入口不存在');
   const list = root.querySelector('#stage-review-list');
   const summary = root.querySelector('#stage-review-summary');
   const message = root.querySelector('#stage-review-message');
@@ -45,14 +45,13 @@ export function createStageReviewView(root) {
         if (button.dataset.stageAction === 'refresh') actions.refresh();
         if (button.dataset.stageAction === 'copy-prompt') actions.copyPrompt();
         if (button.dataset.stageAction === 'ignore') actions.ignore(Number(button.dataset.candidateId));
-        if (button.dataset.stageAction === 'confirm-tk') actions.updateTradingTK(button.dataset.filename, 'confirmed');
-        if (button.dataset.stageAction === 'invalidate-tk') actions.updateTradingTK(button.dataset.filename, 'invalid');
+
       };
       root.addEventListener('click', onClick);
       return () => root.removeEventListener('click', onClick);
     },
     error(error) {
-      if (summary) summary.textContent = '阶段整理暂时不可用';
+      if (summary) summary.textContent = '沉淀候选暂时不可用';
       if (list) list.innerHTML = `<div class="tk-empty">${escapeHtml(error?.message || '读取失败')}</div>`;
       root.dataset.moduleStatus = 'broken';
     },
@@ -84,18 +83,10 @@ function renderCandidate(candidate) {
 }
 
 function renderTradingTK(item) {
-  const status = ({ candidate: '待验证', confirmed: '已确认', invalid: '已失效' })[item.status] || item.status;
-  const filename = escapeHtml(item.filename || '');
-  const actions = item.editable === false ? '' : item.status === 'candidate'
-    ? `<button class="compare-close" data-stage-action="confirm-tk" data-filename="${filename}">确认可用</button>
-       <button class="compare-close" data-stage-action="invalidate-tk" data-filename="${filename}">标记失效</button>`
-    : item.status === 'confirmed'
-      ? `<button class="compare-close" data-stage-action="invalidate-tk" data-filename="${filename}">标记失效</button>`
-      : '';
+  const labels = (item.tags || []).filter((tag) => tag !== '交易').join(' · ');
   return `<article class="stage-candidate">
-    <b>${escapeHtml(status)} · ${escapeHtml(item.scope_label || '')}${item.scope_label ? ' · ' : ''}${escapeHtml(item.statement || '')}</b>
-    <span>${escapeHtml(item.context || '未限定适用范围')}<em>${escapeHtml(item.updated_at || '')}</em></span>
-    ${actions}
+    <b>${escapeHtml([labels, item.statement].filter(Boolean).join(' · '))}</b>
+    <span><em>${escapeHtml(item.updated_at || '')}</em></span>
   </article>`;
 }
 

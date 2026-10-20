@@ -154,7 +154,7 @@ function renderRecord(record) {
     <div class="trade-item-actions">
       <button data-market-action="review" data-id="${Number(record.id)}">复盘</button>
       <button data-market-action="tk-draft" data-id="${Number(record.id)}">沉淀TK</button>
-      <button class="danger" data-market-action="delete" data-id="${Number(record.id)}">删除</button>
+      <button class="danger" data-market-action="delete" data-id="${Number(record.id)}">标记失效</button>
     </div>
   </div>`;
 }

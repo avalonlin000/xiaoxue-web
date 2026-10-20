@@ -1,6 +1,32 @@
 {
-  "event": "LPL 2026 第三赛段",
+  "event": "S16 世界赛",
+  "aliases": ["S16全球总决赛", "Worlds 2026", "2026 World Championship", "Worlds"],
+  "confirmed_teams": ["AL", "BLG", "TES", "IG", "GEN", "HLE", "T1", "DK", "G2", "MKOI", "KC", "TLAW", "LYON", "C9", "TSW", "CFO", "MVK", "LOS", "FUR"],
+  "participants_verified": true,
+  "participant_sources": [
+    {"url": "https://lolesports.com/news/worlds-2026-primer", "section": "QUALIFIED TEAMS", "checked_at": "2026-10-20", "verification": "official_list_read", "boundary": "本届参赛名单，不代表全部进入瑞士轮"},
+    {"url": "https://tips.gg/article/lol-worlds-2026-teams-rosters", "section": "Swiss Stage Rosters + Play-In Rosters", "checked_at": "2026-10-20", "verification": "independent_19_team_list_crosscheck", "boundary": "只核对参赛队集合；媒体列出的人员不升级为本场官方首发"}
+  ],
+  "team_aliases": {
+    "AL": ["Anyone’s Legend", "Anyone's Legend"], "BLG": ["Bilibili Gaming"],
+    "TES": ["Top Esports"], "IG": ["Invictus Gaming"], "GEN": ["Gen.G", "Gen G"],
+    "HLE": ["Hanwha Life Esports"], "T1": ["T1"], "DK": ["Dplus KIA"],
+    "G2": ["G2 Esports"], "MKOI": ["Movistar KOI"], "KC": ["Karmine Corp"],
+    "TLAW": ["Team Liquid", "Team Liquid Alienware", "TL"], "LYON": ["LYON"],
+    "C9": ["Cloud9", "Cloud 9"], "TSW": ["Team Secret Whales", "Secret Whales"],
+    "CFO": ["CTBC Flying Oyster", "Flying Oyster"], "MVK": ["MVK Esports"],
+    "LOS": ["LOS"], "FUR": ["FURIA"]
+  },
+  "source_hints": [
+    {"url": "https://lolesports.com/news/worlds-2026-primer", "title": "Riot：S16赛事介绍", "source_category": "official_background", "weight": "normal", "scopes": ["event"]},
+    {"url": "https://www.leagueoflegends.com/en-us/news/game-updates/league-of-legends-patch-26-20-notes/", "title": "Riot：26.20世界赛版本公告", "source_category": "official_background", "weight": "normal", "scopes": ["event"]},
+    {"url": "https://rft.gg/news/patch-26.20-worlds-lol-preview", "title": "Rémi：26.20世界赛版本推演", "published_at": "2026-10-08T11:22:18+00:00", "source_category": "author_analysis", "weight": "normal", "scopes": ["event"]},
+    {"url": "https://accountshark.net/blog/lol-patch-26-20-worlds-2026-patch-notes-guide", "title": "Rhea Koslov：26.20版本分析（商业站点）", "published_at": "2026-10-06", "source_category": "author_analysis", "weight": "low", "scopes": ["event"]},
+    {"url": "https://dpm.lol/news/worlds-2026-power-rankings-dpm-esports", "title": "DPM编辑组：S16各队打法与选手分析", "source_category": "author_analysis", "weight": "normal"},
+    {"url": "https://tips.gg/article/lol-worlds-2026-teams-rosters", "title": "Patryk Stachowiak：S16各队名单与赛前分析（商业站点）", "published_at": "2026-10-15", "source_category": "author_analysis", "weight": "low"}
+  ],
   "phase": "当前赛事阶段",
-  "knowledge_query": "LPL",
-  "plan_path": "/home/ubuntu/workspace/knowledge/wiki/小雪电竞/20_游戏理解/当前赛事/当前交易预案.md"
+  "knowledge_query": "世界赛",
+  "leagues": ["S16全球总决赛"],
+  "plan_path_template": "/home/ubuntu/workspace/knowledge/wiki/{knowledge_namespace}/20_游戏理解/当前赛事/当前交易预案.md"
 }

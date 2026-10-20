@@ -1,0 +1,5 @@
+{
+  "stock": {"subjects": ["instrument"], "events": ["earnings", "announcement", "macro", "price_move", "corporate_action"], "materials": ["filing", "news", "data", "transcript"]},
+  "football": {"subjects": ["team", "player"], "events": ["match", "lineup", "injury", "transfer", "market_move"], "materials": ["official", "news", "stats", "quote"]},
+  "lol": {"subjects": ["team", "player"], "events": ["match", "roster", "patch", "bp", "market_move"], "materials": ["official", "news", "stats", "vod_note"]}
+}

@@ -83,12 +83,12 @@ export function buildDailyTradeDraft(teamLine, context) {
   if (context?.compare) {
     const a = context.team_a || {};
     const b = context.team_b || {};
-    lines.push(`TS底表：${a.team || '-'} mu ${format1(a.mu)} / σ ${format1(a.sigma)} / TS ${format1(a.ts)}（${a.sample_confidence || '-'}，${a.volatility_tier || '-'}）；${b.team || '-'} mu ${format1(b.mu)} / σ ${format1(b.sigma)} / TS ${format1(b.ts)}（${b.sample_confidence || '-'}，${b.volatility_tier || '-'}）`);
-    lines.push(context.compare.risk_note || '', context.compare.daily_summary || '', context.compare.market_note || '');
+    lines.push(`TS：${a.team || '-'} 综合实力 ${format1(a.power_score)} / 稳定性 ${format1(a.volatility_score)}（${a.sample_confidence || '-'}，${a.volatility_tier || '-'}）；${b.team || '-'} 综合实力 ${format1(b.power_score)} / 稳定性 ${format1(b.volatility_score)}（${b.sample_confidence || '-'}，${b.volatility_tier || '-'}）`);
+    lines.push(context.compare.risk_note || '', context.compare.daily_summary || '');
   } else {
-    lines.push('TS底表：待补对手后自动带入 mu / σ / TS 对比');
+    lines.push('TS：待补对手后自动带入综合实力 / 稳定性 对比');
   }
-  lines.push('盘口 / 方向：', '赔率 / 比分：', '我的判断：', '市场分歧点：', '不碰项：', '备注 / 复盘原始记录：');
+  lines.push('盘口 / 方向：', '比分 / 临场观察：', '我的判断：', '市场分歧点：', '不碰项：', '备注 / 复盘原始记录：');
   lines.push('边界：只填盘口记录，保存到 market_notes；不自动交易，最终判断由钧钧自己定。');
   return lines.filter(Boolean).join('\n');
 }
@@ -132,7 +132,7 @@ export function buildLineupHandoffDto(values = {}) {
     source: 'market-notes',
     matchName: String(values.matchName || '').trim(),
     marketDirection: String(values.direction || '').trim(),
-    oddsScore: String(values.scoreNote || '').trim(),
+    matchObservation: String(values.scoreNote || '').trim(),
     preMatchThought: String(values.reason || '').trim(),
     review: String(values.review || '').trim(),
   };

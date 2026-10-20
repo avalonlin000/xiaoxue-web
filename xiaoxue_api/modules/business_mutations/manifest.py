@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "business_mutations",
+    "name": "业务变更",
+    "version": "1.0.0",
+    "purpose": "以统一业务变更合同更新已有正源，并对结构级或不可逆动作升级干预。",
+    "examples": ["更新 NS 的三维备注", "更新某队已确认首发", "修正既有队伍画像", "把这支库外队伍的身份和首发入库（需带来源）"],
+    "inputs": {"required": ["target_type", "target", "changes"], "optional": ["reason"]},
+    "effect": "write",
+    "reads": ["已有正式正源"],
+    "writes": ["已有正式正源（按 target_type 受限适配）"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"mode": "existing-source-only"},
+    "settings": {},
+    "dependencies": ["database", "wiki"],
+    "health": {"checks": ["database"], "reason_code": "business_mutation_unavailable"},
+    "tests": [],
+    "order": 136,
+}

@@ -67,6 +67,10 @@ class ReindexRequest(BaseModel):
     source_only: str | None = None
 
 
+class DeleteRequest(BaseModel):
+    filename: str = Field(min_length=1, max_length=300)
+
+
 def _date_from(text: str, metadata: dict) -> str:
     match = _DATE_RE.search(text[:1200])
     if match:
@@ -140,6 +144,47 @@ def _run_reindex() -> None:
     finally:
         with _reindex_lock:
             _reindex_running = False
+
+
+@app.post("/api/delete")
+def delete_entry(payload: DeleteRequest) -> dict:
+    """删除一个 TK 词条：正源移入归档 + 清掉 MemPalace 向量。"""
+    import shutil
+    from datetime import datetime
+    import chromadb
+
+    name = Path(payload.filename).name  # 防路径穿越
+    if name != payload.filename:
+        return {"ok": False, "error": "仅支持文件名，不接受路径"}
+    src_path = Path(TK_SOURCE_DIR) / name
+    if not src_path.is_file():
+        return {"ok": False, "error": f"TK 文件不存在: {name}"}
+
+    # 1) 正源移入归档（可回退，不硬删）
+    archive_dir = Path(TK_SOURCE_DIR).resolve().parents[3] / "_deleted_archives"
+    archive_dir.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now().strftime("%Y%m%d_%H%M")
+    dest_path = archive_dir / f"{name}_{stamp}"
+    shutil.move(str(src_path), str(dest_path))
+
+    # 2) 清 MemPalace 向量（drawers + closets 两处）
+    removed = 0
+    try:
+        client = chromadb.PersistentClient(path=PALACE)
+        for cname in ("mempalace_drawers", "mempalace_closets"):
+            try:
+                col = client.get_collection(cname)
+            except Exception:
+                continue
+            res = col.get(where={"source_file": str(src_path)})
+            ids = res.get("ids") or []
+            if ids:
+                col.delete(ids=ids)
+                removed += len(ids)
+    except Exception as exc:
+        return {"ok": True, "warning": f"正源已归档，但向量清理失败: {exc}", "archived_to": str(dest_path), "removed_vectors": removed}
+
+    return {"ok": True, "archived_to": str(dest_path), "removed_vectors": removed}
 
 
 @app.post("/api/reindex")

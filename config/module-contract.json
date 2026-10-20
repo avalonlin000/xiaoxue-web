@@ -1,0 +1,451 @@
+{
+  "schema": "xiaoxue-module-contract-v1",
+  "version": "1.0.0",
+  "project": "esports-trading",
+  "model_usage_guide": "docs/小雪项目总使用说明.md",
+  "tool_contract": {
+    "mcp": "xiaoxue-product",
+    "read_schema": "命名读取能力只读正源并返回精简业务字段；不让模型用终端摸库或猜入口。",
+    "write_schema": "命名写入能力只接收明确对象、身份和范围；普通小范围更新可自治，结构级动作返回干预。",
+    "structured_output": false,
+    "model_max_chars": 3000
+  },
+  "result_contract": {
+    "statuses": ["ok", "partial", "empty", "conflict", "unavailable", "error"],
+    "success": "summary/data/sources/effects 可供审计和业务组织使用。",
+    "empty": "明确返回没有数据或资料缺口，不伪造相邻对象或旧结果。",
+    "conflict": "并列返回来源、时间、冲突点和影响，不静默折中。",
+    "error": "稳定错误和可继续部分可观察，不把失败转成换口令。",
+    "write": "写入指定正源并记录副作用；未确认成功不得报成功。",
+    "readback": "写入、修正或配置变化后从正式正源重新读取，保存类结果必须带 readback。"
+  },
+  "modules": [
+    {
+      "id": "ts_strength",
+      "display_name": "TS／队伍实力展示",
+      "purpose": "查看同赛区队伍的处理后实力、稳定性、趋势、势头和状态，作为后续比较与分析的事实输入。",
+      "ownership": "电竞事实与分析",
+      "user_entry": {
+        "natural_examples": ["查 LPL 的 TS", "比较 HLE 和 GEN 的实力"],
+        "web": "队伍资料页的 TS 表"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": ["xiaoxue_get_team", "xiaoxue_get_ts_updates"],
+        "behavior": "先按当前问题读取需要的队伍或比较结果；不要求固定顺序，不把原始模型量当用户结果。"
+      },
+      "source_of_truth": {
+        "label": "活动阶段 TS 快照与展示层（国内/国际）",
+        "api": "/api/fundamentals/teams",
+        "display_path": "ts_display"
+      },
+      "read_capability": {
+        "id": "fundamentals.read",
+        "entry": "/api/fundamentals/teams",
+        "empty": "没有当前阶段展示值时明确资料不足，不用旧种子值冒充当前阶段。"
+      },
+      "bounded_write_capability": {
+        "id": "data_refresh",
+        "entry": "/api/data-refresh",
+        "scope": "后台刷新赛果和 TS；不是普通对话里的临时改值。"
+      },
+      "readback_capability": {
+        "entry": "/api/fundamentals/teams?team={team}",
+        "checks": ["team", "ts_display", "source"]
+      },
+      "analysis_capability": {
+        "id": "fundamentals.match_context",
+        "entry": "/api/fundamentals/match-context",
+        "boundary": "只提供基本面事实和差异，不替小雪作交易决定。"
+      },
+      "field_mapping": {
+        "display": {
+          "power_score": "综合实力",
+          "volatility_score": "稳定性",
+          "trend": "趋势",
+          "momentum": "势头",
+          "status": "状态"
+        },
+        "legacy_aliases": {
+          "strength_score": "power_score",
+          "stability_score": "volatility_score",
+          "conclusion_score": "status"
+        },
+        "consumer_contract": "API、前端 TS 表、日报和阵容/交易分析只消费上述展示字段。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["队伍资料页", "日报", "阵容分析", "交易判断"],
+      "status": "available",
+      "compatibility": {
+        "backend_capabilities": ["fundamentals"],
+        "frontend_loaders": ["teams"],
+        "legacy_names": ["队伍基本面", "TS 表", "三维 TS"]
+      }
+    },
+    {
+      "id": "team_profile",
+      "display_name": "队伍画像／首发／队伍资料",
+      "purpose": "查回一支队伍当前是什么队、怎么赢、怎么输、看什么、BP 往哪边走，以及当前首发和基础资料。",
+      "ownership": "队伍长期知识与事实",
+      "user_entry": {
+        "natural_examples": ["查 HLE 画像", "把 BLG 的怎么赢补充一下", "看 GEN 当前首发"],
+        "web": "队伍资料页"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": ["xiaoxue_get_team", "xiaoxue_update_team_profile", "xiaoxue_apply_business_mutation"],
+        "behavior": "画像、首发和基础事实按各自正源读取；普通小范围补充直接写回并读回，结构级或破坏性动作才干预。"
+      },
+      "source_of_truth": {
+        "label": "统一五项队伍画像与正式队伍/首发事实",
+        "api": "/api/profile-full/{team}、/api/teams、/api/rosters",
+        "profile_fields": ["positioning", "win_path", "lose_path", "key_points", "bp_tendency"]
+      },
+      "read_capability": {
+        "id": "profiles.read",
+        "entry": "/api/profile-full/{team}",
+        "empty": "统一画像没有资料时明确空态；镜像文件缺失不代表正源无数据。"
+      },
+      "bounded_write_capability": {
+        "id": "business_mutations.team_profile_or_roster",
+        "entry": "/api/team-profile/{team}、/api/business-mutations/apply",
+        "scope": "只更新已存在队伍的明确字段或人员；不自动创建队伍、不清空整表。"
+      },
+      "readback_capability": {
+        "entry": "原读入口",
+        "checks": ["五项画像", "当前首发", "更新时间", "三维兼容投影"]
+      },
+      "analysis_capability": {
+        "id": "team_profile.context",
+        "entry": "xiaoxue_get_team 的 profile 字段",
+        "boundary": "画像是当前结论，不把 TK 原文、TS 数字或交易判断改写进正文。"
+      },
+      "field_mapping": {
+        "display": {
+          "positioning": "队伍定位",
+          "win_path": "怎么赢",
+          "lose_path": "怎么输",
+          "key_points": "关键点",
+          "bp_tendency": "BP 倾向"
+        },
+        "legacy_aliases": {
+          "优势局习惯": "win_path",
+          "劣势局习惯": "lose_path",
+          "胜负手位置": "key_points"
+        },
+        "consumer_contract": "team_3d_data、Wiki 和队伍 Skill 只作兼容或展示镜像。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["队伍资料页", "当前赛事", "阵容分析", "日报", "队伍专项 Skill"],
+      "status": "available",
+      "compatibility": {
+        "backend_capabilities": ["profiles", "team_data", "business_mutations"],
+        "frontend_loaders": ["teams", "current-event"],
+        "legacy_names": ["三维", "队伍资料总览", "*-team-profile Skill", "team_3d_data"]
+      }
+    },
+    {
+      "id": "tk",
+      "display_name": "TK／交易记录",
+      "purpose": "保存和找回钧钧口述、普通 TK 与交易 TK，保持原话、来源、状态和对象身份分开。",
+      "ownership": "钧钧内容与长期材料",
+      "user_entry": {
+        "natural_examples": ["写进 TK：这场先不碰", "搜 BLG 的纪律性 TK", "把这条交易 TK 改成已确认"],
+        "web": "TK 资料库"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": ["xiaoxue_remember", "xiaoxue_search_tk", "xiaoxue_search_trading_tk", "xiaoxue_get_tk_entry", "xiaoxue_delete_tk"],
+        "behavior": "只有用户明确提到 TK 或要求写进 TK 时才调用写入工具；普通 TK 与交易 TK 共用一个资料库但语义不同：普通 TK 保存知识与方法，交易 TK 保存带适用条件、交易含义和失效条件的交易认识；交易 TK 有候选、已确认、已失效状态和复查入口，不自动升级普通 TK、当前判断或赛果。"
+      },
+      "source_of_truth": {
+        "label": "小雪电竞 TK 正源与交易 TK 词条",
+        "api": "/api/tk/remember、/api/tk/search、/api/trading-tk、/api/team-trading-notes/{team}",
+        "identities": ["钧钧口述", "普通 TK", "交易 TK"],
+        "type_contract": {
+          "ordinary": "knowledge_tk",
+          "trading": "trading_tk",
+          "legacy_trade_label": "仅兼容读取，不视为正式交易 TK",
+          "promotion": "普通 TK、当前判断、盘口记录和赛果均不自动升级为交易 TK"
+        }
+      },
+      "read_capability": {
+        "id": "tk.read",
+        "entry": "/api/tk/search、/api/tk/entry/{filename}",
+        "empty": "没有命中时说明查询范围和空态，不扫描目录猜文件。"
+      },
+      "bounded_write_capability": {
+        "id": "tk.write",
+        "entry": "/api/tk/remember、/api/trading-tk、/api/team-trading-notes",
+        "scope": "普通记录和局部修正可自治；归档、删除、批量覆盖或换正源仍属高风险。"
+      },
+      "readback_capability": {
+        "entry": "写入接口返回的 filename/readback 后再走 TK 读入口",
+        "checks": ["原始内容", "来源身份", "对象归属", "状态"]
+      },
+      "analysis_capability": {
+        "id": "tk.context",
+        "entry": "搜索结果和单条正文",
+        "boundary": "TK 是材料或钧钧判断，不自动变成画像、版本事实或交易结论。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["TK 资料库", "当前赛事", "日报", "画像维护", "交易判断"],
+      "status": "available",
+      "compatibility": {
+        "backend_capabilities": ["tk_knowledge", "market_notes"],
+        "frontend_loaders": ["tk-library", "market-notes"],
+        "legacy_names": ["market_notes", "trade_records", "队伍交易备注"]
+      }
+    },
+    {
+      "id": "current_match",
+      "display_name": "当前赛事／单场工作区",
+      "purpose": "围绕一场比赛临时组织已确认事实、焦点、判断和具体变化，随时切换而不把临时状态冒充长期知识。",
+      "ownership": "当前比赛工作状态",
+      "user_entry": {
+        "natural_examples": ["聊聊明天 HLE 打 GEN", "先看这场的阵容", "记录这场首发变化"],
+        "web": "当前赛事页"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": ["xiaoxue_prepare_match", "xiaoxue_collect_match_materials", "xiaoxue_get_match_materials", "xiaoxue_start_match_run", "xiaoxue_get_match_run", "xiaoxue_save_match_trade_entry", "xiaoxue_advance_match_run"],
+        "behavior": "按用户当前问题组合资料；建立、切换、暂停和恢复只影响临时工作状态，明确留存或记录时才写回。"
+      },
+      "source_of_truth": {
+        "label": "正式赛程/赛果与单场运行记录",
+        "api": "/api/current-event/match-desk、/api/current-event/match-run",
+        "state": ["match_runs", "match_run_facts", "match_run_entries"]
+      },
+      "read_capability": {
+        "id": "current_event.read",
+        "entry": "/api/current-event/match-desk",
+        "empty": "没有对应赛事或单场运行时分别说明，不猜比赛身份。"
+      },
+      "bounded_write_capability": {
+        "id": "current_event.write",
+        "entry": "/api/current-event/match-run/entry、/api/current-event/match-run/advance",
+        "scope": "只写本场运行记录，不写画像、TK、TS 或盘口正源。"
+      },
+      "readback_capability": {
+        "entry": "/api/current-event/match-run",
+        "checks": ["运行状态", "当前焦点", "环节记录"]
+      },
+      "analysis_capability": {
+        "id": "current_event.match_context",
+        "entry": "xiaoxue_prepare_match",
+        "boundary": "只汇总证据，不替用户自动交易或把临时观察升级为长期结论。"
+      },
+      "collection_capability": {
+        "entry": "POST /api/current-event/collection",
+        "readback": "GET /api/current-event/collection/{task_id}",
+        "batch_entry": "scripts/collect_match_materials.py",
+        "implementation_state": "released_partial",
+        "consumers": ["原单场页面的比赛资料", "日报的最新比赛材料目录", "命名MCP成果读取"],
+        "boundary": "原工作台已启用按需收集和中文要点；不是完整赛事研究或常驻提前准备。正文与搜索线索分开，不确认实时BP或报价，不写个人判断或长期知识；正式机器人新会话未验收。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["当前赛事页", "TS", "画像", "TK", "阵容分析", "交易判断"],
+      "status": "available",
+      "compatibility": {
+        "backend_capabilities": ["current_event"],
+        "frontend_loaders": ["current-event"],
+        "legacy_names": ["单场推演", "match run", "赛前底稿"]
+      }
+    },
+    {
+      "id": "version_lineup",
+      "display_name": "交易方法／版本／阵容分析",
+      "purpose": "用交易总纲、周期与实力判断、已确认版本理解和明确十英雄输入组织专业分析；方法只说明怎样看，不与队伍事实、交易决定或长期知识混写。",
+      "ownership": "LOL 专业方法",
+      "user_entry": {
+        "natural_examples": ["现在这个版本怎么玩", "BP 出来了，分析这十个英雄", "按交易方法看看这场"],
+        "web": "当前赛事与对话专项入口"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue + 专项 Skill",
+        "tools": ["xiaoxue_get_champion_context", "xiaoxue_prepare_match"],
+        "behavior": "先识别需要的专业方法；纯十英雄分析不混入 TS、队伍、盘口或赛果，交易判断另行组合证据。"
+      },
+      "source_of_truth": {
+        "label": "已确认版本知识、英雄静态资料和专业 Skill",
+        "api": "/api/champion-static/{champion}、专项 Skill",
+        "state": ["shared_version_analysis", "lol-lineup-analysis"]
+      },
+      "read_capability": {
+        "id": "lineup_and_version.read",
+        "entry": "专项 Skill 与命名产品工具",
+        "empty": "版本或阵容输入不足时明确缺口，不填造当前事实。"
+      },
+      "bounded_write_capability": {
+        "id": "knowledge.structured_update",
+        "entry": "版本/画像/TK 各自正式入口",
+        "scope": "普通补充按目标写回对应正源；结构级新增方法才进入工程改造。"
+      },
+      "readback_capability": {
+        "entry": "对应版本、英雄资料或分析入口",
+        "checks": ["输入身份", "来源时间", "边界说明", "分析结果"]
+      },
+      "analysis_capability": {
+        "id": "lol-lineup-analysis",
+        "entry": "专项 Skill",
+        "boundary": "纯阵容结论和交易结论分层，不让一种方法替代另一种。"
+      },
+      "extension_kind": "structural_capability",
+      "consumers": ["当前赛事", "日报", "阵容分析", "交易系统"],
+      "status": "partial",
+      "compatibility": {
+        "backend_capabilities": ["lineup", "champion_static", "current_event"],
+        "frontend_loaders": ["current-event"],
+        "legacy_names": ["BP 长报告", "阵容八步法", "版本理解"]
+      }
+    },
+    {
+      "id": "daily_knowledge",
+      "display_name": "日报／知识维护",
+      "purpose": "读取日报、版本理解、画像维护和 TK 整理的日常结果；将后台产物转成可查回的业务内容。",
+      "ownership": "日常内容与长期知识",
+      "user_entry": {
+        "natural_examples": ["看今天日报", "把这阶段的 TK 整理一下", "更新 BLG 画像"],
+        "web": "日报与阶段整理页"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue + 对应知识 Skill",
+        "tools": ["xiaoxue_get_today", "xiaoxue_list_stage_candidates", "xiaoxue_update_team_profile"],
+        "behavior": "按用户目标进入日报、版本、画像或 TK 的独立能力；不把后台流水线伪装成日常固定步骤。"
+      },
+      "source_of_truth": {
+        "label": "日报产物、共享版本理解、队伍画像和 TK 各自正源",
+        "api": "/api/daily-content、/api/stage-review/candidates",
+        "state": ["shared_version_analysis", "team_profiles", "TK 正源"]
+      },
+      "read_capability": {
+        "id": "daily_knowledge.read",
+        "entry": "/api/daily-content、/api/stage-review/candidates",
+        "empty": "日报未生成或整理材料不足时明确状态，不把入口存在当成产物存在。"
+      },
+      "bounded_write_capability": {
+        "id": "knowledge.ordinary_update",
+        "entry": "版本、画像、TK 各自命名写入能力",
+        "scope": "普通范围直接完成并读回；整包覆盖、删除或换正源仍需干预。"
+      },
+      "readback_capability": {
+        "entry": "对应正源读取入口",
+        "checks": ["内容身份", "适用时间", "状态", "来源或证据"]
+      },
+      "analysis_capability": {
+        "id": "knowledge.loop",
+        "entry": "xiaoxue-knowledge-loop",
+        "boundary": "维护候选、事实、用户判断和长期知识分层；不自动裁决冲突。"
+      },
+      "report_delivery": {
+        "receipt": "daily_run_manifest_{date}.json",
+        "readback": "/api/daily-content 的 report 与 latest_matches",
+        "implementation_state": "released_partial",
+        "reader_entry": "原项目中心日报状态卡的已验证成品链接",
+        "boundary": "报告文件存在不等于发布通过；已发布冻结报告与后续单场最新材料分开，不自动重新发布或启用排程。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["日报页", "阶段整理页", "当前赛事", "对话"],
+      "status": "partial",
+      "compatibility": {
+        "backend_capabilities": ["daily_content", "profiles", "tk_knowledge", "current_event"],
+        "frontend_loaders": ["stage-review", "current-event"],
+        "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
+      }
+    },
+    {
+      "id": "knowledge_automation",
+      "display_name": "知识维护与自动化后台",
+      "purpose": "提供数据刷新、知识导入、日报生成、索引和巡检等后台供给，不把后台任务冒充用户日常模块。",
+      "ownership": "后台运行保障",
+      "user_entry": {
+        "natural_examples": ["检查自动化任务", "刷新数据", "今天日报为什么没生成"],
+        "web": "后台观察与健康入口"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue + Hermes 原生自动化能力",
+        "tools": ["xiaoxue_refresh_results_and_ts", "Hermes cronjob"],
+        "behavior": "仅在用户明确涉及刷新、任务或巡检时使用；任务状态和业务结果分开读回。"
+      },
+      "source_of_truth": {
+        "label": "数据就绪凭据、定时任务和导入回执",
+        "api": "/api/data-refresh、/api/health",
+        "state": ["data_readiness manifest", "Hermes cronjob"]
+      },
+      "read_capability": {
+        "id": "automation.health",
+        "entry": "/api/health 与 Hermes cronjob",
+        "empty": "没有任务或当天产物时分别说明，不声称自动化已完成业务结果。"
+      },
+      "bounded_write_capability": {
+        "id": "automation.run",
+        "entry": "Hermes 原生 cronjob 或明确刷新入口",
+        "scope": "批量覆盖、发布、删除和生产自动化变化属于结构级或高风险动作。"
+      },
+      "readback_capability": {
+        "entry": "任务回执、健康和对应业务正源",
+        "checks": ["任务状态", "业务产物", "正源读回", "失败原因"]
+      },
+      "analysis_capability": {
+        "id": "automation.diagnosis",
+        "entry": "健康与回执检查",
+        "boundary": "后台只供给和报告事实，不替小雪决定业务结论。"
+      },
+      "extension_kind": "structural_capability",
+      "consumers": ["日报", "TS", "知识导入", "巡检", "小白观察面"],
+      "status": "partial",
+      "compatibility": {
+        "backend_capabilities": ["platform", "daily_content", "weread_bridge"],
+        "frontend_loaders": [],
+        "legacy_names": ["后台", "数据刷新", "定时任务", "巡检"]
+      }
+    },
+    {
+      "id": "attention_config",
+      "display_name": "关注队伍／赛事配置",
+      "purpose": "维护关注范围、队伍别名和当前赛事范围，让新增对象通过配置接入而不是临时拼装代码。",
+      "ownership": "项目配置",
+      "user_entry": {
+        "natural_examples": ["把这支队加入关注", "当前关注 LPL 哪些队", "切换当前赛事"],
+        "web": "配置与当前赛事入口"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": ["xiaoxue_query_readonly_api", "Hermes 配置能力"],
+        "behavior": "读取或修改已有配置范围；结构级新增分类或正源才进入工程改造。"
+      },
+      "source_of_truth": {
+        "label": "项目配置和当前赛事配置",
+        "api": "/api/health、当前赛事配置入口",
+        "state": ["config/workflows.json", "current_event/config.json"]
+      },
+      "read_capability": {
+        "id": "attention.read",
+        "entry": "配置读取入口",
+        "empty": "没有配置项时明确当前范围，不猜默认关注对象。"
+      },
+      "bounded_write_capability": {
+        "id": "attention.reversible_change",
+        "entry": "配置维护入口",
+        "scope": "普通范围调整可撤回；增加新模块、分类或正源属于结构级变更。"
+      },
+      "readback_capability": {
+        "entry": "同一配置读取入口",
+        "checks": ["生效范围", "别名", "恢复方式"]
+      },
+      "analysis_capability": {
+        "id": "attention.context",
+        "entry": "当前赛事与关注范围组合",
+        "boundary": "配置改变可见范围，不改变事实正源和小雪业务人格。"
+      },
+      "extension_kind": "ordinary_content",
+      "consumers": ["赛程", "日报", "当前赛事", "队伍资料"],
+      "status": "partial",
+      "compatibility": {
+        "backend_capabilities": ["current_event", "platform"],
+        "frontend_loaders": ["current-event", "teams"],
+        "legacy_names": ["关注分级", "当前赛事配置", "队伍别名"]
+      }
+    }
+  ]
+}
