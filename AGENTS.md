@@ -11,13 +11,21 @@
 - `/home/ubuntu/life-os-frontend-v2/packages/xiaoxue-web/` 不是当前主入口。
 - Hermes 产品入口：`scripts/hermes/xiaoxue_product_mcp.py` 是唯一 `xiaoxue-product` MCP Server；Agent 新功能作为其中命名明确的工具接入，不新增平行 Server。
 
+## 沙箱禁令（2026-10-21 钧钧明确要求）
+
+- 本机 Codex 沙箱（bubblewrap / user namespaces）有兼容问题，可能反复卡在授权或执行失败；禁止使用任何带沙箱的执行方式。
+- 执行命令一律走普通路径：不加 `sandbox_permissions: require_escalated`，不申请提权，不触发 approval 弹窗。
+- 默认配置已固定为 `sandbox_mode = "danger-full-access"` + `approval_policy = "never"`；后续任何客户端、插件或 Skill 不得改回沙箱模式。
+
 ## 项目事实
 
-- `/api/market-notes` 是当前盘口/交易记录主链路；旧 `/api/trades` 仅作兼容。
+- 盘口/交易记录正源是交易 TK，正式写入使用 `/api/trading-tk`；`/api/market-notes` 是只读投影，旧 `/api/trades` 只读兼容，均不恢复旧表写入。
 - 队伍交易备注跟随队伍 TK，使用 `type=trading_note`；队伍不明确时不落库。
 - BP 后阵容分析由 `lol-lineup-analysis` 提供判断，前端只整理输入、复制提示和复盘沉淀。
 - 固定工作流配置以 `config/workflows.json` 为准；今日内容、队伍别名和市场枚举优先改配置，不回写 `main.py` 常量。
-- `market_notes` 复盘先预览，确认后只写回原记录；不自动写 TK、画像或三维。
+- 交易 TK 的复查经明确确认后用原入口更新原条目；不因普通讨论自动写入、认可或修改画像、三维。
+- 当前赛事近期准备窗口由 `xiaoxue_api/modules/current_event/config.json` 的 `preparation.upcoming_days` 声明；源码默认 7 天。生产是否已采用该版本以交付证据为准。
+- `dist/` 由正式服务直接提供；未授权发布时，构建使用独立 `--outDir`，不能把默认构建当成无副作用检查。
 
 ## 边界与验收
 

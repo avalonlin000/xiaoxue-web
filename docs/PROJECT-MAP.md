@@ -1,5 +1,7 @@
 # 小雪项目地图（AI 开发导航·改前必读第一份）
 
+> 整体重构入口：[PRD](小雪整体重构-PRD.md) 与 [SSD](小雪整体重构-SSD.md)。本次约定快速收尾已上线，最终证据和限制见SSD第12节；批次及有限恢复合同仍见第3A节。8场均有可读要点，但均为部分整理；自然飞书入站、未来连续产出和研究质量不冒称通过。本地图不重复任务台账，也不因旧阶段状态续开已收尾工程。
+
 > 这份文件的作用：**让任何 AI（小白、Codex、小雪）在改这个小雪项目前，只读一份就能看到全貌——项目分几块、每块在哪、正源是谁、改某功能牵连哪几处、哪些文档是权威哪些别信。**
 >
 > 它**不是**把所有实现塞进来，它是一根"导航指针"：看完它你该知道去哪看细节。细节在各自模块和对应的权威文档里。
@@ -36,7 +38,7 @@
 | tk-library-and-search（TK资料库） | `tk_knowledge` + `src/modules/tk-library` | `/api/tk/search`, `/api/tk/library` | TK 检索（MemPalace） |
 | project-center-and-feedback（项目中心） | `project_center` + `src/modules/project-center` | `/api/project-center/*` | 开发模块树+待修改/交付；版本理解仅显示状态 |
 | stage-review-candidates（阶段整理） | `current_event`, `tk_knowledge` + `src/modules/stage-review` | `/api/stage-review/*` | 长期候选 |
-| market-and-live-records（盘口记录） | `market_notes` + `src/modules/market-notes` | `/api/market-notes` | 盘口/交易 TK |
+| market-and-live-records（盘口记录） | `tk_knowledge` 为写入正源；`market_notes` + `src/modules/market-notes` 保留兼容 | `/api/trading-tk`；`/api/market-notes` 仅只读投影 | 盘口/交易 TK；不恢复退役写接口 |
 | pure-ten-lineup（阵容分析） | `lineup` + `src/modules/lineup-handoff` | `/api/lineup-workflow/prepare` | BP 阵容 |
 | **version-understanding（版本理解）** | `version_understanding`（后端）+ current-event（前端展示） | `/api/version-understanding/global/current` | 数据库 `shared_version_analysis` |
 
@@ -46,6 +48,8 @@
 
 | 文档 | 读者 | 权威程度 | 说明 |
 |---|---|---|---|
+| `docs/小雪整体重构-PRD.md` | 钧钧/产品方向 | **本次整体重构专项 PRD** | 本轮讨论收束，继承总体产品，不另建系统 |
+| `docs/小雪整体重构-SSD.md` | 执行者 | **本次整体重构专项 SSD** | 第3A节规定关注窗口逐场补齐、有限恢复、批次结果和验收；单场与页面历史证据见第10节 |
 | `docs/交易信息系统-总体设计.md` | 钧钧/产品方向 | **唯一 PRD 正源** | 统一骨架、内容归位、角色边界、对象扩展和产品完成标准 |
 | `docs/LOL信息与自动化整合-PRD.md` | 钧钧/产品方向 | **本立项 PRD（范围展开）** | LOL 线的信息收拢与自动化跟随赛程；骨架以总体设计为准，不另立平行产品 |
 | `docs/当前赛事信息收集能力重构-PRD.md` | 钧钧/小白 | **当前赛前整合 PRD（2026-10-20，已确认）** | 标题《小雪赛前内容整合与自动准备》；内容补齐、实质合并、可见判断入口与赛前可读，纯阵容/BP不在本次范围；未按本版验收 |
@@ -78,12 +82,13 @@
 ## 六、改前的通用流程（防只见局部）
 
 - 当前事实快照（2026-10-07）：单场主链统一为 `match_runs` / facts / entries / revisions；`match-workspace`、研究档案和旧观察表只保留兼容读与退役观察，不再作为活跃容器。
+- 整体重构接点：`current_event/preparation.py` 管近期窗口、开赛时刻与明确赛事别名，`evidence.py` 管共享公开依据及可读来源投影，`trade_plan.py` 管预案存储兼容与条目合成，`match_records.py` 管记录词汇、栏目和纯展示投影。身份、明确写入、暂停恢复和冻结编排仍由原 service／repository 承担；不新增产品入口或正源。批次施工合同见《小雪整体重构-SSD》第3A节；局部结果和缺口见第10节。
 
 1. 读 `AGENTS.md`（项目事实）+ 本文件（项目地图）
 2. 定位要改的是哪块（前端/后端/数据/Skill/配置）→ 找上面对应的正源
 3. 读 `memory-bank/modules.md` 里那一块的边界（"不动什么"）
 4. 确认改动影响面（牵了哪些模块/表/接口，见第三节）
-5. 小步改 → `npm run build` / `py_compile` → 相关测试 → 真实入口验证 → 更新 `memory-bank/progress.md`
+5. 小步改 → 隔离 outDir 构建 / `py_compile` → 相关测试 → 授权范围内真实入口验证 → 更新现有 sync；`memory-bank/progress.md` 保留导航。根 `dist/` 由正式服务直接提供，未授权发布不得覆盖。
 
 ### 跨模块改造如何实际使用地图
 
