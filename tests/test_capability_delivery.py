@@ -113,6 +113,9 @@ def test_api_projection_still_rejects_missing_nested_contract_paths(monkeypatch)
 
 
 def test_agent_tool_readback_rejects_missing_manifest_field(monkeypatch):
+    # The product MCP server pins fastmcp + mcp 1.x, which cannot share an
+    # interpreter with Hermes' mcp 2.0; skip where the adapter is not importable.
+    pytest.importorskip("fastmcp", reason="产品 MCP 运行环境不可用，用 python3 scripts/run_tests.py 跑全量")
     async def fake_get_team(*, team):
         assert team == "KT"
         return json.dumps({

@@ -8,6 +8,8 @@ from pathlib import Path
 from unittest import IsolatedAsyncioTestCase, mock
 from zoneinfo import ZoneInfo
 
+import pytest
+
 
 def _candidate_path() -> Path:
     configured = os.environ.get("XIAOXUE_PRODUCT_MCP_CANDIDATE", "").strip()
@@ -28,7 +30,16 @@ def _load_candidate():
     return module
 
 
-adapter = _load_candidate()
+try:
+    adapter = _load_candidate()
+    import_error = None
+except ImportError as exc:  # the server runs in its own venv, not the workbench one
+    adapter, import_error = None, exc
+
+pytestmark = pytest.mark.skipif(
+    adapter is None,
+    reason=f"产品 MCP 运行环境不可用，用 python3 scripts/run_tests.py 跑全量：{import_error}",
+)
 
 
 class JudgmentEntryMCPTests(IsolatedAsyncioTestCase):

@@ -6,12 +6,23 @@ import os
 from pathlib import Path
 from unittest import IsolatedAsyncioTestCase, mock
 
+import pytest
+
 
 candidate = Path(os.environ.get("XIAOXUE_PRODUCT_MCP_CANDIDATE", "").strip() or
                  Path(__file__).resolve().parents[1] / "scripts/hermes/xiaoxue_product_mcp.py")
-spec = importlib.util.spec_from_file_location("xiaoxue_prepared_reader_candidate", candidate)
-adapter = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(adapter)
+try:
+    spec = importlib.util.spec_from_file_location("xiaoxue_prepared_reader_candidate", candidate)
+    adapter = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(adapter)
+    import_error = None
+except ImportError as exc:  # the server runs in its own venv, not the workbench one
+    adapter, import_error = None, exc
+
+pytestmark = pytest.mark.skipif(
+    adapter is None,
+    reason=f"产品 MCP 运行环境不可用，用 python3 scripts/run_tests.py 跑全量：{import_error}",
+)
 
 
 def prepared():
