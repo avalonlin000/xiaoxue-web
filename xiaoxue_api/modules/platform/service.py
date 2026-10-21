@@ -27,13 +27,22 @@ def health() -> dict:
     checks["daily_operation"] = get_operating_state()
     module_health = project_module_health(checks, _boot_status)
     return {
-        "ok": all(item.get("ok", True) if isinstance(item, dict) else bool(item) for item in checks.values()),
+        "ok": all(_check_passed(item) for item in checks.values()),
         "status": module_health["status"],
         "modules": module_health["modules"],
         "capabilities": module_health["capabilities"],
         "service": "xiaoxue-workbench-api", "time": datetime.now().isoformat(timespec="seconds"),
         "checks": checks,
     }
+
+
+def _check_passed(value) -> bool:
+    """A dependency that is not produced yet is a wait, not an outage."""
+    if isinstance(value, dict):
+        if "ok" not in value:
+            return True
+        return bool(value.get("ok")) or value.get("state") == "not_due"
+    return bool(value)
 
 
 def links(team: str = "") -> dict:

@@ -263,6 +263,58 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertFalse(payload["checks"]["data_readiness"]["ok"])
         self.assertEqual(payload["checks"]["data_readiness"]["status"], "missing_or_blocked")
 
+    def test_readiness_before_due_is_waiting_not_failure(self) -> None:
+        from xiaoxue_api.modules.platform import repository as platform_repository
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        due = (now + timedelta(minutes=10)).strftime("%H:%M")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+            os.environ, {"XIAOXUE_READINESS_ROOT": directory, "XIAOXUE_READINESS_DUE": due}
+        ):
+            readiness = platform_repository.readiness_check()
+
+        self.assertFalse(readiness["ok"])
+        self.assertEqual(readiness["state"], "not_due")
+        self.assertIn("05:30", readiness["message"])
+        self.assertTrue(readiness["due_at"])
+
+    def test_readiness_after_due_counts_as_failure(self) -> None:
+        from xiaoxue_api.modules.platform import repository as platform_repository
+        from datetime import datetime, timedelta
+
+        now = datetime.now()
+        past = now - timedelta(minutes=5)
+        due = "00:00" if past.date() != now.date() else past.strftime("%H:%M")
+        with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
+            os.environ, {"XIAOXUE_READINESS_ROOT": directory, "XIAOXUE_READINESS_DUE": due}
+        ):
+            readiness = platform_repository.readiness_check()
+
+        self.assertEqual(readiness["state"], "failed")
+        self.assertEqual(readiness["status"], "missing_or_blocked")
+
+    def test_daily_module_waits_instead_of_reporting_broken_before_due(self) -> None:
+        from xiaoxue_api.modules.platform import service as platform_service
+        from xiaoxue_api.modules.daily_content.manifest import MODULE
+
+        waiting = {"ok": False, "state": "not_due", "status": "not_due", "message": "今日数据尚未生成：每天 05:30 自动刷新，05:45 前属正常等待"}
+        with mock.patch.object(
+            platform_service.repository, "collect_checks", return_value={"data_readiness": waiting}
+        ), mock.patch.object(
+            platform_service, "_boot_status", {"daily_content": {"status": "ok", "manifest": MODULE}}
+        ), mock.patch.object(
+            platform_service, "get_operating_state", return_value={"state": "active", "message": ""}
+        ):
+            payload = platform_service.health()
+
+        module = payload["modules"]["daily_content"]
+        self.assertEqual(module["status"], "pending")
+        self.assertEqual(module["reason_code"], "readiness_not_due")
+        self.assertIn("05:30", module["message"])
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["status"], "healthy")
+
     def test_health_reports_user_paused_daily_as_disabled_not_broken(self) -> None:
         from xiaoxue_api.modules.platform.public import health
 

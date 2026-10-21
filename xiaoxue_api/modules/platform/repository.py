@@ -47,8 +47,10 @@ def collect_checks() -> dict:
 
 
 def readiness_check() -> dict:
-    date = datetime.now().strftime("%Y-%m-%d")
+    now = datetime.now()
+    date = now.strftime("%Y-%m-%d")
     path = os.path.join(os.environ.get("XIAOXUE_READINESS_ROOT", "/home/ubuntu/lol_data/scripts"), f"data_readiness_manifest_{date}.json")
+    due = readiness_due(now)
     try:
         with open(path, encoding="utf-8") as source:
             readiness = json.load(source)
@@ -68,8 +70,38 @@ def readiness_check() -> dict:
         and str(readiness.get("created_at") or "")[:10] == date and readiness.get("ok") is True
         and readiness.get("mode") == "full" and all(stage_ok(item) for item in ("scoregg_refresh", "ts_update"))
     )
-    status = "ready" if ok else "diagnostic_only" if isinstance(readiness, dict) and readiness.get("mode") == "check-only" else "missing_or_blocked"
-    return {"ok": ok, "path": path, "status": status}
+    if ok:
+        status, state = "ready", "ready"
+    elif isinstance(readiness, dict) and readiness.get("mode") == "check-only":
+        status, state = "diagnostic_only", "failed"
+    elif readiness is None and now < due:
+        # The daily pipeline runs at 05:30; before its scheduled slot there is
+        # nothing to read yet, which is a normal wait rather than a fault.
+        status, state = "not_due", "not_due"
+    else:
+        status, state = "missing_or_blocked", "failed"
+    message = readiness_message(status, due)
+    return {"ok": ok, "path": path, "status": status, "state": state, "due_at": due.isoformat(timespec="minutes"), "message": message}
+
+
+def readiness_due(now: datetime) -> datetime:
+    """Scheduled slot of the daily data pipeline; later than this counts as a fault."""
+    raw = os.environ.get("XIAOXUE_READINESS_DUE", "05:45")
+    try:
+        hour, minute = (int(part) for part in str(raw).split(":", 1))
+        return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    except (TypeError, ValueError):
+        return now.replace(hour=5, minute=45, second=0, microsecond=0)
+
+
+def readiness_message(status: str, due: datetime) -> str:
+    if status == "ready":
+        return ""
+    if status == "not_due":
+        return f"今日数据尚未生成：每天 05:30 自动刷新，{due:%H:%M} 前属正常等待"
+    if status == "diagnostic_only":
+        return "今日数据只做过检查模式，没有正式刷新结果"
+    return "今日数据没有生成或未通过检查，需要重新刷新"
 
 
 def index_path() -> str:

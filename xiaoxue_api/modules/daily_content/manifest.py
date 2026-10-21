@@ -15,6 +15,7 @@ MODULE = {
     "health": {
         "checks": ["data_readiness"],
         "reason_code": "readiness_missing",
+        "deferred_reason_code": "readiness_not_due",
         "pause_check": "daily_operation",
         "pause_state": "paused_by_user"
     },

@@ -58,11 +58,28 @@ def _project_manifest_health(
             return
 
     required_checks = health.get("checks") or []
-    outcomes = [_check_ok(checks.get(key)) for key in required_checks]
+    states = {key: _check_state(checks.get(key)) for key in required_checks}
     mode = health.get("check_mode", "all")
-    available = any(outcomes) if mode == "any" else all(outcomes)
+    values = list(states.values())
+    if not values:
+        # A capability that declares no runtime check is healthy by declaration.
+        registry.healthy(module_id, message=health.get("message") or "")
+        return
+    available = any(value == "ok" for value in values) if mode == "any" else all(value == "ok" for value in values)
     if available:
         registry.healthy(module_id, message=health.get("message") or "")
+        return
+
+    if all(value in {"ok", "deferred"} for value in values):
+        # Dependencies that are simply not produced yet: report the wait, not a fault.
+        deferred_message = next(
+            (checks[key].get("message") for key in required_checks if states[key] == "deferred"), ""
+        )
+        registry.pending(
+            module_id,
+            reason_code=health.get("deferred_reason_code") or "dependency_not_due",
+            message=deferred_message or health.get("deferred_message") or "依赖内容按计划生成中",
+        )
         return
 
     registry.broken(
@@ -72,7 +89,10 @@ def _project_manifest_health(
     )
 
 
-def _check_ok(value: Any) -> bool:
+def _check_state(value: Any) -> str:
+    """ok / deferred (not produced yet) / failed."""
     if isinstance(value, dict):
-        return bool(value.get("ok"))
-    return bool(value)
+        if value.get("state") == "not_due" and not value.get("ok"):
+            return "deferred"
+        return "ok" if value.get("ok") else "failed"
+    return "ok" if value else "failed"

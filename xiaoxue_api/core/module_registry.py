@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Literal
 
 
-ModuleState = Literal["healthy", "broken", "disabled"]
+ModuleState = Literal["healthy", "pending", "broken", "disabled"]
 CapabilityEffect = Literal[
     "read",
     "temporary",
@@ -227,6 +227,18 @@ class ModuleRegistry:
 
     def disabled(self, module_id: str, name: str = "", *, message: str = "") -> None:
         self._set(self._status(module_id, name, "disabled", message=message))
+
+    def pending(
+        self,
+        module_id: str,
+        name: str = "",
+        *,
+        reason_code: str,
+        message: str,
+    ) -> None:
+        self._set(
+            self._status(module_id, name, "pending", reason_code=reason_code, message=message)
+        )
 
     def _status(
         self,

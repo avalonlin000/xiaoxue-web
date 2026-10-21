@@ -386,11 +386,12 @@ def _public_module(module: dict[str, Any], content: dict[str, Any], runtime_by_m
     mapping = content["module_mapping"].get(module["id"], {})
     runtime_states = [runtime_by_module.get(capability, {}).get("status") for capability in module["compatibility"].get("backend_capabilities", [])]
     runtime = _module_runtime(runtime_states, module["status"])
-    if any(
-        runtime_by_module.get(capability, {}).get("reason_code") == "readiness_missing"
-        for capability in module["compatibility"].get("backend_capabilities", [])
-    ):
-        runtime["reason"] = "当天数据就绪信息缺失；不能据此确认日报产物或自动化执行成功"
+    for capability in module["compatibility"].get("backend_capabilities", []):
+        reason_code = runtime_by_module.get(capability, {}).get("reason_code")
+        if reason_code == "readiness_missing":
+            runtime["reason"] = "当天数据就绪信息缺失；不能据此确认日报产物或自动化执行成功"
+        elif reason_code == "readiness_not_due":
+            runtime["reason"] = "今天的数据按 05:30 自动刷新，现在还没到生成时点"
     entry = {
         "type": mapping.get("entry_type", "chat"), "label": mapping.get("entry_label", "在小雪对话使用"),
         "page": mapping.get("page", ""), "chat_prompt": mapping.get("chat_prompt", "聊聊这个模块"),

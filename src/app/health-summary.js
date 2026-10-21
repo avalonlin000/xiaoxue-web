@@ -5,6 +5,7 @@ export function summarizeModuleHealth(backend = {}, frontend = {}) {
   const items = [...backendItems, ...frontendFailures];
   const healthy = items.filter((item) => item.status === 'healthy').length;
   const broken = items.filter((item) => item.status === 'broken');
+  const pending = items.filter((item) => item.status === 'pending');
   const disabled = items.filter((item) => item.status === 'disabled');
   const status = backend.status === 'broken'
     ? 'broken'
@@ -12,11 +13,14 @@ export function summarizeModuleHealth(backend = {}, frontend = {}) {
       ? 'degraded'
       : 'healthy';
 
-  const text = status === 'healthy'
-    ? `${healthy} 个模块可用`
-    : `${healthy} 可用 · ${broken.length} 待修`;
+  const text = broken.length > 0 || backend.status === 'broken'
+    ? `${healthy} 可用 · ${broken.length} 待修`
+    : pending.length > 0
+      ? `${healthy} 可用 · ${pending.length} 待生成`
+      : `${healthy} 个模块可用`;
   const details = [
     ...broken.map((item) => `${item.name || item.id}：${item.message || '暂时不可用'}`),
+    ...pending.map((item) => `${item.name || item.id}：${item.message || '按计划生成中'}`),
     ...disabled.map((item) => `${item.name || item.id}：暂未启用`),
   ];
   return { status, text, details };
