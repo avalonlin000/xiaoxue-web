@@ -53,6 +53,40 @@ def test_unchanged_dependencies_reuse_result_without_new_generation(store):
     assert collection.prepare_scope(values, dispatch=False)["task"]["generation"] == task["generation"]
 
 
+@pytest.mark.parametrize("failed,changed,preserved", [
+    ("digest", "internal", {"external"}),
+    ("external", "analysis", {"internal"}),
+    ("internal", "analysis", {"external"}),
+])
+def test_changed_input_generation_does_not_inherit_failed_checkpoint_as_completed(store, failed, changed, preserved):
+    values, task = complete_scope()
+    path = repository.root() / task["id"] / "checkpoint.json"
+    checkpoint = repository._load(path)
+    checkpoint["stages"][failed] = {"failed": True, "sections": [], "limitations": ["前一轮未完成"]}
+    repository._save(path, checkpoint)
+    store[changed] += "-new"
+    current = collection.prepare_scope(values, dispatch=False)["task"]
+    stages = repository.read_checkpoint(current)["stages"]
+    assert current["generation"] == task["generation"] + 1
+    assert failed not in stages
+    assert "analysis" not in stages
+    if failed in {"external", "internal"}:
+        assert "digest" not in stages
+    assert preserved <= set(stages)
+
+
+def test_unchanged_external_fetch_cannot_resurrect_a_failed_digest(store):
+    values, task = complete_scope()
+    path = repository.root() / task["id"] / "checkpoint.json"
+    checkpoint = repository._load(path)
+    checkpoint["stages"]["digest"] = {"failed": True, "sections": [], "limitations": ["前一轮未完成"]}
+    repository._save(path, checkpoint)
+    store["external"] += "-new"
+    current = collection.prepare_scope(values, dispatch=False)["task"]
+    saved = repository.read_checkpoint(current)
+    assert "digest" not in saved.get("reusable_stages", {})
+
+
 def test_source_revision_invalidates_external_digest_but_keeps_internal(store):
     values, _ = complete_scope()
     store["external"] = "sources-v2"
@@ -102,7 +136,7 @@ def test_scope_analysis_executes_original_method_without_fake_match(store):
     import json
     from xiaoxue_api.modules.current_event import analysis_repository as analysis
 
-    sections = [{"id": "version", "items": [{"text": "旧26.16认识", "applicability": "unverified"}]}, {"id": "digest", "items": [{"text": "官方26.20版本调整", "kind": "reported_information", "source_category": "official_background", "evidence_quote": "Patch 26.20 changes", "source_id": "source1"}]}]
+    sections = [{"id": "version", "items": [{"text": "旧26.16认识", "applicability": "unverified"}]}, {"id": "digest", "selection_status": "screened", "items": [{"text": "官方26.20版本调整", "kind": "reported_information", "source_category": "official_background", "evidence_quote": "Patch 26.20 changes", "source_id": "source1"}]}]
     response = {"items": [{"method_id": "version", "text": "旧26.16认识需要在26.20重新检验。", "basis": "官方已明确比赛版本变化", "confirmation": "新版本比赛出现对应效果", "invalidation": "旧赢法不再适配", "source_ids": ["I1", "I2"]}]}
     with patch.object(repository, "call_digest_model", return_value=json.dumps(response, ensure_ascii=False)) as model:
         outputs, missing = real_analyze_scope({"scope": "event", "event": "S16"}, sections)

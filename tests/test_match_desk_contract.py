@@ -23,6 +23,19 @@ def team_row(team: str, *, mu: float, sigma: float, seed_mu: float | None = None
 
 
 class FundamentalsMatchContextTests(unittest.TestCase):
+    def test_different_or_unverified_regions_do_not_generate_rating_differences(self):
+        for regions in (("LCK", "LPL"), ("INTL", "INTL"), ("", "")):
+            with self.subTest(regions=regions):
+                sides = [{"team": team, "region": region, "mu": mu, "sigma": 1, "ts": mu - 3,
+                          "power_score": mu, "volatility_score": 70}
+                         for team, region, mu in zip(("A", "B"), regions, (80, 30))]
+                result = fundamentals_service._build_match_context(*sides)
+                self.assertFalse(result["comparable"])
+                self.assertTrue(result["reason"])
+                for key in ("mu_diff", "sigma_diff", "ts_diff", "power_diff", "stability_diff", "stronger"):
+                    self.assertIsNone(result[key])
+                self.assertNotIn("明显领先", result["daily_summary"])
+
     def test_generic_match_uses_current_team_ts_instead_of_msi_seed(self):
         rows = {
             "A": team_row("A", mu=30, sigma=1, seed_mu=35, seed_sigma=2),
@@ -48,6 +61,23 @@ class FundamentalsMatchContextTests(unittest.TestCase):
 
 
 class MatchDeskContractTests(unittest.TestCase):
+    def test_one_desk_read_reuses_the_same_framework_for_the_plan(self):
+        framework = {"items": [], "call_order": []}
+        with (
+            patch.object(current_event_service, "get_match_context", return_value={}),
+            patch.object(current_event_service, "_team_evidence", return_value={}),
+            patch.object(current_event_service, "_trading_notes", return_value=[]),
+            patch.object(current_event_service, "get_match_workspace", return_value={}),
+            patch.object(current_event_service, "get_match_run", return_value={"exists": False}),
+            patch.object(current_event_service, "_match_trading_framework", return_value=framework) as build,
+            patch.object(current_event_service, "_trade_plan", return_value={}) as plan,
+        ):
+            payload = current_event_service.get_match_desk("A", "B", "LPL", match_time="17:00")
+
+        self.assertEqual(build.call_count, 1)
+        self.assertIs(payload["trading_framework"], framework)
+        self.assertIs(plan.call_args.args[1], framework)
+
     def test_match_desk_keeps_quantitative_and_qualitative_evidence_separate(self):
         context = {
             "event": "LPL", "team_a": {"team": "A"}, "team_b": {"team": "B"}, "compare": {"ts_diff": 2.4},

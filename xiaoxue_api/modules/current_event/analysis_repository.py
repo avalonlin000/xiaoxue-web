@@ -10,6 +10,7 @@ import subprocess
 from zoneinfo import ZoneInfo
 
 from . import collection_repository as repository
+from .evidence import public_inputs, readable_evidence
 
 
 SKILLS = Path("/home/ubuntu/.agents/skills")
@@ -55,11 +56,11 @@ def collect_library(identity: dict) -> tuple[list[dict], list[str]]:
 
 def collect_inputs(identity: dict, sections: list[dict]) -> list[dict]:
     from .service import list_score_match_results
-    from xiaoxue_api.modules.fundamentals.public import get_match_context
+    from xiaoxue_api.modules.fundamentals.public import get_match_context, can_compare_team_ratings
     # Present-day knowledge must not become historical pre-match evidence.
     if date.fromisoformat(identity["match_date"]) < datetime.now(ZoneInfo("Asia/Shanghai")).date():
         return []
-    evidence = []
+    evidence = public_inputs(sections)
     for section in sections:
         if not section.get("id", "").startswith("team_") and section.get("id") != "knowledge":
             continue
@@ -72,7 +73,7 @@ def collect_inputs(identity: dict, sections: list[dict]) -> list[dict]:
         context = get_match_context(identity["team_a"], identity["team_b"], event=identity.get("event", ""))
         sides = [context.get(side) or {} for side in ("team_a", "team_b")]
         # INTL is an event bucket, not proof that two teams share a rating scale.
-        comparable = sides[0].get("region") in {"LPL", "LCK"} and sides[0].get("region") == sides[1].get("region")
+        comparable = can_compare_team_ratings(*sides)
         complete = comparable and all(all(row.get(key) is not None and str(row[key]).strip() for key in ("power_score", "volatility_score", "trend", "momentum", "status")) for row in sides)
         recent = {}
         cutoff = (date.fromisoformat(identity["match_date"]) - timedelta(days=1)).isoformat()
@@ -106,19 +107,23 @@ def analyze(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]
     eligible = {"trading"} if any(row.get("kind") in {"team_profile", "confirmed_tk", "candidate_rule"} for row in inputs) else set()
     if any(row.get("kind") == "cycle" and row.get("comparable") for row in inputs):
         eligible.update({"cycle", "trading"})
-    if any(row.get("kind") == "version" for row in inputs):
+    if any(row.get("kind") == "version" or row.get("kind") in {"author_analysis", "official_background"} for row in inputs):
         eligible.add("version")
     if not eligible:
         return [], repository.PendingInputs(["现有资料尚不足以按原方法推导本场，不用泛泛结论代替分析"])
+    def inference_scope(method, evidence):
+        supported_kinds = {"version": {"version"}, "cycle": {"cycle"}, "trading": {"team_profile", "cycle", "version"}}[method]
+        return "supported" if any(row.get("kind") in supported_kinds for row in evidence) else "conditional"
     try:
         methods = []
         for key in sorted(eligible):
             title, paths = METHODS[key]
             instruction = "\n\n".join((SKILLS / path).read_text() for path in paths)
-            methods.append({"id": key, "title": title, "version": fingerprint(instruction), "instruction": instruction})
+            methods.append({"id": key, "title": title, "version": fingerprint(instruction), "instruction": instruction,
+                            "inference_scope": inference_scope(key, inputs)})
         public = [{**item, "id": f"P{index}"} for index, item in enumerate(
-            [item for section in sections if section.get("id") == "digest" for item in section.get("items", [])], 1)]
-        scope = "supported" if any(row.get("kind") in {"team_profile", "cycle", "version"} for row in inputs) else "conditional"
+            public_inputs(sections), 1)]
+        scope = "conditional" if any(method["inference_scope"] == "conditional" for method in methods) else "supported"
         packet = {"operation": "match_analysis", "match": identity, "as_of": repository.now(), "methods": methods,
                   "inputs": inputs, "public_analysis": public, "inference_scope": scope,
                   "team_strength_roles": None, "user_adopted_rule": False, "market": None}
@@ -142,15 +147,19 @@ def analyze(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]
                     continue
             if method == "cycle" and not any(refs[ref].get("kind") == "cycle" for ref in ids):
                 continue
-            if method == "version" and not any(refs[ref].get("kind") == "version" for ref in ids):
+            if method == "version" and not any(refs[ref].get("kind") in {"version", "author_analysis", "official_background"} for ref in ids):
                 continue
+            official_roster = any(refs[ref].get("source_category") == "official_background" and refs[ref].get("roster_status") == "officially_confirmed" for ref in ids)
+            if not official_roster and _asserts_confirmed_roster(row["text"] + "\n" + row["basis"]):
+                continue
+            item_scope = inference_scope(method, [refs[ref] for ref in ids])
             used.add(method)
-            items.append({"id": f"M{index}", "title": METHODS[method][0] + ("（条件推导）" if scope == "conditional" else ""), "method_id": method,
+            items.append({"id": f"M{index}", "title": METHODS[method][0] + ("（条件推导）" if item_scope == "conditional" else ""), "method_id": method,
                           "method_version": versions[method], "input_revision": revision, "as_of": packet["as_of"],
-                          "inference_scope": scope,
+                          "inference_scope": item_scope,
                           "text": f"{row['text'][:700]}\n依据：{row['basis'][:500]}\n确认：{row['confirmation'][:400]}\n失效：{row['invalidation'][:400]}",
                           "verification": "system_inference", "source": "按现有方法推导，未确认采用", "source_ids": ids,
-                          "evidence": [{"text": refs[ref].get("display_text", refs[ref]["text"])} for ref in ids],
+                          "evidence": readable_evidence([refs[ref] for ref in ids]),
                           "input_evidence": [refs[ref] for ref in ids]})
         if not items:
             return [], ["本次个人方法推导未取得有依据的结果，已保留其他内容"]
@@ -185,19 +194,9 @@ def _asserts_confirmed_roster(text: str) -> bool:
 
 def analyze_scope(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]]:
     """Apply the existing version lens without fabricating two-team input."""
-    inputs = []
+    inputs = public_inputs(sections)
     for section in sections:
-        if section.get("id") == "digest":
-            for row in section.get("items", []):
-                if not row.get("text") or not row.get("evidence_quote"):
-                    continue
-                inputs.append({"kind": "official_background" if row.get("source_category") == "official_background" else row.get("kind", "reported_information"),
-                               "title": row.get("source_title") or row.get("title", ""), "url": row.get("url", ""),
-                               "source_category": row.get("source_category", "unclassified"), "subject": identity,
-                               "roster_status": row.get("roster_status", "not_officially_confirmed"),
-                               "text": row["text"], "evidence_quote": row["evidence_quote"], "source_id": row.get("source_id"),
-                               "published_at": row.get("published_at"), "applicability": "current_public_evidence", "recognition": "system_input"})
-        elif section.get("id") == "version" or section.get("id", "").startswith("team_"):
+        if section.get("id") == "version" or section.get("id", "").startswith("team_"):
             for row in section.get("items", []):
                 if row.get("text") and "登记选手" not in row.get("source", ""):
                     inputs.append({"kind": "version_background" if section["id"] == "version" else "team_profile_background",
@@ -228,6 +227,7 @@ def analyze_scope(identity: dict, sections: list[dict]) -> tuple[list[dict], lis
             items.append({"id": "M1", "method_id": "version", "title": "已有认识与当前证据对照", "verification": "system_inference",
                           "source": "按原版本理解方法推导，未确认采用", "inference_scope": "conditional", "method_version": method_version,
                           "input_revision": fingerprint(list(refs.values())), "source_ids": ids, "input_evidence": [refs[key] for key in ids],
+                          "evidence": readable_evidence([refs[key] for key in ids]),
                           "text": f"{row['text'][:700]}\n依据：{row['basis'][:500]}\n确认：{row['confirmation'][:400]}\n失效：{row['invalidation'][:400]}"})
         return ([{"id": "analysis", "title": "按已有方法理解", "items": items}] if items else []), ([] if items else ["当前方法对照未取得有依据的结果"])
     except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):

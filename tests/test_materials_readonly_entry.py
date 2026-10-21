@@ -47,7 +47,7 @@ def test_virtual_prematch_desk_redacts_existing_postmatch_materials(monkeypatch)
     monkeypatch.setattr(service, "_trade_plan", lambda *_: {})
     monkeypatch.setattr(service, "_trading_notes", lambda *_: [])
     monkeypatch.setattr(service, "get_match_workspace", lambda *_: {"exists": False})
-    monkeypatch.setattr(service, "get_match_run", lambda *_: {"exists": True, "mode": "virtual_pre", "result_unlocked": False})
+    monkeypatch.setattr(service, "get_match_run", lambda *_, framework=None: {"exists": True, "mode": "virtual_pre", "result_unlocked": False})
     monkeypatch.setattr(collection, "get_prepared_materials", lambda *_: {"task": {}, "result": {"summary": "赛后结果不得泄露"}})
     data = service.get_match_desk("KC", "MVK", match_date="2026-10-19", match_time="02:00")
     assert data["prepared_materials"]["result"] is None

@@ -259,9 +259,25 @@ def current_event_scope_coverage() -> dict:
 @router.get("/current-event/dashboard")
 def current_event_dashboard(date: str = Query("today"), limit: int = Query(12)) -> dict:
     try:
-        return get_current_event_dashboard(date, limit)
+        dashboard = get_current_event_dashboard(date, limit)
+        if date == "upcoming":
+            dashboard["preparation"] = collection.summarize_window_materials(dashboard["matches"])
+            dashboard["preparation"]["truncated"] = dashboard["truncated"]
+        return dashboard
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+
+
+@router.get("/current-event/preparation-coverage")
+def current_event_preparation_coverage(offset: int = Query(0, ge=0, le=200), limit: int = Query(4, ge=1, le=100)) -> dict:
+    """Small read-only page for the existing product tool; counts cover the whole window."""
+    dashboard = get_current_event_dashboard("upcoming", 200)
+    coverage = collection.summarize_window_materials(dashboard["matches"])
+    items = coverage.pop("items")
+    return {**coverage, "event": dashboard["context"].get("event"),
+            "window_start": dashboard["date"], "window_end": dashboard["date_to"],
+            "truncated": dashboard["truncated"], "items": items[offset:offset + limit],
+            "next_offset": offset + limit if offset + limit < len(items) else None}
 
 
 @router.get("/current-event/match-desk")

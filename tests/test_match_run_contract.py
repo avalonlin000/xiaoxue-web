@@ -16,6 +16,38 @@ IDENTITY = {
 
 
 class MatchRunContractTests(unittest.TestCase):
+    def test_existing_record_and_desk_share_one_current_framework(self):
+        framework = {"items": [], "call_order": []}
+        with (
+            patch.object(current_event_service, "_collect_run_facts", return_value=[]),
+            patch.object(current_event_service, "_match_trading_framework", return_value=framework) as build,
+        ):
+            saved = current_event_service.start_match_run(IDENTITY)
+            build.reset_mock()
+            with (
+                patch.object(current_event_service, "get_match_context", return_value={}),
+                patch.object(current_event_service, "_team_evidence", return_value={}),
+                patch.object(current_event_service, "_trading_notes", return_value=[]),
+                patch.object(current_event_service, "get_match_workspace", return_value={}),
+                patch.object(current_event_service, "_trade_plan", return_value={}) as plan,
+                patch("xiaoxue_api.modules.current_event.collection.get_prepared_materials", return_value={}),
+            ):
+                desk = current_event_service.get_match_desk(**IDENTITY)
+        self.assertEqual(build.call_count, 1)
+        self.assertEqual(desk["match_run"]["id"], saved["id"])
+        self.assertIs(desk["match_run"]["trading_framework"], desk["trading_framework"])
+        self.assertIs(plan.call_args.args[1], desk["trading_framework"])
+
+    def test_empty_and_existing_record_guides_use_one_vocabulary_without_shared_state(self):
+        empty = current_event_service._empty_run_guide()
+        for focus in ("overview", "removed_legacy_focus"):
+            self.assertEqual(current_event_service._run_guide({"current_focus": focus}), empty)
+        empty["modules"][0]["label"] = "do not keep this display edit"
+        empty["stages"]["pre"]["modules"].clear()
+        restored = current_event_service._empty_run_guide()
+        self.assertEqual(restored["modules"][0]["label"], "版本与环境")
+        self.assertTrue(restored["stages"]["pre"]["modules"])
+
     def setUp(self):
         self.temp_dir = tempfile.TemporaryDirectory()
         self.db_path = str(Path(self.temp_dir.name) / "match-run.db")
@@ -106,6 +138,11 @@ class MatchRunContractTests(unittest.TestCase):
         self.assertNotIn("过时", d3["action"])
         self.assertEqual(ts["status"], "active")
         self.assertNotIn("排除", ts["action"])
+
+        roster = next(item for item in facts if item["fact_code"] == "E11")
+        self.assertIn("登记名单", roster["label"])
+        self.assertIn("不代表本场首发", roster["action"])
+        self.assertNotIn("是否作为当场首发由你决定", roster["action"])
 
     def test_user_correction_updates_only_the_affected_fact_and_leaves_judgment_empty(self):
         with patch.object(current_event_service, "_collect_run_facts", return_value=[

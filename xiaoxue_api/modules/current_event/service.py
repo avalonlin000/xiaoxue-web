@@ -4,7 +4,7 @@ import json
 import re
 import sqlite3
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 from xiaoxue_api.modules.fundamentals.public import get_match_context
@@ -14,42 +14,18 @@ from xiaoxue_api.modules.version_understanding.public import get_global_version_
 from xiaoxue_api.modules.gol_gg.public import series_facts as gol_series_facts
 
 from xiaoxue_api.modules.current_event import repository
-
-
-RUN_MODES = {"virtual_pre", "live", "post_review"}
-RUN_PHASES = {"fact_check", "trend", "virtual_judgment", "live_update", "post_review", "complete"}
-FACT_STATUSES = {"active", "stale", "excluded", "needs_review", "missing", "user_override"}
-FACT_STATUS_LABELS = {
-    "active": "采用", "stale": "待更新", "excluded": "排除",
-    "needs_review": "待确认", "missing": "缺失", "user_override": "用户覆盖",
-}
-MATCH_RUN_ENTRY_META = {
-    "version": {"label": "版本与环境", "stage": "pre", "purpose": "确认本场适用的版本和比赛环境。"},
-    "team": {"label": "队伍与选手", "stage": "pre", "purpose": "确认双方队伍、选手和当前打法背景。"},
-    "trend": {"label": "已采用规律", "stage": "pre", "purpose": "记录已经确认要放进本场的规律。"},
-    "matchup": {"label": "本场适用性", "stage": "pre", "purpose": "判断已有认识在这场如何延续或被破坏。"},
-    "lineup": {"label": "阵容条件", "stage": "live", "purpose": "记录 BP 和首发是否支持原判断。"},
-    "branches": {"label": "条件分支", "stage": "pre", "purpose": "写清不同剧本出现时怎么处理。"},
-    "market": {"label": "市场对照", "stage": "pre", "purpose": "对照市场共识、分歧和仍未知的部分。"},
-    "plan": {"label": "当前交易计划", "stage": "pre", "purpose": "保留原计划和不碰条件。"},
-    "entry": {"label": "入场信号", "stage": "pre", "purpose": "记录什么现象出现后才考虑执行。"},
-    "exit": {"label": "退出条件", "stage": "pre", "purpose": "记录判断失效或需要退出的条件。"},
-    "execution": {"label": "实际执行", "stage": "live", "purpose": "记录比赛中实际做了什么。"},
-    "review": {"label": "复盘结论", "stage": "post", "purpose": "对照实际发生、判断和执行，留下下次校准。"},
-}
-TRADE_SECTION_LABELS = {section: meta["label"] for section, meta in MATCH_RUN_ENTRY_META.items()}
-MATCH_RUN_FOCUS_LABELS = {
-    "overview": "单场底稿",
-    **TRADE_SECTION_LABELS,
-}
-TRADE_SECTION_ORDER = tuple(TRADE_SECTION_LABELS)
-MATCH_RUN_STAGE_META = {
-    "pre": {"label": "赛前", "purpose": "判断基础、主要矛盾、计划和不碰条件。"},
-    "live": {"label": "赛中", "purpose": "对照 BP、首发、比赛和市场变化，记录实际执行。"},
-    "post": {"label": "赛后", "purpose": "回看实际发生、判断与执行，并留下可复用候选。"},
-}
-KNOWLEDGE_TARGETS = {"team", "player", "version", "trading_method"}
-KNOWLEDGE_CANDIDATE_STATUSES = {"pending", "ignored", "applied"}
+from . import preparation
+from .trade_plan import (
+    PLAN_MARKETS, _json_object, _auto_trade_plan_from_storage, _empty_manual_trade_plan,
+    _manual_trade_plan, _frozen_trade_plan, _compose_trade_plan, _ordered_ids,
+)
+from .match_records import (
+    RUN_MODES, RUN_PHASES, FACT_STATUSES, FACT_STATUS_LABELS, MATCH_RUN_ENTRY_META,
+    TRADE_SECTION_LABELS, MATCH_RUN_FOCUS_LABELS, TRADE_SECTION_ORDER,
+    MATCH_RUN_STAGE_META, KNOWLEDGE_TARGETS, KNOWLEDGE_CANDIDATE_STATUSES,
+    _run_fact_payload, _run_entry_payload, _run_revision_payload,
+    _run_guide, _empty_run_guide, _run_stage_groups,
+)
 TRADING_METHODS_PATH = Path(__file__).resolve().parents[3] / "config" / "trading-methods.json"
 
 
@@ -91,20 +67,47 @@ def discuss_judgment(**values) -> dict:
     return discuss(values, get_trading_methods())
 
 
-def get_current_event_dashboard(date_value: str = "today", limit: int = 12) -> dict:
-    selected_date = _resolve_date(date_value)
-    bounded_limit = max(1, min(int(limit or 12), 30))
+def get_current_event_dashboard(date_value: str = "today", limit: int = 12, *, now_value: datetime | None = None) -> dict:
+    config = get_current_event()
+    upcoming = date_value == "upcoming"
+    window_start = now_value or datetime.now(preparation.ZONE)
+    if window_start.tzinfo is None:
+        raise ValueError("近期比赛窗口必须包含时区")
+    window_start = window_start.astimezone(preparation.ZONE)
+    selected_date = window_start.date().isoformat() if upcoming else _resolve_date(date_value)
+    date_to = (date.fromisoformat(selected_date) + timedelta(days=preparation.window_days(config))).isoformat() if upcoming else selected_date
+    window_end = window_start + timedelta(days=preparation.window_days(config)) if upcoming else None
+    bounded_limit = max(1, min(int(limit or 12), 200))
     leagues = get_current_event_scope_leagues()
+    rows, overflow = preparation.schedules(list_schedules, {**config, "leagues": leagues}, selected_date, date_to)
     matches = [
         match
-        for match in list_schedules({"date_from": selected_date, "date_to": selected_date}, bounded_limit)
+        for match in rows
         if match_in_current_event_scope(match, leagues)
+        and (not upcoming or _match_in_preparation_window(match, window_start, window_end))
     ]
     return {
-        "context": get_current_event(),
+        "context": config,
         "date": selected_date,
-        "matches": [_match_summary(match) for match in matches],
+        "date_to": date_to, "range": "upcoming" if upcoming else "day",
+        "truncated": overflow or len(matches) > bounded_limit,
+        "matches": [_match_summary(match) for match in matches[:bounded_limit]],
     }
+
+
+def _match_in_preparation_window(match: dict, start: datetime, end: datetime) -> bool:
+    """Keep dashboard coverage aligned with the scheduler's exact time window."""
+    try:
+        kickoff = preparation.kickoff(match)
+    except (TypeError, ValueError):
+        # A scheduled TBD may lack a usable kickoff; retain it by its declared
+        # calendar date so the dashboard can explain why it is not researched.
+        try:
+            match_day = date.fromisoformat(str(match.get("date") or ""))
+        except ValueError:
+            return False
+        return start.date() <= match_day <= end.date()
+    return start < kickoff <= end
 
 
 def get_match_desk(
@@ -140,7 +143,8 @@ def get_match_desk(
         }
     team_a_evidence = _team_evidence(side_a)
     team_b_evidence = _team_evidence(side_b)
-    match_run = get_match_run(identity)
+    framework = _match_trading_framework(identity, team_a_evidence, team_b_evidence)
+    match_run = get_match_run(identity, framework=framework)
     from .collection import get_prepared_materials
     try:
         materials = get_prepared_materials(identity)
@@ -154,8 +158,8 @@ def get_match_desk(
         "quantitative": quantitative,
         "team_a": team_a_evidence,
         "team_b": team_b_evidence,
-        "trading_framework": _match_trading_framework(identity, team_a_evidence, team_b_evidence),
-        "trade_plan": _trade_plan(identity, _match_trading_framework(identity, team_a_evidence, team_b_evidence)),
+        "trading_framework": framework,
+        "trade_plan": _trade_plan(identity, framework),
         "trading_notes": {
             "team_a": _trading_notes(side_a),
             "team_b": _trading_notes(side_b),
@@ -249,7 +253,7 @@ def start_match_run(values: dict) -> dict:
     return _match_run_payload(row)
 
 
-def get_match_run(values: dict) -> dict:
+def get_match_run(values: dict, *, framework: dict | None = None) -> dict:
     identity = _resolve_run_identity(values)
     row = repository.get_match_run_by_identity(identity)
     if not row:
@@ -258,7 +262,7 @@ def get_match_run(values: dict) -> dict:
             "match": _identity_payload(identity),
             "guide": _empty_run_guide(),
         }
-    return _match_run_payload(row)
+    return _match_run_payload(row, framework=framework)
 
 
 def get_active_match_run() -> dict:
@@ -626,12 +630,12 @@ def _collect_run_facts(identity: dict, cutoff_at: str, mode: str) -> list[dict]:
         base = 10 + (index - 1) * 10
         evidence = _team_evidence(team)
         starters = evidence.get("starters") or []
-        starter_value = "、".join(f"{item['role']} {item['name']}" for item in starters) or "未录入首发"
+        starter_value = "、".join(f"{item['role']} {item['name']}" for item in starters) or "未取得登记名单"
         facts.append({
-            "fact_code": f"E{base + 1:02d}", "kind": "qualitative", "label": f"{team} 首发",
+            "fact_code": f"E{base + 1:02d}", "kind": "qualitative", "label": f"{team} 登记名单",
             "value": starter_value, "source": "team_profile", "source_ref": team, "as_of": "",
             "status": "active" if starters else "missing",
-            "affects": "阵容与对线", "action": "这是已录入的队伍首发资料；是否作为当场首发由你决定。",
+            "affects": "阵容与对线", "action": "已登记选手可能包含轮换或替补，不代表本场首发；本场名单仍需核验。",
         })
 
         three_d = evidence.get("three_dimensional") or {}
@@ -685,7 +689,7 @@ def _source_time_action(as_of: str) -> str:
     return "资料没有记录时间；是否仍适用于本场由你决定。"
 
 
-def _match_run_payload(row) -> dict:
+def _match_run_payload(row, *, framework: dict | None = None) -> dict:
     facts = [_run_fact_payload(item) for item in repository.list_match_run_facts(row["id"])]
     identity = _identity_payload(row)
     virtual = None
@@ -701,82 +705,13 @@ def _match_run_payload(row) -> dict:
         "activity_status": row["activity_status"], "focus": row["current_focus"],
         "entries": [_run_entry_payload(item) for item in repository.list_match_run_entries(row["id"])],
         "facts": facts, "virtual_judgment": virtual,
-        "trading_framework": _match_trading_framework(identity),
+        "trading_framework": framework if framework is not None else _match_trading_framework(identity),
         "revisions": [_run_revision_payload(item) for item in repository.list_match_run_revisions(row["id"])],
         "guide": _run_guide(row, facts), "updated_at": row["updated_at"],
         "debug_replay": {
             "enabled": row["mode"] == "virtual_pre",
             "result_available": bool(row["result_unlocked"]),
         },
-    }
-
-
-def _run_fact_payload(row) -> dict:
-    status = "needs_review" if row["status"] == "stale" else row["status"]
-    return {
-        "id": row["id"], "kind": row["kind"], "label": row["label"],
-        "value": row["value"], "source": row["source"], "source_ref": row["source_ref"], "as_of": row["as_of"],
-        "status": status, "affects": row["affects"], "action": row["action"], "updated_at": row["updated_at"],
-    }
-
-
-def _run_entry_payload(row) -> dict:
-    metadata = MATCH_RUN_ENTRY_META.get(row["section"], {})
-    return {
-        "section": row["section"], "label": TRADE_SECTION_LABELS.get(row["section"], row["section"]),
-        "stage": metadata.get("stage", "pre"), "purpose": metadata.get("purpose", ""),
-        "content": row["content"], "updated_at": row["updated_at"],
-    }
-
-
-def _run_revision_payload(row) -> dict:
-    return {
-        "id": row["id"], "fact_id": row["fact_id"], "old_status": row["old_status"],
-        "new_status": row["new_status"], "old_value": row["old_value"], "new_value": row["new_value"],
-        "reason": row["reason"], "created_at": row["created_at"],
-    }
-
-
-def _run_guide(row, facts: list[dict] | None = None) -> dict:
-    focus = row["current_focus"] if row["current_focus"] in MATCH_RUN_FOCUS_LABELS else "overview"
-    return {
-        "focus": focus,
-        "focus_label": MATCH_RUN_FOCUS_LABELS[focus],
-        "can_jump": True,
-        "stages": _run_stage_groups(),
-        "modules": [
-            {"id": item, "label": meta["label"], "stage": meta["stage"], "purpose": meta["purpose"]}
-            for item, meta in MATCH_RUN_ENTRY_META.items()
-        ],
-    }
-
-
-def _empty_run_guide() -> dict:
-    return {
-        "focus": "overview",
-        "focus_label": "单场底稿",
-        "can_jump": True,
-        "stages": _run_stage_groups(),
-        "modules": [
-            {"id": item, "label": meta["label"], "stage": meta["stage"], "purpose": meta["purpose"]}
-            for item, meta in MATCH_RUN_ENTRY_META.items()
-        ],
-    }
-
-
-def _run_stage_groups() -> dict:
-    return {
-        stage: {
-            "id": stage,
-            "label": stage_meta["label"],
-            "purpose": stage_meta["purpose"],
-            "modules": [
-                {"id": section, "label": entry_meta["label"], "stage": stage, "purpose": entry_meta["purpose"]}
-                for section, entry_meta in MATCH_RUN_ENTRY_META.items()
-                if entry_meta["stage"] == stage
-            ],
-        }
-        for stage, stage_meta in MATCH_RUN_STAGE_META.items()
     }
 
 
@@ -870,6 +805,8 @@ def build_current_event(config: dict, plan: dict | None) -> dict:
     }
     return {
         "event": config.get("event", "当前赛事"),
+        "leagues": config.get("leagues") or [],
+        "preparation": config.get("preparation") or {"upcoming_days": 7},
         "confirmed_teams": config.get("confirmed_teams") or config.get("participants") or [],
         "participants_verified": config.get("participants_verified") is True,
         "participant_sources": config.get("participant_sources") or [],
@@ -1075,11 +1012,6 @@ def _event_region(event: str) -> str:
     return ""
 
 
-PLAN_MARKETS = {
-    "team": {"label": "队伍", "directions": {"做多", "做空"}},
-    "kills": {"label": "人头", "directions": {"做大", "做小"}},
-    "duration": {"label": "时间", "directions": {"做大", "做小"}},
-}
 
 
 def _parse_trade_plan_text(content: str, identity: dict) -> list[dict]:
@@ -1248,152 +1180,12 @@ def _store_draft_trade_plan(identity: dict, auto: dict, manual: dict) -> dict:
 
 
 def _auto_trade_plan(framework: dict, identity: dict) -> dict:
-    items: list[dict] = []
-    for source in framework.get("items") or []:
-        statement = str(source.get("statement") or "").strip()
-        context = str(source.get("context") or "").strip()
-        text = f"{statement} {context}"
-        if not statement:
-            continue
-        subject = str(source.get("subject") or "").strip().upper()
-        market, direction = _auto_market_direction(text)
-        if not market or not direction:
-            continue
-        if market == "team" and subject not in {identity["team_a"], identity["team_b"]}:
-            continue
-        key = str(source.get("id") or source.get("filename") or f"{subject}|{statement}")
-        item_id = "auto-" + uuid.uuid5(uuid.NAMESPACE_URL, key).hex[:16]
-        items.append({
-            "id": item_id, "origin": "auto", "market": market, "team": subject if market == "team" else "",
-            "direction": direction, "statement": statement,
-            "source": {
-                "tk_id": str(source.get("id") or source.get("filename") or ""),
-                "statement": statement, "scope_label": str(source.get("scope_label") or "交易 TK"),
-                "updated_at": str(source.get("updated_at") or ""),
-            },
-        })
-    return {"items": items}
+    """Related TK is research context, never an automatically adopted trade.
 
-
-def _auto_market_direction(text: str) -> tuple[str, str]:
-    lowered = text.casefold()
-    if re.search(r"(?:大|多)\s*人头|人头\s*(?:做)?(?:大|多)", text):
-        return "kills", "做大"
-    if re.search(r"(?:小|少)\s*人头|人头\s*(?:做)?(?:小|少)", text):
-        return "kills", "做小"
-    if re.search(r"时间\s*(?:做)?大|时长\s*(?:做)?大", text):
-        return "duration", "做大"
-    if re.search(r"时间\s*(?:做)?小|时长\s*(?:做)?小", text):
-        return "duration", "做小"
-    if any(token in lowered for token in ("做空", "看空", "发挥差", "容易送", "不稳定", "下滑")):
-        return "team", "做空"
-    if any(token in lowered for token in ("做多", "看多", "发挥好", "稳定", "变强", "强势")):
-        return "team", "做多"
-    return "", ""
-
-
-def _json_object(value) -> dict:
-    if isinstance(value, dict):
-        return value
-    try:
-        parsed = json.loads(value or "{}")
-    except (TypeError, ValueError, json.JSONDecodeError):
-        parsed = {}
-    return parsed if isinstance(parsed, dict) else {}
-
-
-def _auto_trade_plan_from_storage(value) -> dict:
-    raw = _json_object(value)
-    if isinstance(raw.get("items"), list):
-        return {"items": [item for item in raw["items"] if isinstance(item, dict)]}
-    # First-slice compatibility: preserve existing category arrays as automatic items.
-    items: list[dict] = []
-    for market in PLAN_MARKETS:
-        for index, legacy in enumerate(raw.get(market) or []):
-            if not isinstance(legacy, dict):
-                continue
-            source_statement = str(legacy.get("statement") or "")
-            item_id = f"auto-legacy-{market}-{index}-{uuid.uuid5(uuid.NAMESPACE_URL, source_statement or str(index)).hex[:12]}"
-            items.append({
-                "id": item_id, "origin": "auto", "market": market, "team": str(legacy.get("team") or ""),
-                "direction": str(legacy.get("direction") or ""), "statement": source_statement,
-                "source": {"tk_id": "", "statement": source_statement, "scope_label": "交易 TK", "updated_at": ""},
-            })
-    return {"items": items}
-
-
-def _empty_manual_trade_plan() -> dict:
-    return {"items": [], "overrides": {}, "order": []}
-
-
-def _manual_trade_plan(value) -> dict:
-    raw = _json_object(value)
-    manual = _empty_manual_trade_plan()
-    if isinstance(raw.get("items"), list):
-        manual["items"] = [item for item in raw["items"] if isinstance(item, dict) and str(item.get("id") or "")]
-    else:
-        # Preserve first-slice manual entries while converting them into normal item rows.
-        for market in PLAN_MARKETS:
-            for index, legacy in enumerate(raw.get(market) or []):
-                if not isinstance(legacy, dict):
-                    continue
-                manual["items"].append({
-                    "id": f"manual-legacy-{market}-{index}", "origin": "manual", "market": market,
-                    "team": str(legacy.get("team") or ""), "direction": str(legacy.get("direction") or ""),
-                    "statement": str(legacy.get("statement") or ""), "source": {},
-                })
-        for index, note in enumerate(raw.get("notes") or []):
-            manual["items"].append({
-                "id": f"manual-legacy-note-{index}", "origin": "manual", "market": "note", "team": "",
-                "direction": "", "statement": str(note or ""), "source": {},
-            })
-    if isinstance(raw.get("overrides"), dict):
-        manual["overrides"] = {str(key): value for key, value in raw["overrides"].items() if isinstance(value, dict)}
-    if isinstance(raw.get("order"), list):
-        manual["order"] = [str(value) for value in raw["order"] if str(value)]
-    return manual
-
-
-def _frozen_trade_plan(value: dict) -> dict:
-    raw = _json_object(value)
-    if "auto" in raw or "manual" in raw:
-        auto = _auto_trade_plan_from_storage(raw.get("auto"))
-        manual = _manual_trade_plan(raw.get("manual"))
-        final = raw.get("final") if isinstance(raw.get("final"), dict) else _compose_trade_plan(auto, manual)
-        if not isinstance(final.get("items"), list):
-            final = _compose_trade_plan(auto, manual)
-        return {"auto": auto, "manual": manual, "final": final, "frozen_at": str(raw.get("frozen_at") or ""), "snapshot_missing": bool(raw.get("snapshot_missing"))}
-    # Old frozen rows stored only the final category arrays.
-    auto = _auto_trade_plan_from_storage(raw)
-    manual = _empty_manual_trade_plan()
-    return {"auto": auto, "manual": manual, "final": _compose_trade_plan(auto, manual), "frozen_at": ""}
-
-
-def _compose_trade_plan(auto: dict, manual: dict) -> dict:
-    effective: list[dict] = []
-    for base in auto.get("items") or []:
-        override = manual.get("overrides", {}).get(base.get("id"), {})
-        if override.get("mode") == "delete":
-            continue
-        item = dict(override.get("item") or base) if override.get("mode") == "replace" else dict(base)
-        item["origin"] = "auto"
-        item["source"] = dict(base.get("source") or item.get("source") or {})
-        effective.append(item)
-    effective.extend(dict(item) for item in manual.get("items") or [])
-    order = _ordered_ids(effective, manual.get("order") or [])
-    positions = {item_id: index for index, item_id in enumerate(order)}
-    effective.sort(key=lambda item: positions.get(item.get("id"), len(positions)))
-    for index, item in enumerate(effective, start=1):
-        item["position"] = index
-    grouped = {market: [item for item in effective if item.get("market") == market] for market in PLAN_MARKETS}
-    return {"items": effective, **grouped}
-
-
-def _ordered_ids(items: list[dict], saved_order: list[str]) -> list[str]:
-    current_ids = [str(item.get("id") or "") for item in items if str(item.get("id") or "")]
-    order = [item_id for item_id in saved_order if item_id in current_ids]
-    order.extend(item_id for item_id in current_ids if item_id not in order)
-    return order
+    Keep this composition seam for existing consumers. Historical frozen plans
+    and explicitly saved user items retain their original read paths.
+    """
+    return {"items": []}
 
 
 def _trade_plan_payload(state: str, auto: dict, manual: dict, final: dict, *, frozen_at: str = "", snapshot_missing: bool = False) -> dict:

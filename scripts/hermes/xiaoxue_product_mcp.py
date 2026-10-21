@@ -725,18 +725,12 @@ def _material_text(value: Any) -> str:
     return value
 
 
-def _material_item(item: dict, *, personal_analysis: bool = False) -> dict:
-    """Project readable evidence, never the private/raw input audit bundle."""
+def _material_source(item: dict) -> dict:
+    """A readable citation is not the private/raw input audit bundle."""
     result = {key: text for key in (
-        "text", "title", "source", "published_at", "verification", "conditions", "counterevidence",
-        "why_relevant", "kind", "evidence_quote",
+        "text", "title", "source_title", "source", "published_at", "updated_at", "verification", "conditions", "counterevidence",
+        "why_relevant", "kind", "source_kind", "applicability", "evidence_quote", "basis_note",
     ) if (text := _material_text(item.get(key)))}
-    if personal_analysis:
-        for key in ("text", "conditions", "counterevidence", "why_relevant"):
-            if key in result:
-                # Input-row references remain in the audit data; readable evidence stays separate.
-                result[key] = re.sub(r"(?<![A-Za-z0-9])[IPM]\d+(?:\s*(?:[、,，/]|与|和|及)\s*[IPM]\d+)*(?![A-Za-z0-9])", "", result[key])
-                result[key] = re.sub(r"[（(]\s*[）)]", "", result[key])
     url = _material_text(item.get("url"))
     parsed = urlparse(url)
     if parsed.scheme in {"http", "https"} and parsed.hostname and not parsed.username and not parsed.password:
@@ -745,23 +739,70 @@ def _material_item(item: dict, *, personal_analysis: bool = False) -> dict:
         result["published_at"] = _material_text(item.get("published_at"))
         if not result["published_at"]:
             result["date_note"] = "发布日期未知"
-    evidence = [{"text": text} for row in item.get("evidence", []) if isinstance(row, dict) and (text := _material_text(row.get("text")))]
+    return result
+
+
+def _material_item(item: dict, *, personal_analysis: bool = False) -> dict:
+    result = _material_source(item)
+    if personal_analysis:
+        for key in ("text", "conditions", "counterevidence", "why_relevant"):
+            if key in result:
+                # Input-row references remain in the audit data; readable evidence stays separate.
+                result[key] = re.sub(r"(?<![A-Za-z0-9])[IPM]\d+(?:\s*(?:[、,，/]|与|和|及)\s*[IPM]\d+)*(?![A-Za-z0-9])", "", result[key])
+                result[key] = re.sub(r"[（(]\s*[）)]", "", result[key])
+    evidence = [_material_source(row) for row in item.get("evidence", []) if isinstance(row, dict) and _material_text(row.get("text"))]
     if evidence:
         result["evidence"] = evidence
     return result
 
 
-def _material_summary(payload: dict, *, section: str = "", offset: int = 0) -> dict:
+def _revision_change(data: dict, expected_revision: str) -> dict | None:
+    """A live reread may change; never append a new revision to older pages."""
+    if len(expected_revision) > 128:
+        raise ValueError("expected_revision过长")
+    if expected_revision and expected_revision != data.get("revision", ""):
+        output = {key: data[key] for key in ("task_id", "method_id", "match", "subject", "revision") if key in data}
+        output.update(revision_changed=True, expected_revision=expected_revision, restart_offset=0, text="", next_offset=None,
+                      read_hint="成果已更新，丢弃此前分页；沿用原对象和栏目，以新revision作为expected_revision从offset=0重读，不拼接两版。")
+        if len(_json(output)) > 3000:
+            raise ValueError("分页元信息超过读取预算")
+        return output
+    return None
+
+
+def _text_page(data: dict, text: str, offset: int = 0) -> dict:
+    """Shared escaped-JSON budget for material, judgment and cached reply pages."""
+    offset = max(0, int(offset))
+    output = {**data, "offset": offset, "total_chars": len(text), "text": "", "next_offset": None}
+    if len(_json(output)) > 3000:
+        raise ValueError("分页元信息超过读取预算")
+    low, high = 0, min(1400, max(0, len(text) - offset))
+    while low < high:
+        length = (low + high + 1) // 2
+        output.update(text=text[offset:offset + length], next_offset=offset + length if offset + length < len(text) else None)
+        if len(_json(output)) <= 3000:
+            low = length
+        else:
+            high = length - 1
+    if not low and offset < len(text):
+        raise ValueError("分页元信息未留下正文读取空间")
+    output.update(text=text[offset:offset + low], next_offset=offset + low if offset + low < len(text) else None)
+    return output
+
+
+def _material_summary(payload: dict, *, section: str = "", offset: int = 0, expected_revision: str = "") -> dict:
     task = payload.get("task") or {}
     result = payload.get("result") or {}
     match = result.get("match") or task.get("match") or {}
     output = {"task_id": str(task.get("id") or "")[:24], "state": str(task.get("state") or "")[:20],
               "message": _material_text(task.get("message"))[:100],
               "match": {key: _material_text(match.get(key))[:limit] for key, limit in (("team_a", 40), ("team_b", 40), ("event", 120), ("match_date", 10), ("match_time", 20))},
-              "updated_at": str(result.get("updated_at") or "")[:40], "revision": str(result.get("revision") or "")[:24]}
+              "updated_at": str(result.get("updated_at") or "")[:40], "revision": str(result.get("revision") or "")[:128]}
     subject = result.get("subject") or task.get("subject") or {}
     if subject:
         output["subject"] = {key: _material_text(subject.get(key))[:limit] for key, limit in (("scope", 10), ("event", 120), ("team", 40)) if subject.get(key)}
+    if changed := _revision_change(output, expected_revision):
+        return changed
     # Never return a whole evidence bundle to the model. All text remains pageable.
     sections = result.get("sections") or []
     offset = max(0, int(offset))
@@ -773,36 +814,29 @@ def _material_summary(payload: dict, *, section: str = "", offset: int = 0) -> d
             if not selected:
                 raise ValueError("没有找到这部分比赛资料")
             text = "\n".join(_json(_material_item(item, personal_analysis=section == "analysis")) for item in selected.get("items", []))
-        output.update(section=section[:100], total_chars=len(text), offset=offset, text="", next_offset=None)
-        # Budget the serialized JSON, including escaped control characters.
-        low, high = 0, min(1400, max(0, len(text) - offset))
-        while low < high:
-            length = (low + high + 1) // 2
-            output.update(text=text[offset:offset + length], next_offset=offset + length if offset + length < len(text) else None)
-            if len(_json(output)) <= 3000:
-                low = length
-            else:
-                high = length - 1
-        output.update(text=text[offset:offset + low], next_offset=offset + low if offset + low < len(text) else None)
+        return _text_page({**output, "section": section[:100]}, text, offset)
     else:
         output.update(summary=_material_text(result.get("summary"))[:240],
                       limitations=[_material_text(item)[:90] for item in result.get("limitations", [])[:3]],
                       limitations_total=len(result.get("limitations", [])), limitations_section="__limitations__",
                       sections_total=len(sections), next_section_offset=offset + 6 if len(sections) > offset + 6 else None,
                       sections=[{"id": str(item["id"])[:80], "title": str(item.get("title", ""))[:40], "items": len(item.get("items") or [])} for item in sections[offset:offset + 6]],
-                      read_hint="默认只转述takeaways和必要限制；不要为补字数主动读version/news或铺目录。用户需细节时按section和next_offset读完整条件/反证；限制用__limitations__。发布日期未知就明确未知，不从原文其他日期、导航或球员卡推断文章日期。")
+                      read_hint="简单看看默认只转述takeaways和必要限制，不为补字数主动读version/news或铺目录。充分准备、对照或找反例时自主读相关section及后页的条件/反证，不让用户翻页；传首屏revision为expected_revision，revision_changed时丢弃旧页从0重读。限制用__limitations__。发布日期未知就明确未知，不从原文其他日期、导航或球员卡推断文章日期。")
         output["takeaways"] = []
         labels = {"ai_summary": "AI整理，请结合原文", "system_inference": "系统推导，未确认采用"}
-        for name in ("digest", "analysis", "comparison"):
+        for name in ("digest", "shared_digest", "analysis", "comparison"):
             selected = next((item for item in sections if item.get("id") == name), None)
-            if not selected or (name == "digest" and selected.get("selection_status") != "screened"):
+            if not selected or (name in {"digest", "shared_digest"} and selected.get("selection_status") != "screened"):
                 continue
             first = next((item for item in selected.get("items", []) if _material_text(item.get("text"))), None)
             if first:
+                readable = _material_item(first, personal_analysis=name == "analysis")
                 output["takeaways"].append({"section": name, "text": _material_item(first, personal_analysis=name == "analysis").get("text", "")[:160],
                                             "basis": labels.get(first.get("verification"), "请结合来源核对"),
+                                            **{key: readable[key][:140] for key in ("source", "conditions", "counterevidence") if readable.get(key)},
+                                            **({"url": readable["url"]} if readable.get("url") and len(readable["url"]) <= 300 else {}),
                                             **({"published_at": _material_text(first.get("published_at"))[:40],
-                                                "date_note": "" if _material_text(first.get("published_at")) else "发布日期未知"} if name == "digest" else {}),
+                                                "date_note": "" if _material_text(first.get("published_at")) else "发布日期未知"} if name in {"digest", "shared_digest"} else {}),
                                             "more": "按同名section读取完整正文与依据"})
         # Keep all lines represented while progressively shortening previews, not full pages.
         for limit in (120, 80, 40, 20):
@@ -811,25 +845,17 @@ def _material_summary(payload: dict, *, section: str = "", offset: int = 0) -> d
             output["summary"] = output["summary"][:limit]
             output["limitations"] = [item[:limit] for item in output["limitations"]]
             for item in output["takeaways"]:
-                item["text"] = item["text"][:limit]
+                for key in ("text", "source", "conditions", "counterevidence"):
+                    if key in item:
+                        item[key] = item[key][:limit]
         while len(_json(output)) > 3000 and output["sections"]:
             output["sections"].pop()
             output["next_section_offset"] = offset + len(output["sections"])
-    return output
-
-
-def _judgment_page(data: dict, text: str, offset: int = 0) -> dict:
-    offset = max(0, int(offset))
-    output = {**data, "offset": offset, "total_chars": len(text), "text": "", "next_offset": None}
-    low, high = 0, min(1400, max(0, len(text) - offset))
-    while low < high:
-        length = (low + high + 1) // 2
-        output.update(text=text[offset:offset + length], next_offset=offset + length if offset + length < len(text) else None)
-        if len(_json(output)) <= 3000:
-            low = length
-        else:
-            high = length - 1
-    output.update(text=text[offset:offset + low], next_offset=offset + low if offset + low < len(text) else None)
+        if len(_json(output)) > 3000:
+            for item in output["takeaways"]:
+                item.pop("url", None)  # Full provenance is losslessly readable in the named section.
+        if len(_json(output)) > 3000:
+            raise ValueError("材料摘要超过读取预算，请按具体栏目读取")
     return output
 
 
@@ -865,9 +891,18 @@ def _judgment_params(method_id: str, event: str = "", team: str = "", team_a: st
 @mcp.tool(name="xiaoxue_open_judgment", structured_output=False,
           annotations={"title": "打开判断所需的已有内容", "readOnlyHint": True, "destructiveHint": False, "openWorldHint": False})
 async def xiaoxue_open_judgment(method_id: str, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
-                               match_date: str = "", match_time: str = "", match_format: str = "", as_of: str = "", offset: int = 0) -> str:
-    """只读实际正文与依据；next_offset继续完整正文，不触发搜索、模型或保存。"""
+                               match_date: str = "", match_time: str = "", match_format: str = "", as_of: str = "", offset: int = 0,
+                               expected_revision: str = "") -> str:
+    """只读实际正文与依据，不触发搜索、模型或保存。充分研究时自主按next_offset继续相关正文及依据，不让用户翻页。
+
+    后页沿用相同对象/as_of，并将首屏revision作为expected_revision；revision_changed时丢弃旧页，从offset=0读新revision，不拼接两版。
+    """
     data = await _api_request("GET", "/current-event/judgment-context", params=_judgment_params(method_id, event, team, team_a, team_b, match_date, match_time, match_format, as_of))
+    metadata = {"method_id": method_id, "status": str(data.get("status") or "")[:30],
+                "revision": str(data.get("revision") or "")[:128], "needed": data.get("needed") or [],
+                "discussion_available": data.get("discussion_available") is True}
+    if changed := _revision_change(metadata, expected_revision):
+        return _json(changed)
     blocks = []
     for row in [*(data.get("contents") or []), *(data.get("analysis") or [])]:
         if not isinstance(row, dict):
@@ -880,9 +915,7 @@ async def xiaoxue_open_judgment(method_id: str, event: str = "", team: str = "",
                 blocks.append("所用依据：" + _material_text(evidence["text"]) +
                               ("\n" + _material_item(evidence)["url"] if _material_item(evidence).get("url") else ""))
     blocks.extend(_material_text(value) for value in data.get("limitations", []))
-    return _json(_judgment_page({"method_id": method_id, "status": str(data.get("status") or "")[:30],
-                                "revision": str(data.get("revision") or "")[:64], "needed": data.get("needed") or [],
-                                "discussion_available": data.get("discussion_available") is True}, "\n\n".join(blocks), offset))
+    return _json(_text_page(metadata, "\n\n".join(blocks), offset))
 
 
 # Short-lived unsaved replies only, so long answers remain fully readable without
@@ -894,7 +927,7 @@ _JUDGMENT_REPLIES: OrderedDict = OrderedDict()
           annotations={"title": "根据已有内容讨论判断", "readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
 async def xiaoxue_discuss_judgment(method_id: str, question: str, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
                                   match_date: str = "", match_time: str = "", match_format: str = "", history: list[dict] | None = None, as_of: str = "") -> str:
-    """沿用open时的完整对象及as_of，明确提问后才调用现有模型；历史截止视图目前不重推。讨论未保存、未采用。长答复按reply_id继续读，不重复提问。"""
+    """沿用open时的完整对象及as_of，明确提问后才调用现有模型；历史截止视图目前不重推。讨论未保存、未采用。长答复自主按reply_id及next_offset读完，不让用户说继续，不重复提问或调用模型。"""
     params = _judgment_params(method_id, event, team, team_a, team_b, match_date, match_time, match_format, as_of)
     question = _clean_text(question, "问题")
     if len(question) > 2000:
@@ -907,19 +940,19 @@ async def xiaoxue_discuss_judgment(method_id: str, question: str, event: str = "
     _JUDGMENT_REPLIES[reply_id] = (time.monotonic(), text)
     while len(_JUDGMENT_REPLIES) > 16:
         _JUDGMENT_REPLIES.popitem(last=False)
-    output = _judgment_page({"reply_id": reply_id, "saved": False, "context_revision": str(data.get("context_revision") or "")[:64]}, text)
+    output = _text_page({"reply_id": reply_id, "saved": False, "context_revision": str(data.get("context_revision") or "")[:128]}, text)
     return _json(output)
 
 
 @mcp.tool(name="xiaoxue_get_judgment_reply", structured_output=False,
           annotations={"title": "继续读取本次未保存讨论", "readOnlyHint": True, "destructiveHint": False, "openWorldHint": False})
 async def xiaoxue_get_judgment_reply(reply_id: str, offset: int = 0) -> str:
-    """十分钟内按next_offset读完本次答复，不重复模型请求，不写知识。"""
+    """十分钟内自主按next_offset读完同一reply_id答复，不让用户翻页，不重复模型请求，不写知识。"""
     row = _JUDGMENT_REPLIES.get(reply_id)
     if not row or time.monotonic() - row[0] > 600:
         _JUDGMENT_REPLIES.pop(reply_id, None)
         raise ValueError("这次未保存讨论已过期，请在原会话继续")
-    return _json(_judgment_page({"reply_id": reply_id, "saved": False}, row[1], offset))
+    return _json(_text_page({"reply_id": reply_id, "saved": False}, row[1], offset))
 
 
 @mcp.tool(name="xiaoxue_collect_match_materials", structured_output=False,
@@ -934,12 +967,13 @@ async def xiaoxue_collect_match_materials(team_a: str, team_b: str, event: str =
 @mcp.tool(name="xiaoxue_get_match_materials", structured_output=False,
           annotations={"title": "先看赛事/某队已整理的粗筛与系统解释", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False})
 async def xiaoxue_get_match_materials(task_id: str = "", section: str = "", offset: int = 0,
-                                    scope: str = "", event: str = "", team: str = "") -> str:
+                                    scope: str = "", event: str = "", team: str = "", expected_revision: str = "") -> str:
     """只读已整理成果：问S16赛事/某队有哪些现成内容时优先使用，默认先看粗筛+系统解释，不搜索、不调用模型、不保存。
 
     team='BLG'直接读当前赛事的BLG；scope='event'读当前赛事，event可指定正式全称如'S16 世界赛'，省略由当前赛事配置定位。
     task_id兼容原单场任务读回，与scope/event/team互斥。默认只转述takeaways和必要限制，不为补字数主动读version/news或铺目录。
-    用户需要细节时才用section和next_offset读完整条件/反证，原文/旧版本/画像只按需分页。
+    简单看看保持短摘要；充分准备、对照双方、找反例时自主用section和next_offset读相关正文、完整条件/反证，不让用户说继续或翻页，原文/旧版本/画像只按需分页。
+    后页沿用相同对象与section，目录后页也传首屏revision为expected_revision；revision_changed时丢弃旧页，以新revision从offset=0重读，不拼接两版。
     published_at为空必须说明发布日期未知，不从原文其他日期、网页导航或球员卡猜文章日期；处理中不代表内容完成。
     """
     task_id, scope, event, team = (value.strip() for value in (task_id, scope, event, team))
@@ -961,7 +995,37 @@ async def xiaoxue_get_match_materials(task_id: str = "", section: str = "", offs
         if team:
             params["team"] = _clean_team(team)
         payload = await _api_request("GET", "/current-event/scope-materials", params=params)
-    return _json(_material_summary(payload, section=section, offset=offset))
+    return _json(_material_summary(payload, section=section, offset=offset, expected_revision=expected_revision))
+
+
+@mcp.tool(name="xiaoxue_get_upcoming_preparation", structured_output=False,
+          annotations={"title": "查看近期比赛逐场准备进度", "readOnlyHint": True, "destructiveHint": False,
+                       "idempotentHint": True, "openWorldHint": False})
+async def xiaoxue_get_upcoming_preparation(offset: int = 0) -> str:
+    """只读关注窗口逐场状态；有next_offset时自主读完，别让用户逐页催促。
+
+    充分准备时，沿read_with读取相同修订的单场正文、条件和限制；列表不代替原文。
+    """
+    offset = max(0, min(int(offset), 200))
+    batch = await _api_request("GET", "/current-event/preparation-coverage", params={"offset": offset, "limit": 4})
+    items = []
+    for row in batch.get("items") or []:
+        match = row.get("match") or {}
+        item = {"team_a": str(match.get("team_a") or "")[:40], "team_b": str(match.get("team_b") or "")[:40],
+                "date": match.get("date"), "time": match.get("time"), "state": row.get("state"),
+                "reason": str(row.get("reason") or "")[:120], "revision": row.get("revision")}
+        if row.get("task_id") and row.get("state") in {"prepared", "partial"}:
+            item["read_with"] = {"tool": "xiaoxue_get_match_materials", "task_id": row["task_id"],
+                                 "expected_revision": row.get("revision") or ""}
+        items.append(item)
+    output = {"event": batch.get("event"), "window_start": batch.get("window_start"),
+              "window_end": batch.get("window_end"), "confirmed_total": batch.get("confirmed_total"),
+              "prepared": batch.get("prepared"), "partial": batch.get("partial"),
+              "not_started": batch.get("not_started"), "pending_total": batch.get("pending_total"),
+              "truncated": batch.get("truncated"), "items": items, "next_offset": batch.get("next_offset")}
+    if len(_json(output)) > 3000:
+        raise ValueError("比赛列表超过单次读取预算，请缩小单页内容")
+    return _json(output)
 
 
 @mcp.tool(
@@ -977,7 +1041,7 @@ async def xiaoxue_prepare_match(
     match_time: str = "",
     match_format: str = "",
 ) -> str:
-    """读取一场比赛的 TS、首发、三维和交易 TK；只汇总事实，不替用户写交易或长期知识。"""
+    """只读单场事实及已有准备成果。充分准备时先沿prepared_materials.read_with读取本场正文、出处和条件，再按需补双方；不要把赛事task当成单场，也不要因正式赛程待定就忽略已有单场材料。不写交易或长期知识。"""
 
     params: dict[str, Any] = {"team_a": _clean_team(team_a), "team_b": _clean_team(team_b)}
     if event.strip():
@@ -988,7 +1052,40 @@ async def xiaoxue_prepare_match(
         params["match_time"] = _clean_text(match_time, "比赛时间")
     if match_format.strip():
         params["match_format"] = _clean_text(match_format, "赛制")
-    return _json(await _api_request("GET", "/current-event/match-desk", params=params))
+    desk = await _api_request("GET", "/current-event/match-desk", params=params)
+    prepared = _material_summary(desk.get("prepared_materials") or {})
+    if prepared.get("task_id"):
+        prepared["read_with"] = {"tool": "xiaoxue_get_match_materials", "task_id": prepared["task_id"],
+                                 "expected_revision": prepared.get("revision", "")}
+    quantitative = desk.get("quantitative") or {}
+    fields = ("team", "region", "power_score", "volatility_score", "trend", "momentum", "status")
+    output = {"match": desk.get("match") or {}, "quantitative": {
+        "available": quantitative.get("available", False),
+        **{side: {key: row[key] for key in fields if key in row}
+           for side in ("team_a", "team_b") if isinstance(row := quantitative.get(side), dict)},
+    }, "prepared_materials": prepared,
+        "reading_note": "这是单场入口；已有成果按read_with继续读，不把赛事材料当成本场。队伍详细资料沿xiaoxue_get_team读取；统计差异不直接证明原因，旧背景不等于当前适用。"}
+    if quantitative.get("reason"):
+        output["quantitative"]["reason"] = _material_text(quantitative["reason"])[:200]
+    comparison = quantitative.get("compare") or {}
+    if "comparable" in comparison:
+        output["quantitative"]["comparable"] = comparison["comparable"]
+    if comparison.get("reason"):
+        output["quantitative"]["comparison_note"] = _material_text(comparison["reason"])[:200]
+    for limit in (100, 60, 30):
+        if len(_json(output)) <= 3000:
+            break
+        prepared["summary"] = str(prepared.get("summary") or "")[:limit]
+        for item in prepared.get("takeaways", []):
+            for key in ("text", "source", "conditions", "counterevidence"):
+                if key in item:
+                    item[key] = item[key][:limit]
+        prepared["sections"] = []
+    if len(_json(output)) > 3000:
+        output["prepared_materials"] = {key: prepared[key] for key in ("state", "task_id", "revision", "updated_at", "read_with") if key in prepared}
+    if len(_json(output)) > 3000:
+        raise ValueError("单场读取元信息超过预算，请按对象单独读取")
+    return _json(output)
 
 
 @mcp.tool(
@@ -1565,11 +1662,15 @@ async def xiaoxue_update_stage_candidate(user_command: str, candidate_id: int, s
     structured_output=False,
 )
 async def xiaoxue_get_team(team: str, trading_note_limit: int = 8) -> str:
-    """一次读取队伍画像、TS、已确认的交易备注和相关知识标题。返回精简版，供模型直接阅读。"""
+    """一次读取队伍画像、TS、交易备注和当前已整理队伍材料，先复用再补缺。
+
+    prepared_materials是当前赛事该队的已有研究，不是旧画像；充分准备/比较双方时沿read_with读取相关栏目及条件、反证，再补查缺失。
+    旧画像、作者观点、系统推导保持原身份；比分或终局统计不证明输赢原因，没有过程证据的解释标为待证假设。
+    """
 
     clean_team = _clean_team(team)
     encoded = quote(clean_team, safe="")
-    profile, version, notes, fundamentals = await asyncio.gather(
+    responses = await asyncio.gather(
         _api_request("GET", f"/profile-full/{encoded}"),
         _api_request("GET", f"/version-understanding/{encoded}"),
         _api_request(
@@ -1582,7 +1683,19 @@ async def xiaoxue_get_team(team: str, trading_note_limit: int = 8) -> str:
             "/fundamentals/teams",
             params={"scope": "all", "team": clean_team, "limit": 1},
         ),
+        _api_request("GET", "/current-event/scope-materials", params={"scope": "team", "team": clean_team}),
+        return_exceptions=True,
     )
+    for response in responses[:4]:
+        if isinstance(response, Exception):
+            raise response
+    profile, version, notes, fundamentals, materials = responses
+    if isinstance(materials, Exception):
+        prepared_reading = {"state": "unavailable", "message": "已整理队伍材料读取失败，不代表没有材料；其余资料可继续使用。"}
+    else:
+        summary = _material_summary(materials)
+        prepared_reading = {key: summary[key] for key in ("state", "revision", "updated_at", "takeaways", "limitations", "sections") if key in summary}
+        prepared_reading["read_with"] = {"tool": "xiaoxue_get_match_materials", "team": clean_team, "expected_revision": summary.get("revision", "")}
     ts = next((item for item in fundamentals.get("teams", []) if item.get("short_name", "").upper() == clean_team.upper()), None)
 
     # 精简：只保留模型要读的字段，去掉 _read_result 审计壳和长摘要
@@ -1605,6 +1718,7 @@ async def xiaoxue_get_team(team: str, trading_note_limit: int = 8) -> str:
 
     slim = {
         "team": clean_team,
+        "region": (ts or {}).get("region", ""),
         "profile": profile_text,
         "ts": {
             "power_score": ts_display.get("power_score"),
@@ -1615,6 +1729,9 @@ async def xiaoxue_get_team(team: str, trading_note_limit: int = 8) -> str:
         },
         "trading_notes": trading_titles,
         "related_knowledge": knowledge_titles,
+        "prepared_materials": prepared_reading,
+        "reading_note": "先复用已整理材料及其出处、条件和反证。旧画像须核对本届适用性；统计现象不等于归因，无过程证据时只作待证假设；不同赛区TS分数不直接比较。",
+        "profile_truncated": False,
     }
     # The model-facing contract is deliberately smaller than the audit/API
     # envelope. Do not leak raw mu/sigma/ts or long TK bodies into context.
@@ -1624,6 +1741,15 @@ async def xiaoxue_get_team(team: str, trading_note_limit: int = 8) -> str:
             slim["trading_notes"].pop()
         else:
             slim["related_knowledge"].pop()
+        encoded_slim = _json(slim)
+    while len(encoded_slim) > 3000 and len(slim["profile"]) > 80:
+        slim["profile"] = slim["profile"][:max(80, len(slim["profile"]) // 2)]
+        slim["profile_truncated"] = True
+        encoded_slim = _json(slim)
+    if len(encoded_slim) > 3000:
+        # Keep the direct reading identity, not a misleading slice of evidence.
+        slim["prepared_materials"] = {key: prepared_reading[key] for key in ("state", "revision", "updated_at", "read_with", "message") if key in prepared_reading}
+        slim["prepared_materials"]["message"] = "已有材料须按read_with读取，摘要未在此展开。" if not isinstance(materials, Exception) else prepared_reading["message"]
         encoded_slim = _json(slim)
     return encoded_slim
 

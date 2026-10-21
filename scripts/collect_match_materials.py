@@ -17,6 +17,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from xiaoxue_api.modules.current_event.public import get_collection_task, prepare_date, prepare_upcoming, prepare_scope, prepare_scope_batch, resume_collection, run_collection_bounded
+from xiaoxue_api.modules.current_event.preparation import kickoff
 
 
 def _scheduler_directory() -> Path:
@@ -101,7 +102,7 @@ def scheduler_tick(*, now_value: datetime | None = None) -> dict:
         if now_value.tzinfo is None:
             raise ValueError("调度检查时刻需要包含时区")
         scope = prepare_scope_batch(dispatch=False)
-        matches = prepare_upcoming(hours=24, dispatch=False)
+        matches = prepare_upcoming(now_value=now_value, dispatch=False)
         tasks = {row["id"]: row for row in [*scope["tasks"], *matches["tasks"]]}
         pending = []
         for task in tasks.values():
@@ -122,9 +123,13 @@ def scheduler_tick(*, now_value: datetime | None = None) -> dict:
                 pending.append(task)
         def priority(task):
             match = task.get("match") or {}
-            start = _timestamp(f"{match.get('match_date', '')}T{match.get('match_time', '')}+08:00")
+            try:
+                start = kickoff(match)
+            except (ValueError, TypeError):
+                start = None
             urgent = start is not None and 0 < (start - now_value).total_seconds() <= 7200
-            return (not urgent, task.get("created_at") or "", task["id"])
+            recovery = int(task.get("attempts") or 0) > 0
+            return (0 if urgent else 1 if recovery else 2 if not match else 3, start.isoformat() if match and start else "", task.get("created_at") or "", task["id"])
         pending.sort(key=priority)
         dispatched = []
         for slot_number in range(2):
@@ -138,7 +143,7 @@ def scheduler_tick(*, now_value: datetime | None = None) -> dict:
             _spawn_worker(task["id"], slot)
             dispatched.append(task["id"])
         return {"status": "checked", "event": scope["event"], "queued": len(pending) + len(dispatched),
-                "dispatched": dispatched, "skipped": [*scope.get("skipped", []), *matches.get("skipped", [])]}
+                "dispatched": dispatched, "truncated": matches.get("truncated", False), "skipped": [*scope.get("skipped", []), *matches.get("skipped", [])]}
     finally:
         for handle in handles:
             handle.close()
@@ -153,7 +158,7 @@ def main() -> int:
     parser.add_argument("--hours", type=int, help="按当前关注范围提前准备未来N小时，含跨日比赛；不修改排程")
     parser.add_argument("--scope", choices=("event", "team", "all"), help="不等对阵：准备赛事、指定队伍或关注赛事全部已确认参赛队")
     parser.add_argument("--team", default="", help="仅与 --scope team 同用")
-    parser.add_argument("--scheduler-tick", action="store_true", help="原排程器的有界检查接点；赛事/队伍/未来24小时比赛共用队列，不安装任务")
+    parser.add_argument("--scheduler-tick", action="store_true", help="原排程器的有界检查接点；赛事/队伍/近期比赛共用队列，不安装任务")
     args = parser.parse_args()
     try:
         if args.scheduler_tick:

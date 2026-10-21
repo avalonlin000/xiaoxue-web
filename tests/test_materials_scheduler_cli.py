@@ -29,9 +29,10 @@ def setup_tick(monkeypatch, tmp_path, tasks):
 def test_tick_enqueues_all_scopes_and_matches_but_only_dispatches_two(monkeypatch, tmp_path):
     tasks = [task(index) for index in range(5)]
     setup_tick(monkeypatch, tmp_path, tasks)
-    result = cli.scheduler_tick()
+    now = datetime(2026, 10, 20, tzinfo=timezone.utc)
+    result = cli.scheduler_tick(now_value=now)
     cli.prepare_scope_batch.assert_called_once_with(dispatch=False)
-    cli.prepare_upcoming.assert_called_once_with(hours=24, dispatch=False)
+    cli.prepare_upcoming.assert_called_once_with(now_value=now, dispatch=False)
     assert len(result["dispatched"]) == 2
     assert cli._spawn_worker.call_count == 2
     assert result["queued"] == 5

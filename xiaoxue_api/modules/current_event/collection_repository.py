@@ -21,6 +21,9 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from .preparation import kickoff
+from .evidence import with_readable_evidence
+
 COLLECTOR_VERSION = 5
 _deadline = ContextVar("collection_deadline", default=None)
 _source_counts = ContextVar("collection_source_counts", default=None)
@@ -175,10 +178,10 @@ def read(task_id: str) -> dict:
                 result = {identity_field(subject_of(task)): subject_of(task), "updated_at": staged.get("updated_at"), "status": "partial", "revision": None,
                           "summary": "已取得的材料可先阅读，其他来源仍在核对；这不是完整研究成果。", "sections": sections,
                           "limitations": list(dict.fromkeys(limitations + ["本次资料准备尚未完成"]))}
-    return {"task": task, "result": result}
+    return {"task": task, "result": with_readable_evidence(result)}
 
 
-def submit(identity: dict, *, refresh: bool = False) -> dict:
+def submit(identity: dict, *, refresh: bool = False, automatic_schedule: bool = False) -> dict:
     task_id = task_id_for(identity)
     dependencies = dependency_manifest(identity)
     with _locked(task_id) as directory:
@@ -189,7 +192,7 @@ def submit(identity: dict, *, refresh: bool = False) -> dict:
             changed = {name for name, value in dependencies.items() if value != previous.get("dependencies", {}).get(name)}
             fresh = (latest and latest.get("collector_version") == COLLECTOR_VERSION
                      and datetime.fromisoformat(latest["updated_at"]) > datetime.now(timezone.utc) - timedelta(minutes=source_refresh_minutes(identity)))
-            if active or (fresh and not refresh and not changed):
+            if active or (fresh and previous["state"] != "paused" and not refresh and not changed):
                 return {"task": previous, "result": latest}
             recovery_window = datetime.fromisoformat(previous["updated_at"]) > datetime.now(timezone.utc) - timedelta(minutes=source_refresh_minutes(identity))
             if not refresh and not changed and recovery_window and previous["state"] in {"partial", "failed"} and (previous.get("next_recovery_at") or previous["attempts"] >= 3):
@@ -200,20 +203,21 @@ def submit(identity: dict, *, refresh: bool = False) -> dict:
             "attempts": 0, "progress": [], "lease_until": "", "message": "正在准备比赛资料",
             "dependencies": dependencies,
         }
+        if automatic_schedule:
+            task["automatic_schedule"] = True
         if previous and not refresh:
             saved = _load(directory / "checkpoint.json") or {}
             if saved.get("generation") == previous["generation"]:
                 invalid = set(changed)
                 if not fresh:
                     invalid.add("external")
-                if invalid & {"external", "library"}:
-                    invalid.update({"digest", "analysis"})
-                if "internal" in invalid:
-                    invalid.add("analysis")
+                invalid = _invalidated_stages(saved.get("stages", {}), invalid)
                 stages = {name: stage for name, stage in saved.get("stages", {}).items() if name not in invalid}
                 reusable = {}
                 if "external" in invalid and "library" not in invalid:
-                    reusable = {name: stage for name, stage in saved.get("stages", {}).items() if name == "digest" or (name == "analysis" and "internal" not in invalid and "analysis" not in changed)}
+                    failed = _invalidated_stages(saved.get("stages", {}))
+                    reusable = {name: stage for name, stage in saved.get("stages", {}).items()
+                                if name not in failed and (name == "digest" or (name == "analysis" and "internal" not in invalid and "analysis" not in changed))}
                 _save(directory / "checkpoint.json", {"generation": task["generation"], "updated_at": now(), "stages": stages,
                                                        "reusable_stages": reusable, "external_basis": _fingerprint((saved.get("stages", {}).get("external") or {}).get("sections"))})
         _save(directory / "task.json", task)
@@ -235,7 +239,7 @@ def read_at(task_id: str, as_of: str) -> dict:
         except (KeyError, ValueError, TypeError):
             continue
     result = max(candidates, key=lambda value: value[0])[1] if candidates else None
-    return {"task": {"id": task_id, identity_field(result.get("subject") or result.get("match") or {}): result.get("subject") or result.get("match"), "state": "completed" if result.get("status") == "ok" else "partial"} if result else None, "result": result}
+    return {"task": {"id": task_id, identity_field(result.get("subject") or result.get("match") or {}): result.get("subject") or result.get("match"), "state": "completed" if result.get("status") == "ok" else "partial"} if result else None, "result": with_readable_evidence(result)}
 
 
 def update_task(task_id: str, values: dict, *, generation: int | None = None, attempt: int | None = None) -> dict | None:
@@ -264,6 +268,32 @@ def claim(task_id: str) -> dict | None:
         return task
 
 
+def pause_scheduled_task(task: dict, message: str) -> None:
+    """Withdraw idle automatic execution, retaining sources and every snapshot."""
+    with _locked(task["id"]) as directory:
+        current = _load(directory / "task.json")
+        if not current or not current.get("automatic_schedule") or current["generation"] != task["generation"] or current["attempts"] != task["attempts"]:
+            return
+        if current["state"] not in {"queued", "running"}:
+            return
+        if current["state"] == "running" and current.get("lease_until", "") > now():
+            return  # Do not interrupt work owned by another live worker.
+        current.update(state="paused", lease_until="", next_recovery_at="", message=message, updated_at=now())
+        _save(directory / "task.json", current)
+
+
+def _invalidated_stages(stages: dict, changed=()) -> set[str]:
+    """Generation changes and same-generation recovery share one dependency rule."""
+    failed = {name for name, stage in stages.items()
+              if stage.get("failed") or ("failed" not in stage and stage.get("limitations") and not stage.get("sections"))}
+    invalid = set(changed) | failed
+    if invalid & {"external", "library"} or "internal" in failed:
+        invalid.update({"digest", "analysis"})
+    if invalid & {"internal", "digest"}:
+        invalid.add("analysis")
+    return invalid
+
+
 def requeue_failed_stages(task_id: str) -> dict:
     """Resume this generation; refreshing inputs is a separate explicit action."""
     with _locked(task_id) as directory:
@@ -273,13 +303,7 @@ def requeue_failed_stages(task_id: str) -> dict:
         saved = _load(directory / "checkpoint.json") or {}
         if saved.get("generation") == task["generation"]:
             stages = saved.get("stages", {})
-            failed = {name for name, stage in stages.items() if stage.get("failed") or ("failed" not in stage and stage.get("limitations") and not stage.get("sections"))}
-            # Derived results depend on recovered upstream inputs. Independent
-            # successful collection stages retain their checkpoint.
-            if failed & {"internal", "library", "external"}:
-                failed.update({"digest", "analysis"})
-            elif "digest" in failed:
-                failed.add("analysis")
+            failed = _invalidated_stages(stages)
             saved["stages"] = {name: stage for name, stage in stages.items() if name not in failed}
             _save(directory / "checkpoint.json", saved)
         task.update(state="queued", lease_until="", next_recovery_at="", updated_at=now(), message="正在补齐未完成内容，已取得内容保留")
@@ -318,7 +342,8 @@ def finish(task: dict, result: dict | None, *, message: str = "") -> None:
             if not snapshot.exists():
                 _save(snapshot, result)
             _save(directory / "latest.json", result)
-        current.update(state=("completed" if result["status"] == "ok" else "partial") if result else "failed", updated_at=now(), lease_until="", message=message or ("资料已准备，可直接阅读" if result else "本次准备失败，已有资料仍可阅读"))
+        readable_message = "资料已准备，可直接阅读" if result and result["status"] == "ok" else "部分资料已整理，可先阅读；仍有内容待补" if result else "本次准备失败，已有资料仍可阅读"
+        current.update(state=("completed" if result["status"] == "ok" else "partial") if result else "failed", updated_at=now(), lease_until="", message=message or readable_message)
         saved = _load(directory / "checkpoint.json") or {}
         stages = saved.get("stages", {}) if saved.get("generation") == current["generation"] else {}
         expected = {"internal", "external", "digest", "analysis"} if current.get("subject") else {"internal", "library", "external", "digest", "analysis"}
@@ -349,10 +374,7 @@ def _fingerprint(value) -> str:
 def source_refresh_minutes(identity: dict) -> int:
     """Six-hour ordinary window; last two hours use the existing half-hour cap."""
     try:
-        raw_time = str(identity.get("match_time") or "")
-        stamp = raw_time if len(raw_time) > 10 and raw_time[4:5] == "-" else f"{identity['match_date']}T{raw_time}"
-        start = datetime.fromisoformat(stamp)
-        start = start.replace(tzinfo=ZoneInfo("Asia/Shanghai")) if start.tzinfo is None else start
+        start = kickoff(identity)
         if timedelta(0) <= start - datetime.now(timezone.utc) <= timedelta(hours=2):
             return 30
     except (KeyError, ValueError, TypeError):
@@ -367,6 +389,7 @@ def dependency_manifest(identity: dict) -> dict:
     from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
     from xiaoxue_api.modules.tk_knowledge.public import browse, get_entry, list_match_trading_tk
     from .analysis_repository import METHODS, SKILLS
+    from .evidence import PUBLIC_EVIDENCE_VERSION
     from .service import get_current_event
 
     def safely(operation):
@@ -405,6 +428,11 @@ def dependency_manifest(identity: dict) -> dict:
     if teams:
         internal["trading_tk"] = safely(lambda: list_match_trading_tk(region=next(iter(regions)) if len(regions) == 1 else "", teams=teams, players=players, limit=12))
     if identity_field(identity) == "match":
+        from .evidence import prepared_sections
+        internal["prepared"] = [
+            {**section, "items": [{key: value for key, value in row.items() if key != "prepared_revision"} for row in section.get("items", [])]}
+            for section in prepared_sections(identity)
+        ]
         from xiaoxue_api.modules.fundamentals.public import get_match_context
         from .service import list_score_match_results
         internal["cycle"] = safely(lambda: get_match_context(identity["team_a"], identity["team_b"], event=identity.get("event", "")))
@@ -412,7 +440,7 @@ def dependency_manifest(identity: dict) -> dict:
     source_config = {key: config.get(key) for key in ("event", "aliases", "team_aliases", "source_hints", "confirmed_teams", "participant_sources")}
     methods = {name: [_fingerprint(safely(lambda: {"text": (SKILLS / path).read_text()})) for path in paths] for name, (_, paths) in METHODS.items()}
     return {"internal": _fingerprint(internal), "library": _fingerprint(library), "external": _fingerprint(source_config),
-            "analysis": _fingerprint({"methods": methods, "version": version_item})}
+            "analysis": _fingerprint({"methods": methods, "version": version_item, "evidence_contract": PUBLIC_EVIDENCE_VERSION})}
 
 
 def read_checkpoint(task: dict) -> dict:
@@ -780,9 +808,15 @@ def call_digest_model(packet: dict) -> str:
 
 
 def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]]:
+    from .evidence import source_fingerprints, unseen_source_sections
+    original = sections
+    sections = unseen_source_sections(identity, sections)
     sources = [item for section in sections if section.get("id") in {"news", "library"}
                for item in section.get("items", [])[:6]
                if item.get("verification") in {"source_text", "knowledge_extract"} and item.get("text")]
+    if not sources and sections != original:
+        return [{"id": "digest", "title": "本场值得知道", "selection_status": "screened", "items": [],
+                 "summary": "已复用双方筛选过的相同原文，本次没有新增待筛内容。"}], []
     if identity.get("scope") != "event" or (len(sources) <= 2 and all(len(row["text"]) <= 1600 for row in sources)):
         return _summarize_materials_once(identity, sections)
     # Keep each source's complete evidence window. Successful batches survive a
@@ -838,10 +872,12 @@ def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict
     if not items and not incomplete:
         summary = "已粗筛，未发现值得补充的赛事信息，不以旧闻或泛泛表态凑数。"
     return [{"id": "digest", "title": "本届赛事值得知道", "selection_status": "screened",
-             "incomplete": incomplete, "summary": summary, "items": items}], notice
+             "incomplete": incomplete, "summary": summary, "items": items,
+             "screened_sources": source_fingerprints(sources) if not incomplete else []}], notice
 
 
 def _summarize_materials_once(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]]:
+    from .evidence import source_fingerprints, knowledge_provenance
     prepared_at = datetime.fromisoformat(now())
     sources = {}
     for section in sections:
@@ -921,14 +957,16 @@ def _summarize_materials_once(identity: dict, sections: list[dict]) -> tuple[lis
                           "why_relevant": reason.strip()[:500], "relevance": relevance,
                           "event_key": event_key.strip()[:160], "evidence_quote": quote, "source_ids": ids,
                           "source_id": source.get("source_id", ""), "source_kind": source.get("verification"),
+                          "content_hash": source.get("content_hash", ""),
                           "kind": row.get("kind") if source.get("source_category") != "official_background" and row.get("kind") in {"author_analysis", "reported_information"} else "reported_information",
                           "source_category": source.get("source_category", "unclassified"), "weight": source.get("weight", "normal"),
                           "related_teams": source.get("related_teams", []),
-                          "conditions": str(row.get("conditions") or "")[:600], "counterevidence": str(row.get("counterevidence") or "")[:600]})
+                          "conditions": str(row.get("conditions") or "")[:600], "counterevidence": str(row.get("counterevidence") or "")[:600],
+                          **knowledge_provenance({"source_kind": source.get("verification")})})
         if items or not selected:
             return [{"id": "digest", "title": "本场值得知道", "selection_status": "screened",
                      "summary": f"已粗筛，保留 {len(items)} 条与本场有关的内容。" if items else "已粗筛，未发现值得补充的本场信息，不以旧闻或泛泛表态凑数。",
-                     "items": items}], []
+                     "items": items, "screened_sources": source_fingerprints(list(sources.values()))}], []
     except (OSError, ValueError, TypeError, AttributeError, TimeoutError, subprocess.TimeoutExpired):
         pass
     return [], ["本次信息粗筛未完成，原文保留在依据中，不将未筛材料当作阅读成果"]
@@ -940,7 +978,8 @@ def collect_internal(identity: dict) -> tuple[list[dict], list[str]]:
     from xiaoxue_api.modules.tk_knowledge.public import list_match_trading_tk
     from xiaoxue_api.modules.profiles.public import get_current_profile
 
-    sections, limitations, player_names, regions = [], [], set(), set()
+    from .evidence import prepared_sections
+    sections, limitations, player_names, regions = prepared_sections(identity), [], set(), set()
     try:
         context = get_match_context(identity["team_a"], identity["team_b"], event=identity["event"])
         rows = []

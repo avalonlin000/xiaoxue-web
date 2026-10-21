@@ -1,5 +1,6 @@
 {
   "event": "S16 世界赛",
+  "preparation": {"upcoming_days": 7},
   "aliases": ["S16全球总决赛", "Worlds 2026", "2026 World Championship", "Worlds"],
   "confirmed_teams": ["AL", "BLG", "TES", "IG", "GEN", "HLE", "T1", "DK", "G2", "MKOI", "KC", "TLAW", "LYON", "C9", "TSW", "CFO", "MVK", "LOS", "FUR"],
   "participants_verified": true,

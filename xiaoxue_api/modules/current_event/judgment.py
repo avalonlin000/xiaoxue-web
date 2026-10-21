@@ -14,6 +14,7 @@ import xiaoxue_api.modules.version_understanding.public as version_public
 
 from . import analysis_repository as analysis
 from . import collection_repository as materials_repository
+from .evidence import readable_evidence
 
 
 HANDLERS = {"version", "team", "cycle", "trading", "match"}
@@ -66,7 +67,7 @@ def _saved_contents(result: dict | None, handler: str) -> tuple[list[dict], list
         if not isinstance(section, dict):
             continue
         sid = str(section.get("id") or "")
-        if sid == "digest" and section.get("selection_status") != "screened":
+        if sid in {"digest", "shared_digest"} and section.get("selection_status") != "screened":
             continue
         for index, item in enumerate(section.get("items", [])):
             if not isinstance(item, dict) or not isinstance(item.get("text"), str) or not item["text"].strip():
@@ -77,23 +78,20 @@ def _saved_contents(result: dict | None, handler: str) -> tuple[list[dict], list
             if sid == "analysis":
                 if item.get("method_version") and (handler == "match" or item.get("method_id") == {"version": "version", "team": "version", "cycle": "cycle", "trading": "trading"}.get(handler)):
                     output = {key: item.get(key) for key in ("title", "text", "verification", "inference_scope", "method_id", "method_version")}
-                    output["evidence"] = [{"text": str(row.get("display_text") or row.get("evidence_quote") or row.get("text") or ""),
-                                           "kind": str(row.get("kind") or ""),
-                                           "url": row.get("url") if materials_repository.is_public_url(row.get("url") or "") else ""}
-                                          for row in item.get("input_evidence", item.get("evidence", []))
-                                          if isinstance(row, dict) and (row.get("display_text") or row.get("evidence_quote") or row.get("text"))]
+                    output["evidence"] = readable_evidence(item.get("input_evidence") or item.get("evidence") or [])
                     outputs.append(output)
                 continue
-            if handler != "match" and kind not in allowed.get(handler, set()) and sid not in allowed.get(handler, set()) and sid not in {"digest", "news"} and not (handler == "team" and sid.startswith("team_")):
+            if handler != "match" and kind not in allowed.get(handler, set()) and sid not in allowed.get(handler, set()) and sid not in {"digest", "shared_digest", "news"} and not (handler == "team" and sid.startswith("team_")):
                 continue
             if sid == "news":
                 continue  # Raw articles are not a second wall of text.
             text = item["text"]
             for field, label in (("conditions", "适用条件"), ("counterevidence", "反证与限制")):
-                if str(item.get(field) or "").strip():
-                    text += f"\n{label}：{item[field]}"
+                addition = f"{label}：{item[field]}" if str(item.get(field) or "").strip() else ""
+                if addition and addition not in text:
+                    text += f"\n{addition}"
             source_title = str(item.get("title") or "")
-            if sid == "digest" and not source_title:
+            if sid in {"digest", "shared_digest"} and not source_title:
                 from urllib.parse import urlparse
                 host = urlparse(str(item.get("url") or "")).hostname or "公开来源"
                 source_title = ("作者分析：" if kind == "author_analysis" else "公开信息：") + host
@@ -102,7 +100,7 @@ def _saved_contents(result: dict | None, handler: str) -> tuple[list[dict], list
                                      "system_inference" if sid in {"analysis", "comparison"} else kind,
                                      str(item.get("updated_at") or (result or {}).get("as_of") or ""),
                                      "system" if sid in {"analysis", "comparison"} else "unknown",
-                                     source_label=("作者观点 · AI整理，请结合原文" if kind == "author_analysis" else "公开信息 · AI整理，请结合原文") if sid == "digest" else str(item.get("source") or "已有准备内容"),
+                                     source_label=("作者观点 · AI整理，请结合原文" if kind == "author_analysis" else "公开信息 · AI整理，请结合原文") if sid in {"digest", "shared_digest"} else str(item.get("source") or "已有准备内容"),
                                      record_id=item.get("record_id"),
                                      subject_team=sid[5:] if sid.startswith("team_") else "",
                                      url=item.get("url") if materials_repository.is_public_url(item.get("url") or "") else "",

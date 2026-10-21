@@ -7,12 +7,14 @@ import json
 import os
 from pathlib import Path
 import signal
+import sqlite3
 import subprocess
 import sys
 from threading import Timer
 from zoneinfo import ZoneInfo
 
 from . import collection_repository as repository
+from . import preparation
 from .service import get_current_event, normalize_match_identity
 from xiaoxue_api.modules.team_data.public import list_schedules
 
@@ -38,12 +40,68 @@ def _identity(values: dict) -> dict:
             raise ValueError("尚未找到明确开赛时间，不生成无法区分场次的资料")
         row = candidates[0]
         identity = normalize_match_identity({**identity, "match_time": row["time"], "event": identity["event"] or row.get("stage", ""), "match_format": identity["match_format"] or row.get("format", "")})
+    canonical_event = preparation.match_event(identity["event"], identity["match_date"], get_current_event())
+    if canonical_event != identity["event"]:
+        identity = normalize_match_identity({**identity, "event": canonical_event})
     return identity
 
 
 def get_prepared_materials(values: dict, *, as_of: str = "") -> dict:
     task_id = repository.task_id_for(_identity(values))
     return repository.read_at(task_id, as_of) if as_of else repository.read(task_id)
+
+
+def summarize_window_materials(matches: list[dict]) -> dict:
+    """Read the displayed fixtures' saved results; never queue work on a GET."""
+    items = []
+    counts = {"confirmed_total": 0, "prepared": 0, "partial": 0, "not_started": 0, "pending_total": 0}
+    for entry in matches:
+        match = entry.get("match") or {}
+        item = {"match": match, "state": "pending", "reason": entry.get("pending_reason") or "对阵或时间尚未明确"}
+        if entry.get("pending"):
+            counts["pending_total"] += 1
+            items.append(item)
+            continue
+        try:
+            if not match.get("time"):
+                raise ValueError("开赛时间尚未明确")
+            identity = _identity({"team_a": match.get("team_a"), "team_b": match.get("team_b"),
+                                  "event": match.get("stage") or match.get("region") or "",
+                                  "match_date": match.get("date"), "match_time": match.get("time"),
+                                  "match_format": match.get("format") or ""})
+        except (KeyError, TypeError, ValueError) as exc:
+            item["reason"] = str(exc) or "对阵或时间尚未明确"
+            counts["pending_total"] += 1
+            items.append(item)
+            continue
+        counts["confirmed_total"] += 1
+        try:
+            data = repository.read(repository.task_id_for(identity))
+        except (OSError, ValueError, json.JSONDecodeError):
+            counts["not_started"] += 1
+            item.update({"state": "not_started", "reason": "该场已保存资料读取失败，未影响其他比赛"})
+            items.append(item)
+            continue
+        result, task = data.get("result") or {}, data.get("task") or {}
+        readable = any(
+            isinstance(row.get("text"), str) and row["text"].strip()
+            for section in result.get("sections") or []
+            if section.get("id") in {"digest", "shared_digest", "analysis", "comparison"}
+            and (section.get("id") not in {"digest", "shared_digest"} or section.get("selection_status") == "screened")
+            for row in section.get("items") or []
+        )
+        limitations = [str(text) for text in result.get("limitations") or [] if text]
+        state = ("prepared" if readable and result.get("status") == "ok" and task.get("state") == "completed" and
+                 (result.get("delivery") or {}).get("ready") is not False and not limitations
+                 else "partial" if readable else "not_started")
+        counts[state] += 1
+        item.update({"state": state, "reason": (limitations[0][:180] if limitations else
+                     "已有正文，仍需核对本次变化" if state == "partial" else
+                     str(task.get("message") or "尚未开始整理")[:180] if state == "not_started" else ""),
+                     "revision": result.get("revision"), "updated_at": result.get("updated_at"),
+                     "task_id": task.get("id"), "summary": str(result.get("summary") or "")[:180] if readable else ""})
+        items.append(item)
+    return {**counts, "items": items}
 
 
 def get_collection_task(task_id: str) -> dict:
@@ -53,8 +111,9 @@ def get_collection_task(task_id: str) -> dict:
     return data
 
 
-def prepare_materials(values: dict, *, refresh: bool = False, dispatch: bool = True) -> dict:
-    data = repository.submit(_identity(values), refresh=refresh)
+def prepare_materials(values: dict, *, refresh: bool = False, dispatch: bool = True, automatic_schedule: bool = False) -> dict:
+    options = {"automatic_schedule": True} if automatic_schedule else {}
+    data = repository.submit(_identity(values), refresh=refresh, **options)
     if dispatch and data["task"]["state"] == "queued":
         _executor.submit(run_collection_bounded, data["task"]["id"])
     return data
@@ -116,8 +175,43 @@ def _schedule_recovery(task_id: str) -> None:
     timer.start()
 
 
+def _claim_current_task(task_id: str) -> dict | None:
+    task = repository.read(task_id)["task"]
+    if task and task.get("automatic_schedule") and task["state"] in {"queued", "running"}:
+        try:
+            config = get_current_event()
+            if not config.get("event"):
+                raise ValueError("关注赛事暂不可读")
+            match = task["match"]
+            start = preparation.kickoff(match)
+            now_value = datetime.now(preparation.ZONE)
+            not_started = start > now_value
+            rows, overflow = preparation.schedules(list_schedules, config, start.date().isoformat(), start.date().isoformat()) if not_started else ([], False)
+            keys = set()
+            for row in rows:
+                try:
+                    when = preparation.kickoff(row)
+                    identity = normalize_match_identity({"team_a": row.get("team_a"), "team_b": row.get("team_b"), "event": row.get("stage"),
+                                                         "match_date": when.date().isoformat(), "match_time": when.strftime("%H:%M:%S")})
+                    keys.add(identity["match_key"])
+                except (ValueError, TypeError):
+                    continue
+            if match["match_key"] not in keys:
+                if overflow:
+                    repository.update_task(task_id, {"message": "当日赛程较多，暂不能完整核对本场，保留资料等待后续检查。"}, generation=task["generation"], attempt=task["attempts"])
+                    return None
+                repository.pause_scheduled_task(task, "赛程或关注范围已调整，停止本场自动准备；原资料仍保留。")
+                return None
+        except (OSError, sqlite3.Error, ValueError, KeyError, TypeError):
+            # Unknown schedule state is not proof of cancellation, nor license
+            # to spend on stale automatic work. A later tick can check again.
+            repository.update_task(task_id, {"message": "赛程暂时无法核对，保留原资料，等待下次检查。"}, generation=task["generation"], attempt=task["attempts"])
+            return None
+    return repository.claim(task_id)
+
+
 def run_collection(task_id: str) -> None:
-    task = repository.claim(task_id)
+    task = _claim_current_task(task_id)
     if not task:
         return
     with repository.collection_budget(attempt=task["attempts"]):
@@ -160,7 +254,7 @@ def run_collection_bounded(task_id: str, *, budget_seconds: float = 720, worker_
 
 
 def _run_collection_in_slot(task_id: str, *, budget_seconds: float, worker_slot_fd: int) -> None:
-    task = repository.claim(task_id)
+    task = _claim_current_task(task_id)
     if not task:
         return
     try:
@@ -236,7 +330,8 @@ def _run_claimed_collection(task: dict) -> None:
             limitations.extend(missing)
         if "analysis" not in stages:
             repository.check_budget()
-            repository.update_task(task_id, {"progress": ["公开内容已筛选", "正在按现有方法分析本场"]}, generation=task["generation"], attempt=task["attempts"])
+            screening = "新原文粗筛未完成，先使用已有可读依据" if stages.get("digest", {}).get("failed") else "公开内容已筛选"
+            repository.update_task(task_id, {"progress": [screening, "正在按现有方法分析本场"]}, generation=task["generation"], attempt=task["attempts"])
             try:
                 analysis, missing = _call_stage(repository.analyze_materials, task["match"], sections)
             except Exception:
@@ -246,19 +341,22 @@ def _run_claimed_collection(task: dict) -> None:
                 return
             sections.extend(analysis)
             limitations.extend(missing)
-        order = {"digest": 0, "analysis": 1, "comparison": 2}
-        sections.sort(key=lambda section: order.get(section.get("id"), 3))
+        order = {"digest": 0, "shared_digest": 1, "analysis": 2, "comparison": 3}
+        sections.sort(key=lambda section: order.get(section.get("id"), 4))
         result = None
         if any(section.get("items") for section in sections):
             match = task["match"]
             digest = next((section for section in sections if section.get("id") == "digest" and section.get("selection_status") == "screened"), None)
+            shared = next((section for section in sections if section.get("id") == "shared_digest" and section.get("selection_status") == "screened" and section.get("items")), None)
             summary = digest["summary"] if digest else "已有资料可按需查看；本场外部信息尚未完成粗筛。"
+            if shared:
+                summary = (summary + "已复用赛事与双方准备依据。") if digest else "已复用赛事与双方准备依据；本场新增公开来源尚未补齐。"
             own = next((section for section in sections if section.get("id") == "analysis" and section.get("items")), None)
-            author_analysis = bool(digest and any(item.get("kind") == "author_analysis" for item in digest.get("items", [])))
+            author_analysis = any(item.get("kind") == "author_analysis" for section in (digest, shared) if section for item in section.get("items", []))
             own_scope = "supported" if own and any(item.get("inference_scope") == "supported" for item in own["items"]) else "conditional" if own else "unavailable"
             ready = bool(author_analysis and own_scope == "supported")
             result = {"match": match, "updated_at": repository.now(), "as_of": repository.now(), "status": "ok" if ready and not limitations else "partial", "summary": f"{match['team_a']} vs {match['team_b']}：{summary}" + ("个人方法分析已备好。" if own else ""), "sections": sections, "limitations": list(dict.fromkeys(limitations)),
-                      "delivery": {"public_analysis": "screened" if digest else "unavailable", "public_author_analysis": "available" if author_analysis else "unavailable",
+                      "delivery": {"public_analysis": "screened" if digest or shared else "unavailable", "public_author_analysis": "available" if author_analysis else "unavailable",
                                    "personal_analysis": "prepared" if own else "unavailable", "personal_analysis_scope": own_scope, "ready": ready},
                       "conditional_capabilities": {"live_bp": "unverified", "market_quotes": "unverified"}}
         repository.finish(task, result)
@@ -280,10 +378,13 @@ def list_prepared_materials(date_value: str = "today", limit: int = 30) -> dict:
 def prepare_date(date_value: str = "today", *, event: str = "", refresh: bool = False, dispatch: bool = True) -> dict:
     """Shared scheduler entry. Does not register or enable any production job."""
     date_value = datetime.now(ZoneInfo("Asia/Shanghai")).date().isoformat() if date_value == "today" else datetime.fromisoformat(date_value).date().isoformat()
-    scope = event.strip() or str(get_current_event().get("event") or "").strip()
+    config = get_current_event()
+    scope = event.strip() or str(config.get("event") or "").strip()
     if not scope:
         raise ValueError("尚未配置关注赛事，不自动扩大到全部比赛")
-    rows = list_schedules({"date_from": date_value, "date_to": date_value, "event": scope}, 200)
+    aliases = [config.get("event"), *config.get("aliases", []), *config.get("leagues", [])]
+    current_scope = not event.strip() or scope.casefold() in {str(value).casefold() for value in aliases if value}
+    rows, truncated = preparation.schedules(list_schedules, config if current_scope else {"event": scope}, date_value, date_value)
     tasks, skipped = [], []
     for row in rows:
         values = {"team_a": row.get("team_a"), "team_b": row.get("team_b"), "event": row.get("stage") or scope,
@@ -292,40 +393,36 @@ def prepare_date(date_value: str = "today", *, event: str = "", refresh: bool = 
             tasks.append(prepare_materials(values, refresh=refresh, dispatch=dispatch)["task"])
         except ValueError as exc:
             skipped.append({"match": values, "reason": str(exc)})
-    return {"date": date_value, "event": scope, "tasks": tasks, "skipped": skipped, "source": "configured_schedule"}
+    return {"date": date_value, "event": scope, "tasks": tasks, "skipped": skipped, "truncated": truncated, "source": "configured_schedule"}
 
 
-def prepare_upcoming(*, hours: int = 24, now_value: datetime | None = None, refresh: bool = False, dispatch: bool = True) -> dict:
-    """Existing scheduler can call this before its 90-minute delivery node."""
-    if not 1 <= hours <= 48:
-        raise ValueError("提前准备窗口应在1至48小时之间")
+def prepare_upcoming(*, hours: int | None = None, now_value: datetime | None = None, refresh: bool = False, dispatch: bool = True) -> dict:
+    """Reuse the existing queue for the configured, bounded upcoming window."""
+    config = get_current_event()
+    hours = preparation.window_days(config) * 24 if hours is None else hours
+    if isinstance(hours, bool) or not isinstance(hours, int) or not 1 <= hours <= 336:
+        raise ValueError("提前准备窗口应在1至336小时之间")
     start = now_value or datetime.now(ZoneInfo("Asia/Shanghai"))
     if start.tzinfo is None:
         raise ValueError("准备窗口必须包含时区")
     start = start.astimezone(ZoneInfo("Asia/Shanghai"))
     end = start + timedelta(hours=hours)
-    scope = str(get_current_event().get("event") or "").strip()
+    scope = str(config.get("event") or "").strip()
     if not scope:
         raise ValueError("尚未配置关注赛事，不自动扩大到全部比赛")
-    rows = list_schedules({"date_from": start.date().isoformat(), "date_to": end.date().isoformat(), "event": scope}, 200)
+    rows, truncated = preparation.schedules(list_schedules, config, start.date().isoformat(), end.date().isoformat())
     tasks, skipped = [], []
     for row in rows:
         try:
-            raw_time = str(row["time"])
-            when = datetime.fromisoformat(raw_time if re_match_date_time(raw_time) else f"{row['date']}T{raw_time}")
-            when = when.replace(tzinfo=ZoneInfo("Asia/Shanghai")) if when.tzinfo is None else when.astimezone(ZoneInfo("Asia/Shanghai"))
+            when = preparation.kickoff(row)
             if not start < when <= end:
                 continue
             values = {"team_a": row.get("team_a"), "team_b": row.get("team_b"), "event": row.get("stage") or scope,
-                      "match_date": row["date"], "match_time": row["time"], "match_format": row.get("format") or ""}
-            tasks.append(prepare_materials(values, refresh=refresh, dispatch=dispatch)["task"])
+                      "match_date": when.date().isoformat(), "match_time": when.strftime("%H:%M:%S"), "match_format": row.get("format") or ""}
+            tasks.append(prepare_materials(values, refresh=refresh, dispatch=dispatch, automatic_schedule=True)["task"])
         except (KeyError, ValueError, TypeError):
             skipped.append({"match": row, "reason": "对阵或时间尚未明确，未生成比赛分析"})
-    return {"date": start.date().isoformat(), "event": scope, "window_start": start.isoformat(), "window_end": end.isoformat(), "tasks": tasks, "skipped": skipped, "source": "configured_schedule"}
-
-
-def re_match_date_time(value: str) -> bool:
-    return len(value) > 10 and value[4:5] == "-" and value[7:8] == "-"
+    return {"date": start.date().isoformat(), "event": scope, "window_start": start.isoformat(), "window_end": end.isoformat(), "tasks": tasks, "skipped": skipped, "truncated": truncated, "source": "configured_schedule"}
 
 
 def _scope_identity(values: dict) -> dict:

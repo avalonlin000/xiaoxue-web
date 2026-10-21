@@ -68,6 +68,25 @@ def test_background_and_conditional_analysis_are_readable_but_not_full_readiness
     assert result["status"] == "partial"
 
 
+def test_failed_screening_is_not_announced_as_screened_or_fully_prepared(store):
+    task = collection.prepare_materials(MATCH, dispatch=False)["task"]
+    observed = []
+    def analyze(*_):
+        observed.extend(repo.read(task["id"])["task"].get("progress", []))
+        return [], []
+    internal = [{"id": "team_KC", "items": [{"text": "已有队伍资料"}]}]
+    with patch.object(repo, "collect_internal", return_value=(internal, [])), \
+         patch.object(repo, "collect_external", return_value=([], [])), \
+         patch.object(repo, "summarize_materials", return_value=([], ["本次信息粗筛未完成"])), \
+         patch.object(repo, "analyze_materials", side_effect=analyze):
+        collection.run_collection(task["id"])
+    saved = collection.get_collection_task(task["id"])
+    assert "公开内容已筛选" not in observed
+    assert any("未完成" in item for item in observed)
+    assert saved["task"]["state"] == "partial"
+    assert "待补" in saved["task"]["message"]
+
+
 def test_lol_sources_are_not_silently_applied_to_other_games(store):
     with pytest.raises(ValueError, match="只适用于 LOL"):
         collection.prepare_materials({**MATCH, "game": "valorant"}, dispatch=False)
@@ -270,7 +289,8 @@ def test_batch_reuses_configured_schedule_scope_and_does_not_fabricate_opponents
     rows = [{"team_a": "KC", "team_b": "MVK", "date": "2026-10-19", "time": "02:00", "stage": "Worlds", "format": "BO3"}, {"team_a": "TBD", "team_b": "MVK", "date": "2026-10-19", "time": "04:00", "stage": "Worlds"}]
     with patch("xiaoxue_api.modules.current_event.collection.get_current_event", return_value={"event": "Worlds"}), patch("xiaoxue_api.modules.current_event.collection.list_schedules", return_value=rows) as schedules:
         report = collection.prepare_date("2026-10-19", dispatch=False)
-    schedules.assert_called_once_with({"date_from": "2026-10-19", "date_to": "2026-10-19", "event": "Worlds"}, 200)
+    # Read one extra row so a full batch can honestly report truncation.
+    schedules.assert_called_once_with({"date_from": "2026-10-19", "date_to": "2026-10-19", "event": "Worlds"}, 201)
     assert len(report["tasks"]) == 1
     assert len(report["skipped"]) == 1
     assert report["tasks"][0]["match"]["team_a"] == "KC"

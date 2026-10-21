@@ -272,6 +272,11 @@ def _difference_line(label: str, value: float, strong_side: str, threshold: floa
 
 
 def _build_match_context(team_a: dict, team_b: dict) -> dict:
+    if not can_compare_team_ratings(team_a, team_b):
+        reason = "跨赛区或赛区口径未核实，TS分数不能直接比较；只分别查看各队状态。"
+        return {**dict.fromkeys(("mu_diff", "sigma_diff", "ts_diff", "power_diff", "stability_diff", "stronger", "more_volatile")),
+                "comparable": False, "reason": reason, "power_note": reason,
+                "volatility_note": "", "risk_note": reason, "daily_summary": reason}
     power_a = team_a.get("power_score")
     power_b = team_b.get("power_score")
     stability_a = team_a.get("volatility_score")
@@ -310,6 +315,7 @@ def _build_match_context(team_a: dict, team_b: dict) -> dict:
         f"综合实力差 {_formatted(abs(power_diff or 0))} 偏向 {team_a['team'] if (power_diff or 0) >= 0 else team_b['team']}。"
     )
     return {
+        "comparable": True,
         "mu_diff": mu_diff,
         "sigma_diff": sigma_diff,
         "ts_diff": ts_diff,
@@ -322,3 +328,8 @@ def _build_match_context(team_a: dict, team_b: dict) -> dict:
         "risk_note": risk_note,
         "daily_summary": daily_summary,
     }
+
+
+def can_compare_team_ratings(team_a: dict, team_b: dict) -> bool:
+    """The existing cycle method allows only a known, shared domestic scale."""
+    return team_a.get("region") in {"LPL", "LCK"} and team_a.get("region") == team_b.get("region")
