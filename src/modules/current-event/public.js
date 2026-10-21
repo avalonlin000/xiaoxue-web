@@ -49,14 +49,22 @@ export default {
         view.renderJudgment(packet); watchReading('judgment', packet);
       },
       onDiscussion(payload) { if (active) view.renderJudgmentDiscussion(payload); },
+      onSession(payload) { if (active) view.restoreJudgmentSession(payload); },
     });
+    const rememberJudgmentDraft = () => judgment.setDraft(view.readJudgmentQuestion());
     const resetJudgment = () => {
-      selectedMethod = '';
       stopReading('judgment');
       const identity = judgmentObject(state.context, state.desk, state.selected);
       judgmentIdentityKey = JSON.stringify(identity);
-      judgment.setObject(identity);
+      const session = judgment.setObject(identity, { restoreTeam: true });
+      selectedMethod = session.methodId;
       view.resetJudgment();
+      view.restoreJudgmentSession(session);
+      if (!selecting && state.methods.some((method) => method.id === selectedMethod && method.status === 'ready')) {
+        view.renderJudgmentLoading(selectedMethod);
+        view.restoreJudgmentSession(session);
+        void judgment.open(selectedMethod);
+      }
     };
     const materials = createMatchMaterialsController({
       onUpdate(payload) {
@@ -92,6 +100,7 @@ export default {
     };
     const refresh = async () => {
       const current = ++selection;
+      rememberJudgmentDraft();
       materials.stop();
       materialsDesk = null;
       stopReading();
@@ -106,6 +115,7 @@ export default {
         state.recentMatches = payload.recentMatches || [];
         state.selected = null;
         state.desk = null;
+        selecting = false;
         state.context = payload.context || {};
         state.methods = payload.methods || [];
         view.render(payload);
@@ -114,13 +124,18 @@ export default {
         view.renderEventMaterials(eventPacket); watchReading('event', eventPacket);
         resetJudgment();
         root.dataset.moduleStatus = 'healthy';
-        if (state.matches.length) await actions.selectMatch(0);
+        const firstConfirmed = state.matches.findIndex((entry) => entry.match && !entry.pending);
+        if (firstConfirmed >= 0) await actions.selectMatch(firstConfirmed);
       } catch {
         if (active && current === selection) view.error();
       }
     };
     const selectMatch = async (entry, select) => {
-      if (!entry?.match) return null;
+      if (!entry?.match || entry.pending) return null;
+      // Selecting the active card is navigation, not a refresh. Keep its live
+      // editor and let an in-flight read finish; explicit refresh still reloads.
+      if (state.selected === entry.match && (selecting || state.desk)) return state.desk;
+      rememberJudgmentDraft();
       const current = ++selection;
       materials.stop();
       materialsDesk = null;
@@ -161,10 +176,12 @@ export default {
           return null;
         }
         selectedMethod = methodId;
+        rememberJudgmentDraft();
         stopReading('judgment');
         reading.reset();
-        judgment.setObject(judgmentObject(state.context, state.desk, state.selected, view.readJudgmentTeam()));
+        const session = judgment.setObject(judgmentObject(state.context, state.desk, state.selected, view.readJudgmentTeam()));
         view.renderJudgmentLoading(methodId);
+        view.restoreJudgmentSession(session);
         return judgment.open(methodId);
       },
       async reloadJudgment() {
@@ -174,9 +191,14 @@ export default {
         return method ? actions.openJudgment(method.id) : null;
       },
       closeJudgment() {
-        resetJudgment();
+        rememberJudgmentDraft();
+        judgment.stop();
+        selectedMethod = '';
+        stopReading('judgment');
+        view.resetJudgment();
         view.returnToMatch();
       },
+      draftJudgment(value) { judgment.setDraft(value); },
       async askJudgment() {
         return judgment.ask(view.readJudgmentQuestion());
       },
@@ -417,9 +439,10 @@ export default {
     const unbind = view.bind(actions);
     const unsubscribe = context.events?.on('page:changed', ({ page }) => {
       if (page === 'event') refresh();
-      else { selection += 1; materials.stop(); materialsDesk = null; judgment.stop(); stopReading(); }
+      else { rememberJudgmentDraft(); selection += 1; materials.stop(); materialsDesk = null; judgment.stop(); stopReading(); }
     });
     dispose = () => {
+      rememberJudgmentDraft();
       active = false;
       selection += 1;
       materials.stop();

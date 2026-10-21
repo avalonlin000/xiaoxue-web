@@ -91,9 +91,9 @@ export function createCurrentEventView(root) {
       if (results) results.innerHTML = '<div class="tk-empty">正在读取赛事资料…</div>';
       if (methods) methods.innerHTML = '<div class="tk-empty">正在读取可用判断视角…</div>';
       if (versionUnderstanding) versionUnderstanding.innerHTML = '<div class="tk-empty">正在读取当前版本理解…</div>';
-      if (matchList) matchList.innerHTML = '<div class="tk-empty">正在读取今日比赛…</div>';
+      if (matchList) matchList.innerHTML = '<div class="tk-empty">正在读取近期比赛…</div>';
       if (recentList) recentList.innerHTML = '<div class="tk-empty">正在读取最近查看…</div>';
-      if (matchDesk) matchDesk.innerHTML = '<div class="tk-empty">选择今天的一场比赛后，在这里查看资料和当前方案。</div>';
+      if (matchDesk) matchDesk.innerHTML = '<div class="tk-empty">选择一场比赛后，在这里查看资料和当前方案。</div>';
     },
     render(payload) {
       const { context = {}, items = [], matches = [], recentMatches = [], methods: methodCards = [], versionUnderstanding: versionData = null } = payload || {};
@@ -103,9 +103,14 @@ export function createCurrentEventView(root) {
       renderVersionUnderstanding(versionUnderstanding, versionData);
       renderMethods(methods, methodCards);
       if (matchList) {
+        const coverage = payload.preparation;
+        const overview = coverage ? '<p class="tk-empty" data-preparation-summary>近期确认 ' + coverage.confirmed_total
+          + ' 场 · 已整理 ' + coverage.prepared + ' · 部分整理 ' + coverage.partial
+          + ' · 暂无正文 ' + coverage.not_started + (coverage.pending_total ? ' · 对阵待定 ' + coverage.pending_total : '') + '</p>' : '';
         matchList.innerHTML = matches.length
-          ? matches.map((item, index) => renderMatchButton(item, index)).join('')
-          : '<div class="tk-empty">今天没有已确认比赛。</div>';
+          ? overview + matches.map((item, index) => renderMatchButton(item, index)).join('')
+          : overview + '<div class="tk-empty">所选范围暂没有赛程，仍可阅读赛事内容或选择队伍。</div>';
+        if (payload.scheduleTruncated) matchList.innerHTML += '<p class="tk-empty">近期赛程较多，当前只显示部分比赛。</p>';
       }
       if (recentList) renderRecentList(recentList, recentMatches);
       if (results) {
@@ -265,6 +270,23 @@ export function createCurrentEventView(root) {
       const ask = root.querySelector('[data-event-action="ask-judgment"]');
       if (ask) ask.disabled = false;
     },
+    restoreJudgmentSession(session = {}) {
+      const messages = root.querySelector('#event-judgment-messages');
+      if (messages) messages.innerHTML = (session.exchanges || []).map(renderJudgmentDiscussion).join('');
+      const question = root.querySelector('#event-judgment-question');
+      if (question) question.value = session.draft || '';
+      const team = root.querySelector('#event-judgment-team');
+      if (team) team.value = session.object?.team || '';
+      const notices = [];
+      if (session.basisChanged) notices.push('已有回答所用依据有更新；继续讨论会读取当前依据，旧回答不作为当前事实。');
+      if (session.truncated) notices.push('本页与继续讨论仅保留最近8条问答消息；较长回答发送时会节选。');
+      else if (session.exchanges?.some((item) => item.answer?.length > 3900)) notices.push('较长回答继续讨论时会节选，页面保留全文。');
+      if (session.evicted) notices.push('之前这部分临时讨论已移出缓存，请重新提供必要信息。');
+      const status = root.querySelector('#event-judgment-message');
+      if (status) status.textContent = session.pending ? '正在结合当前内容讨论…' : notices.join(' ');
+      const ask = root.querySelector('[data-event-action="ask-judgment"]');
+      if (ask) ask.disabled = Boolean(session.pending);
+    },
     readJudgmentTeam() { return root.querySelector('#event-judgment-team')?.value.trim() || ''; },
     readJudgmentQuestion() { return root.querySelector('#event-judgment-question')?.value || ''; },
     returnToMatch() {
@@ -374,11 +396,16 @@ export function createCurrentEventView(root) {
         direction.innerHTML = options.map((value) => `<option value="${value}">${value}</option>`).join('');
         if (team) team.disabled = market !== 'team';
       };
+      const onInput = (event) => {
+        if (event.target?.id === 'event-judgment-question') actions.draftJudgment?.(event.target.value);
+      };
       root.addEventListener('click', onClick);
       root.addEventListener('change', onChange);
+      root.addEventListener('input', onInput);
       return () => {
         root.removeEventListener('click', onClick);
         root.removeEventListener('change', onChange);
+        root.removeEventListener('input', onInput);
       };
     },
     error() {
@@ -397,6 +424,7 @@ export function renderPreparedMaterials(payload = {}) {
   const active = ['queued', 'running'].includes(payload?.task?.state) && !payload?.notice;
   const stateText = payload?.notice ? '暂未取得更新'
     : active ? (material ? '正在核对最新变化' : '正在准备')
+      : payload?.task?.state === 'paused' ? '自动准备已暂停'
       : payload?.task?.state === 'failed' ? '暂未补齐' : material?.status === 'partial' ? '部分资料已整理' : material ? '已准备资料' : '等待准备';
   const sections = (material?.sections || []).map((section) => {
     const items = (section.items || []).map((item, index) => {
@@ -404,15 +432,18 @@ export function renderPreparedMaterials(payload = {}) {
       const url = safeMaterialUrl(item.url);
       const source = readableMaterialText(item.source, '公开来源');
       const verification = { verified: '已核实', unverified: '待核实', lead: '待核实线索', search_lead: '仅搜索线索', source_text: '已读原文，适用性待核对', ai_summary: 'AI整理 · 请结合原文', internal_record: '已有记录，留意时效', knowledge_extract: '已有知识提炼，非原始全文', system_inference: '系统推导 · 未确认采用', conflict: '存在分歧' }[item.verification] || '';
-      const evidence = [source, readableMaterialTime(item.published_at), verification, item.is_excerpt ? '原文摘录' : ''].filter(Boolean).join(' · ');
+      const applicability = { verified: '适用性已核实', unverified_public_evidence: '公开依据适用性待核实', unverified_knowledge_extract: '知识提炼，适用性待核实', useful_background: '仅作背景，尚未证明适用于本场', stale: '资料较旧，适用性待核实' }[item.applicability] || '';
+      const evidence = [source, readableMaterialTime(item.published_at), verification, applicability, item.is_excerpt ? '原文摘录' : ''].filter(Boolean).join(' · ');
       const quote = item.verification === 'ai_summary' ? readableMaterialText(item.evidence_quote) : '';
       const reason = prose(item.why_relevant);
-      const conditions = [item.conditions && `适用条件：${item.conditions}`, item.counterevidence && `反证：${item.counterevidence}`].filter(Boolean).map(prose);
-      const inputEvidence = (item.evidence || []).map((row) => readableMaterialText(row.text)).filter(Boolean);
+      const conditions = [item.basis_note,
+        item.conditions && !item.text?.includes(`适用条件：${item.conditions}`) && `适用条件：${item.conditions}`,
+        item.counterevidence && !item.text?.includes(`反证与限制：${item.counterevidence}`) && `反证：${item.counterevidence}`].filter(Boolean).map(prose);
+      const inputEvidence = (item.evidence || []).map(renderAnalysisEvidence).filter(Boolean).join('');
       const kind = item.kind === 'author_analysis' ? '作者观点' : item.kind === 'reported_information' ? '报道信息' : '';
-      return `<article class="today-entry"${readingHighlight(payload.reading, `${section.id}:${index}`)}><b>${escapeHtml(readableMaterialText(item.title) || kind)}</b><p style="white-space:pre-line">${escapeHtml(prose(item.text))}</p>${reason ? `<p>${escapeHtml(reason)}</p>` : ''}${conditions.map((text) => `<p>${escapeHtml(text)}</p>`).join('')}${evidence ? `<em>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(evidence)}</a>` : escapeHtml(evidence)}</em>` : ''}${quote ? `<details><summary>查看原文依据</summary><blockquote style="white-space:pre-line">${escapeHtml(quote)}</blockquote></details>` : ''}${inputEvidence.length ? `<details><summary>查看分析依据</summary>${inputEvidence.map((text) => `<p style="white-space:pre-line">${escapeHtml(text)}</p>`).join('')}</details>` : ''}</article>`;
+      return `<article class="today-entry"${readingHighlight(payload.reading, `${section.id}:${index}`)}><b>${escapeHtml(readableMaterialText(item.title) || kind)}</b><p style="white-space:pre-line">${escapeHtml(prose(item.text))}</p>${reason ? `<p>${escapeHtml(reason)}</p>` : ''}${conditions.map((text) => `<p>${escapeHtml(text)}</p>`).join('')}${evidence ? `<em>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(evidence)}</a>` : escapeHtml(evidence)}</em>` : ''}${quote ? `<details><summary>查看原文依据</summary><blockquote style="white-space:pre-line">${escapeHtml(quote)}</blockquote></details>` : ''}${inputEvidence ? `<details><summary>查看分析依据</summary>${inputEvidence}</details>` : ''}</article>`;
     }).join('');
-    const screened = section.id === 'digest' && section.selection_status === 'screened';
+    const screened = ['digest', 'shared_digest'].includes(section.id) && section.selection_status === 'screened';
     if (!items && !screened) return '';
     const title = section.id === 'digest' && !screened ? '历史摘录（未按本场粗筛）' : readableMaterialText(section.title, '相关资料');
     const opened = screened || ['analysis', 'comparison'].includes(section.id);
@@ -422,6 +453,7 @@ export function renderPreparedMaterials(payload = {}) {
     .map((item) => readableMaterialText(item, '部分来源暂时无法核实，已保留可读取的资料。'));
   return `<div class="match-workspace-head"><b>${escapeHtml(payload.title || '比赛资料')}</b><span>${stateText}</span></div>
     ${renderReadingNotice(payload.reading)}
+    ${payload?.task?.state === 'paused' ? `<p class="match-desk-line">${escapeHtml(readableMaterialText(payload.task.message, '原资料仍可查看。'))}</p>` : ''}
     ${material?.updated_at ? `<p class="match-desk-line">截至 ${escapeHtml(readableMaterialTime(material.updated_at))}（北京时间）</p>` : ''}
     <p class="match-desk-line">${escapeHtml(readableMaterialText(material?.summary) || (active ? '小雪正在收集、核对并整理公开资料；已有比赛信息仍可直接查看。' : '暂时没有可读取的准备成果。'))}</p>
     ${sections}
@@ -444,6 +476,21 @@ function safeMaterialUrl(value) {
     const url = new URL(String(value || ''));
     return ['http:', 'https:'].includes(url.protocol) && !url.username && !url.password ? url.href : '';
   } catch { return ''; }
+}
+
+function renderAnalysisEvidence(row) {
+  const text = readableMaterialText(row.text);
+  if (!text) return '';
+  const url = safeMaterialUrl(row.url);
+  const kind = { author_analysis: '作者观点', reported_information: '报道信息', official_background: '官方资料',
+    version_background: '旧版本背景', team_profile_background: '旧队伍背景', cycle: '周期与近期赛果',
+    confirmed_tk: '已有交易认识', candidate_rule: '待确认认识' }[row.kind] || '';
+  const meta = [readableMaterialText(row.source_title || row.title || row.source), readableMaterialTime(row.published_at), kind].filter(Boolean).join(' · ');
+  const notes = [readableMaterialText(row.basis_note),
+    row.conditions && `适用条件：${readableMaterialText(row.conditions)}`,
+    row.counterevidence && `反证与限制：${readableMaterialText(row.counterevidence)}`].filter(Boolean);
+  const quote = readableMaterialText(row.evidence_quote);
+  return `<div class="judgment-prose"><p style="white-space:pre-line">${escapeHtml(withoutMaterialReferences(text))}</p>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}${notes.map((note) => `<p>${escapeHtml(note)}</p>`).join('')}${quote && quote !== text ? `<blockquote>${escapeHtml(quote)}</blockquote>` : ''}${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开出处</a>` : ''}</div>`;
 }
 
 function readableMaterialText(value, fallback = '') {
@@ -644,12 +691,7 @@ export function renderJudgmentContext(payload = {}) {
   }).join('');
   const analysis = (payload.analysis || []).map((item, index) => {
     const text = typeof item === 'string' ? item : item.text || item.summary || item.content || '';
-    const evidence = (item.evidence || []).map((row) => {
-      const quote = readableMaterialText(row.text);
-      if (!quote) return '';
-      const url = safeMaterialUrl(row.url);
-      return `<div class="judgment-prose"><p>${escapeHtml(withoutMaterialReferences(quote))}</p>${url ? `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">打开出处</a>` : ''}</div>`;
-    }).filter(Boolean).join('');
+    const evidence = (item.evidence || []).map(renderAnalysisEvidence).filter(Boolean).join('');
     return `<article class="judgment-inference"${readingHighlight(payload.reading, `analysis:${index}`)}><h4>${escapeHtml(readableMaterialText(item.title, '相关解释'))}</h4><small>系统推导，不等于你的判断</small><div class="judgment-prose">${versionContentHtml(withoutMaterialReferences(readableMaterialText(text)))}</div>${evidence ? `<details class="judgment-origin"><summary>所用依据</summary>${evidence}</details>` : ''}</article>`;
   }).join('');
   const limitations = [...new Set((payload.limitations || []).map((item) => readableMaterialText(item, '部分依据暂时无法核实。')).filter(Boolean))];
@@ -664,7 +706,8 @@ export function renderJudgmentContext(payload = {}) {
 
 export function renderJudgmentDiscussion(payload = {}) {
   const references = [...new Set((payload.references || []).map((item) => readableMaterialText(item.title)).filter(Boolean))];
-  return `<article class="judgment-exchange"><b>你的问题</b><p>${escapeHtml(readableMaterialText(payload.question))}</p><b>小雪</b><div class="judgment-prose">${versionContentHtml(discussionDisplayText(readableMaterialText(payload.answer)))}</div>${references.length ? `<small>参考：${escapeHtml(references.join('、'))}</small>` : ''}<small>本次讨论未保存，不代表你已认可或采用。</small></article>`;
+  const basis = [payload.method_title ? `讨论视角：${readableMaterialText(payload.method_title)}` : '', payload.basis_updated ? '这条回答所用依据已有更新' : ''].filter(Boolean).join(' · ');
+  return `<article class="judgment-exchange">${basis ? `<small>${escapeHtml(basis)}</small>` : ''}<b>你的问题</b><p>${escapeHtml(readableMaterialText(payload.question))}</p><b>小雪</b><div class="judgment-prose">${versionContentHtml(discussionDisplayText(readableMaterialText(payload.answer)))}</div>${references.length ? `<small>参考：${escapeHtml(references.join('、'))}</small>` : ''}<small>本次讨论未保存，不代表你已认可或采用。</small></article>`;
 }
 
 export function discussionDisplayText(value) {
@@ -684,19 +727,23 @@ function renderRecentList(target, recentMatches) {
 
 function renderMatchButton(item, index) {
   const match = item.match || {};
+  const materialState = { prepared: '已整理', partial: '部分整理', not_started: '暂无可用正文' }[item.preparation?.state];
+  const materialNote = materialState ? '资料：' + materialState + (item.preparation.reason ? ' · ' + item.preparation.reason : '') : '';
   const ts = item.ts || {};
   const compare = ts.compare || {};
   const meta = [formatMatchTime(match.time), match.region, match.format].filter(Boolean).join(' · ');
   if (item.pending) {
     return `<article class="event-match-button event-fixture-card is-pending">
-    <span class="event-match-kicker">待定</span>
+    <span class="event-match-kicker">${escapeHtml(match.match_date || match.date || '近期')} · 待定</span>
     <b>${escapeHtml(match.team_a || '待定')} <i>vs</i> ${escapeHtml(match.team_b || '待定')}</b>
     <span class="event-match-meta">${escapeHtml(meta)}</span>
     <em class="event-match-summary">${escapeHtml(item.pending_reason || '对阵未定，名额产生后再看这场。')}</em>
   </article>`;
   }
   const line = ts.available
-    ? `${compare.stronger || '双方'} · 综合实力差 ${format(compare.power_diff)}`
+    ? compare.comparable === false
+      ? compare.reason || '不同赛区的实力分数不能直接比较'
+      : `${compare.stronger || '双方'} · 综合实力差 ${format(compare.power_diff)}`
     : ts.reason || '未能读取两队实力资料';
   const plan = item.trade_plan?.final || {};
   const planBits = [
@@ -706,9 +753,10 @@ function renderMatchButton(item, index) {
   ];
   const planLine = planBits.length ? ` · ${planBits.join(' / ')}` : '';
   return `<button class="event-match-button event-fixture-card" data-event-match="${index}" aria-pressed="false">
-    <span class="event-match-kicker">今天</span>
+    <span class="event-match-kicker">${escapeHtml(match.match_date || match.date || '近期')}</span>
     <b>${escapeHtml(match.team_a || '')} <i>vs</i> ${escapeHtml(match.team_b || '')}</b>
     <span class="event-match-meta">${escapeHtml(meta)}</span>
+    ${materialNote ? '<span class="event-match-meta">' + escapeHtml(materialNote) + '</span>' : ''}
     <em class="event-match-summary">${escapeHtml(`实力参考：${line}${planLine}`)}</em>
   </button>`;
 }
@@ -746,7 +794,7 @@ function renderTeamEvidence(team) {
   const styleUnderstanding = (team.three_dimensional?.items || [])
     .map((item) => [item.label, item.value].filter(Boolean).join('：')).filter(Boolean).join('；');
   if (!starters && !styleUnderstanding) return '';
-  return `<div class="match-desk-team"><b>${escapeHtml(team.team)}</b>${starters ? `<span>首发：${escapeHtml(starters)}</span>` : ''}${styleUnderstanding ? `<span>风格/版本理解：${escapeHtml(styleUnderstanding)}</span>` : ''}</div>`;
+  return `<div class="match-desk-team"><b>${escapeHtml(team.team)}</b>${starters ? `<span>登记名单（不代表本场首发）：${escapeHtml(starters)}</span>` : ''}${styleUnderstanding ? `<span>风格/版本理解：${escapeHtml(styleUnderstanding)}</span>` : ''}</div>`;
 }
 
 function renderTradingFramework(framework = {}) {

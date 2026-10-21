@@ -14,7 +14,7 @@ import { actions as marketNotesActions } from './modules/market-notes/public.js'
 const appContext = createAppContext();
 const primaryPages = new Set(['teams', 'event', 'stage', 'tk', 'project']);
 const pages = new Set([...primaryPages, 'market']);
-let page = 'teams';
+let page = 'event';
 let projectView = 'book';
 
 function tick() {
@@ -25,7 +25,7 @@ function tick() {
 }
 
 function showPage(nextPage, { view = projectView, history = true } = {}) {
-  page = pages.has(nextPage) ? nextPage : 'teams';
+  page = pages.has(nextPage) ? nextPage : 'event';
   projectView = validProjectView(view) ? view : 'book';
   const activeTabId = `tab-${page === 'project' ? 'project-center' : page}`;
   document.querySelectorAll('.workspace-tab').forEach(button => {
@@ -129,7 +129,7 @@ function locationTarget() {
   const raw = decodeURIComponent(location.hash.replace(/^#/, ''));
   const project = raw.match(/^project-center(?:\/(book|architecture|objects|modules|requests|deliveries|manual))?$/);
   if (project) return { page: 'project', view: project[1] || 'book' };
-  return { page: pages.has(raw) ? raw : 'teams', view: 'book' };
+  return { page: pages.has(raw) ? raw : 'event', view: 'book' };
 }
 
 function updateLocation(nextPage, nextProjectView) {

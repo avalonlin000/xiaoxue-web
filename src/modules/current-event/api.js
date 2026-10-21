@@ -38,7 +38,7 @@ export function fetchGlobalVersionUnderstanding() {
   return apiRequest('/version-understanding/global/current');
 }
 
-export function fetchCurrentEventDashboard(date = 'today', limit = 12) {
+export function fetchCurrentEventDashboard(date = 'upcoming', limit = 100) {
   return apiRequest(`/current-event/dashboard?date=${encodeURIComponent(date)}&limit=${encodeURIComponent(limit)}`);
 }
 

@@ -52,6 +52,39 @@ function clock() {
   };
 }
 
+test('upcoming list distinguishes eight scheduled fixtures from eight finished reports', () => {
+  const { root, node } = fakeRoot();
+  view.createCurrentEventView(root).render({ matches: [{ match, ts: { available: false },
+    preparation: { state: 'partial', reason: '首发尚未核实' } }],
+  preparation: { confirmed_total: 8, prepared: 0, partial: 8, not_started: 0, pending_total: 0 } });
+  const html = node('#event-match-list').innerHTML;
+  assert.match(html, /近期确认 8 场/);
+  assert.match(html, /已整理 0 · 部分整理 8/);
+  assert.match(html, /资料：部分整理 · 首发尚未核实/);
+  assert.doesNotMatch(html, /task_id|generation|checkpoint/);
+});
+
+test('registered squad including substitutes is not presented as the match starting lineup', () => {
+  const { root, node } = fakeRoot();
+  view.createCurrentEventView(root).renderMatch({ match,
+    team_a: { team: 'IG', starters: Array.from({ length: 8 }, (_, i) => ({ name: `Player${i}`, role: 'TOP' })) },
+  }, match);
+  const html = node('#event-match-desk').innerHTML;
+  assert.match(html, /登记名单/);
+  assert.match(html, /不代表本场首发/);
+  assert.match(html, /Player7/);
+  assert.doesNotMatch(html, /<span>首发：/);
+});
+
+test('cross-region match cards show the comparison limit instead of a strength gap', () => {
+  const { root, node } = fakeRoot();
+  view.createCurrentEventView(root).render({ matches: [{ match, ts: { available: true,
+    compare: { comparable: false, reason: '跨赛区TS不可直接比较', power_diff: null } } }] });
+  const html = node('#event-match-list').innerHTML;
+  assert.match(html, /跨赛区TS不可直接比较/);
+  assert.doesNotMatch(html, /综合实力差/);
+});
+
 test('collection API uses only the existing match identity, not personal judgment', async () => {
   assert.equal(typeof api.prepareMatchMaterials, 'function');
   const original = globalThis.fetch;
@@ -154,6 +187,22 @@ test('material renderer safely expands full sections and never links executable 
   assert.doesNotMatch(html, /href="javascript:|file:\/\/|hidden-task-id|Traceback|\/home\/|<img|\*\*消息\*\*/);
 });
 
+test('material cards surface applicability and unverified basis in plain language', () => {
+  const html = view.renderPreparedMaterials({ result: { sections: [{
+    id: 'digest', title: '本场值得知道', selection_status: 'screened', items: [{
+      title: '版本倾向', text: '后期团战价值可能上升。',
+      source: '已有知识提炼整理（未复核原文）', verification: 'ai_summary',
+      applicability: 'unverified_knowledge_extract',
+      basis_note: '已有知识提炼，未复核原文；是否适用于当前比赛仍需核实。',
+      conditions: '需要结合正式版本与实际 BP 确认。',
+    }],
+  }] } });
+  assert.match(html, /知识提炼，适用性待核实/);
+  assert.match(html, /已有知识提炼，未复核原文/);
+  assert.match(html, /需要结合正式版本与实际 BP 确认/);
+  assert.doesNotMatch(html, /unverified_knowledge_extract/);
+});
+
 function fakeRoot() {
   const nodes = new Map();
   const makeNode = () => ({
@@ -164,6 +213,47 @@ function fakeRoot() {
   const node = (selector) => { if (!nodes.has(selector)) nodes.set(selector, makeNode()); return nodes.get(selector); };
   return { root: makeNode(), node };
 }
+
+test('pending fixtures never become selected match context or block event reading', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDocument = globalThis.document;
+  const { root, node } = fakeRoot();
+  const calls = [];
+  const pending = { pending: true, match: { ...match, team_a: 'TBD', team_b: 'TBD' } };
+  let matches = [pending];
+  const response = (data) => new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
+  globalThis.document = { getElementById: () => root };
+  globalThis.fetch = async (url) => {
+    calls.push(url);
+    if (url.startsWith('/api/current-event/dashboard')) return response({ context: { event: 'Worlds' }, matches });
+    if (url.startsWith('/api/current-event/match-runs')) return response({ matches: [] });
+    if (url.startsWith('/api/tk/search')) return response({ results: [] });
+    if (url.startsWith('/api/current-event/scope-materials')) return response({ result: null });
+    if (url === '/api/trading-methods') return response({ methods: [{ id: 'version', status: 'ready' }] });
+    if (url === '/api/version-understanding/global/current') return response({ data: null });
+    if (url.startsWith('/api/current-event/judgment-context')) return response({ status: 'ok', method: { id: 'version' }, contents: [] });
+    if (url.startsWith('/api/current-event/match-desk')) return response({ match });
+    if (url === '/api/current-event/collection') return response(packet('one', 'completed'));
+    throw new Error(url);
+  };
+  try {
+    const { actions } = await currentEvent.mount();
+    await actions.refresh();
+    await actions.selectMatch(0);
+    assert.equal(calls.filter((url) => url.startsWith('/api/current-event/match-desk')).length, 0);
+    await actions.openJudgment('version');
+    assert.ok(calls.some((url) => url.includes('judgment-context')));
+    assert.ok(calls.filter((url) => url.includes('judgment-context')).every((url) => !url.includes('team_a=')));
+    matches = [pending, { match }];
+    await actions.refresh();
+    assert.match(node('#event-match-desk').innerHTML, /A <i>vs<\/i> B/);
+    assert.ok(calls.every((url) => !url.includes('team_a=TBD')));
+  } finally {
+    currentEvent.unmount();
+    globalThis.fetch = originalFetch;
+    globalThis.document = originalDocument;
+  }
+});
 
 test('material-only updates leave unsaved trade-plan and discussion input intact', () => {
   const { root, node } = fakeRoot();
@@ -177,6 +267,75 @@ test('material-only updates leave unsaved trade-plan and discussion input intact
   assert.equal(node('#event-trade-plan-statement').value, '尚未保存的新方案');
   assert.equal(node('#event-trade-content').value, '尚未保存的讨论');
   assert.match(node('[data-match-materials]').innerHTML, /新增资料/);
+});
+
+test('reselecting the active fixture keeps its editor and does not prepare again, while refresh still reloads', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalDocument = globalThis.document;
+  const { root, node } = fakeRoot();
+  const calls = [];
+  let matches = [];
+  let pendingDesk = null;
+  let failNextDesk = false;
+  let deskWrites = 0;
+  let deskHtml = '';
+  Object.defineProperty(node('#event-match-desk'), 'innerHTML', {
+    get: () => deskHtml,
+    set(value) { deskHtml = value; deskWrites += 1; },
+  });
+  const response = (value) => new Response(JSON.stringify(value), { headers: { 'content-type': 'application/json' } });
+  globalThis.document = { getElementById: () => root };
+  globalThis.fetch = async (url) => {
+    calls.push(url);
+    if (url.startsWith('/api/current-event/dashboard')) return response({ context: { event: 'Worlds' }, matches });
+    if (url.startsWith('/api/current-event/match-runs')) return response({ matches: [] });
+    if (url.startsWith('/api/tk/search')) return response({ results: [] });
+    if (url.startsWith('/api/current-event/scope-materials')) return response({ result: null });
+    if (url === '/api/trading-methods') return response({ methods: [] });
+    if (url === '/api/version-understanding/global/current') return response({ data: null });
+    if (url.startsWith('/api/current-event/match-desk')) {
+      if (failNextDesk) { failNextDesk = false; throw new Error('temporary read failure'); }
+      return pendingDesk ? pendingDesk.promise : response({ match });
+    }
+    if (url === '/api/current-event/collection') return response(packet('one', 'completed', result('已有资料')));
+    throw new Error(url);
+  };
+  const counts = () => ({ desk: calls.filter((url) => url.startsWith('/api/current-event/match-desk')).length,
+    preparation: calls.filter((url) => url === '/api/current-event/collection').length, deskWrites });
+  try {
+    const { actions } = await currentEvent.mount();
+    await actions.refresh();
+    matches = [{ match }];
+    await actions.refresh();
+    const before = counts();
+    await actions.selectMatch(0);
+    await actions.selectMatch(0);
+    assert.deepEqual(counts(), before, 'active editor must not be reconstructed or its materials resubmitted');
+
+    pendingDesk = deferred();
+    const refresh = actions.refresh();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const during = counts();
+    await actions.selectMatch(0);
+    await actions.selectMatch(0);
+    assert.deepEqual(counts(), during, 'rapid clicks must not create competing reads');
+    pendingDesk.resolve(response({ match }));
+    await refresh;
+    pendingDesk = null;
+    assert.equal(counts().desk, before.desk + 1, 'explicit refresh still reloads');
+    assert.equal(counts().preparation, before.preparation + 1);
+
+    failNextDesk = true;
+    await actions.refresh();
+    const failed = counts();
+    await actions.selectMatch(0);
+    assert.equal(counts().desk, failed.desk + 1, 'a failed selection remains retryable');
+    assert.equal(counts().preparation, failed.preparation + 1);
+  } finally {
+    currentEvent.unmount();
+    globalThis.fetch = originalFetch;
+    globalThis.document = originalDocument;
+  }
 });
 
 test('only screened points are open by default; reasons are visible and full evidence stays expandable', () => {
@@ -230,6 +389,23 @@ test('personal-analysis reference numbers stay behind evidence without swallowin
   assert.match(html, /要求先看下路/);
   assert.match(html, /把赢法与版本结合/);
   assert.match(html, /T1的BO5样本与26\.16版本/);
+});
+
+test('analysis sources show original links and limits while old background stays unverified', () => {
+  const html = view.renderPreparedMaterials({ result: { sections: [{ id: 'analysis', title: '当前分析', items: [{
+    text: '只作条件推导。', evidence: [
+      { text: '原作者依据。', source: '作者甲', url: 'https://example.org/analysis', published_at: '2026-10-20',
+        conditions: '仅旧版本样本', counterevidence: '本届尚未验证', evidence_quote: '原文中的具体表述' },
+      { text: '旧版本认识。', kind: 'version_background', basis_note: '旧背景，适用性未核实' },
+      { text: '公开条目', url: 'javascript:alert(1)', source: '<script>danger</script>' },
+    ],
+  }] }] } });
+  assert.match(html, /href="https:\/\/example\.org\/analysis"/);
+  assert.match(html, /2026[年/\-]10[月/\-]20/);
+  for (const expected of ['作者甲', '仅旧版本样本', '本届尚未验证', '原文中的具体表述', '旧背景，适用性未核实']) {
+    assert.ok(html.includes(expected), expected);
+  }
+  assert.doesNotMatch(html, /javascript:|<script>|version_background/);
 });
 
 test('original recent-match entry prepares materials without opening a trade run, and ignores a late desk', async () => {
@@ -286,6 +462,15 @@ test('AI summaries retain their interpretation label and safely expandable origi
   assert.match(html, /<details[^>]*><summary>查看原文依据<\/summary>/);
   assert.match(html, /Original evidence &lt;script&gt;/);
   assert.doesNotMatch(html, /<script>|已核实/);
+});
+
+test('withdrawn automatic preparation keeps the last readable result and explains the pause', () => {
+  const html = view.renderPreparedMaterials({ task: { state: 'paused', message: '赛程已调整，保留原资料。' },
+    result: { summary: '此前已取得的材料', sections: [] } });
+  assert.match(html, /自动准备已暂停/);
+  assert.match(html, /赛程已调整，保留原资料/);
+  assert.match(html, /此前已取得的材料/);
+  assert.doesNotMatch(html, /正在准备|正在核对最新变化/);
 });
 
 test('sealed pre-match replay hides post-match material even when passed directly to the view', () => {

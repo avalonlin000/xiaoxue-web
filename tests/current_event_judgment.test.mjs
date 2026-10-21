@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import * as api from '../src/modules/current-event/api.js';
 import * as service from '../src/modules/current-event/service.js';
 import * as view from '../src/modules/current-event/view.js';
+import currentEvent from '../src/modules/current-event/public.js';
 
 const deferred = () => { let resolve; const promise = new Promise((yes) => { resolve = yes; }); return { promise, resolve }; };
 
@@ -200,4 +201,165 @@ test('a long one-paragraph discussion is grouped by complete sentences without d
   assert.equal((rendered.match(/同一标题/g) || []).length, 1);
   assert.match(rendered, /不同文章/);
   assert.equal((rendered.match(/<p>这是/g) || []).length, 5);
+});
+
+test('same-object perspectives share bounded conversation and preserve each answer basis', async () => {
+  const calls = [];
+  let versionRevision = 'version';
+  const controller = service.createJudgmentController({
+    load: async (id) => ({ method: { id, title: id === 'version' ? '版本理解' : '队伍画像' }, discussion_available: true, revision: id === 'version' ? versionRevision : id }),
+    discuss: async (...args) => { calls.push(args); return { answer: `回答${calls.length}` }; },
+  });
+  controller.setObject({ event: 'S16', team: 'A' }); await controller.open('version');
+  await controller.ask('版本问题'); controller.setDraft('还想追问');
+  controller.setObject({ team: 'A', event: 'S16' }); await controller.open('team');
+  assert.equal(controller.getSession().draft, '还想追问');
+  await controller.ask('换个角度');
+  assert.equal(calls[1][3].length, 2);
+  assert.match(calls[1][3][0].content, /版本问题/);
+  assert.equal(controller.getSession().exchanges[0].method_id, 'version');
+  assert.equal(controller.getSession().exchanges[0].revision, 'version');
+  assert.equal(controller.getSession().basisChanged, false);
+  versionRevision = 'version-updated'; await controller.open('version');
+  assert.equal(controller.getSession().basisChanged, true);
+});
+
+test('returning to a match restores draft and messages; stop, replay and eviction remain isolated', async () => {
+  const controller = service.createJudgmentController({
+    load: async () => ({ discussion_available: true, revision: 'r1' }),
+    discuss: async () => ({ answer: '留在A场的回答' }),
+  });
+  const identity = { event: 'S16', team_a: 'A', team_b: 'B', match_date: '2026-10-24' };
+  controller.setObject(identity); await controller.open('version');
+  for (let index = 0; index < 6; index += 1) await controller.ask(`问题${index}`);
+  controller.setDraft('A场未发的问题'); controller.stop();
+  controller.setObject({ ...identity, team_a: 'C' }); await controller.open('version');
+  assert.equal(controller.getSession().exchanges.length, 0);
+  controller.setObject(identity);
+  assert.equal(controller.getSession().draft, 'A场未发的问题');
+  assert.equal(controller.getSession().exchanges.length, 4);
+  controller.setObject({ ...identity, as_of: '2026-10-23T12:00:00+08:00' });
+  assert.equal(controller.getSession().exchanges.length, 0);
+  controller.setObject(identity);
+  for (let index = 0; index < 10; index += 1) controller.setObject({ event: 'S16', team: `队${index}` });
+  controller.setObject(identity);
+  assert.equal(controller.getSession().exchanges.length, 0);
+  assert.equal(controller.getSession().evicted, true);
+});
+
+test('equivalent normalized match identities retain discussion when source time or series format spelling changes', async () => {
+  const controller = service.createJudgmentController({
+    load: async () => ({ discussion_available: true }), discuss: async () => ({ answer: '同一场回答' }),
+  });
+  controller.setObject({ event: ' S16 ', team_a: 'A', team_b: 'B', match_date: '2026-10-24', match_time: '9:00', match_format: 'BO1' });
+  await controller.open('version'); await controller.ask('同一场问题');
+  controller.setObject({ event: 's16', team_a: 'a', team_b: 'b', match_date: '2026-10-24', match_time: '2026-10-24 09:00:00', match_format: 'BO3' });
+  assert.equal(controller.getSession().exchanges[0].answer, '同一场回答');
+  controller.setObject({ event: 's16', team_a: 'a', team_b: 'b', match_date: '2026-10-24', match_time: '10:00' });
+  assert.equal(controller.getSession().exchanges.length, 0);
+});
+
+test('late same-object perspective answer cannot enter history and a failed question remains a draft', async () => {
+  const late = deferred(); let attempts = 0;
+  const controller = service.createJudgmentController({
+    load: async () => ({ discussion_available: true }),
+    discuss: async () => { attempts += 1; if (attempts === 1) return late.promise; throw new Error('offline'); },
+  });
+  controller.setObject({ event: 'S16' }); await controller.open('version');
+  const first = controller.ask('旧视角问题'); await controller.open('team');
+  late.resolve({ answer: '旧请求回答' }); await first;
+  assert.equal(controller.getSession().exchanges.length, 0);
+  assert.equal(controller.getSession().draft, '旧视角问题');
+  await controller.ask('失败问题');
+  assert.equal(controller.getSession().draft, '失败问题');
+});
+
+test('a completed answer retains a newer draft and notices evidence updated by the discussion response', async () => {
+  const late = deferred(); let count = 0;
+  const controller = service.createJudgmentController({
+    load: async () => ({ method: { title: '版本理解' }, discussion_available: true, revision: 'r1' }),
+    discuss: async () => { count += 1; return count === 1 ? { answer: '原依据回答', context_revision: 'r1' } : late.promise; },
+  });
+  controller.setObject({ event: 'S16' }); await controller.open('version'); await controller.ask('第一个问题');
+  const pending = controller.ask('第二个问题'); controller.setDraft('我还在写的新问题');
+  late.resolve({ answer: '新依据回答', context_revision: 'r2' }); await pending;
+  assert.equal(controller.getSession().draft, '我还在写的新问题');
+  assert.equal(controller.getSession().pending, false);
+  assert.equal(controller.getSession().basisChanged, true);
+  assert.equal(controller.getSession().exchanges[0].basis_updated, true);
+  assert.equal(controller.getSession().exchanges[1].basis_updated, false);
+});
+
+test('view restores cached exchanges and draft after loading a perspective without duplicating messages', () => {
+  const nodes = new Map();
+  const node = (key) => {
+    if (!nodes.has(key)) nodes.set(key, { innerHTML: '', value: '', textContent: '', querySelector: node, querySelectorAll: () => [] });
+    return nodes.get(key);
+  };
+  const current = view.createCurrentEventView({ querySelector: node, querySelectorAll: () => [] });
+  const session = { object: { team: 'A' }, draft: '还未提交', basisChanged: true, truncated: true,
+    exchanges: [{ question: '旧问题', answer: '旧回答', method_title: '版本理解', revision: 'r1' }] };
+  current.renderJudgmentLoading('team'); current.restoreJudgmentSession(session);
+  assert.equal(node('#event-judgment-question').value, '还未提交');
+  assert.match(node('#event-judgment-messages').innerHTML, /旧问题/);
+  assert.match(node('#event-judgment-messages').innerHTML, /版本理解/);
+  assert.match(node('#event-judgment-message').textContent, /依据.*更新/);
+  assert.match(node('#event-judgment-message').textContent, /最近.*8/);
+  current.restoreJudgmentSession(session);
+  assert.equal((node('#event-judgment-messages').innerHTML.match(/旧问题/g) || []).length, 1);
+});
+
+test('mounted web workspace restores discussion and draft when switching perspectives and returning to a match', async () => {
+  const originalDocument = globalThis.document; const originalFetch = globalThis.fetch;
+  const nodes = new Map();
+  const listeners = new Map();
+  const makeNode = () => ({ innerHTML: '', textContent: '', value: '', dataset: {},
+    classList: { toggle() {}, remove() {} }, addEventListener() {}, removeEventListener() {},
+    querySelector: (selector) => node(selector), querySelectorAll: () => [], closest: () => null });
+  const node = (selector) => { if (!nodes.has(selector)) nodes.set(selector, makeNode()); return nodes.get(selector); };
+  const root = { ...makeNode(), addEventListener: (name, listener) => listeners.set(name, listener), removeEventListener: (name) => listeners.delete(name) };
+  const match = { team_a: 'A', team_b: 'B', date: '2026-10-24', time: '12:00', stage: 'S16' };
+  const other = { ...match, team_a: 'C' };
+  const calls = [];
+  const response = (data) => new Response(JSON.stringify(data), { headers: { 'content-type': 'application/json' } });
+  globalThis.document = { getElementById: () => root };
+  globalThis.fetch = async (url, options) => {
+    calls.push({ url, options });
+    if (url.startsWith('/api/current-event/dashboard')) return response({ context: { event: 'S16' }, matches: [] });
+    if (url.startsWith('/api/current-event/match-runs')) return response({ matches: [{ match }, { match: other }] });
+    if (url.startsWith('/api/tk/search')) return response({ results: [] });
+    if (url.startsWith('/api/current-event/scope-materials')) return response({ result: null });
+    if (url === '/api/trading-methods') return response({ methods: ['version', 'team'].map((id) => ({ id, title: id, status: 'ready' })) });
+    if (url === '/api/version-understanding/global/current') return response({ data: null });
+    if (url.startsWith('/api/current-event/match-desk')) {
+      const selected = new URL(url, 'https://local.test').searchParams.get('team_a') === 'A' ? match : other;
+      return response({ match: selected });
+    }
+    if (url === '/api/current-event/collection') return response({ task_id: 'done', state: 'completed', result: { sections: [] } });
+    if (url.startsWith('/api/current-event/judgment-context')) {
+      const method = new URL(url, 'https://local.test').searchParams.get('method_id');
+      return response({ status: 'ok', method: { id: method, title: method === 'version' ? '版本理解' : '队伍画像' }, discussion_available: true, revision: method, contents: [] });
+    }
+    if (url === '/api/current-event/judgment-discussion') return response({ answer: 'A场已有回答', context_revision: 'version' });
+    throw new Error(`Unexpected request ${url}`);
+  };
+  try {
+    const { actions } = await currentEvent.mount(); await actions.refresh(); await actions.selectRecentMatch(0);
+    await actions.openJudgment('version'); node('#event-judgment-question').value = 'A场问题'; await actions.askJudgment();
+    node('#event-judgment-question').value = 'A场未发草稿';
+    listeners.get('input')({ target: { id: 'event-judgment-question', value: 'A场未发草稿' } });
+    await actions.openJudgment('team');
+    assert.match(node('#event-judgment-messages').innerHTML, /A场已有回答/);
+    assert.equal(node('#event-judgment-question').value, 'A场未发草稿');
+    await actions.selectRecentMatch(1);
+    assert.doesNotMatch(node('#event-judgment-messages').innerHTML, /A场已有回答/);
+    await actions.selectRecentMatch(0); await new Promise((resolve) => setTimeout(resolve, 0));
+    assert.match(node('#event-judgment-messages').innerHTML, /A场已有回答/);
+    assert.equal(node('#event-judgment-question').value, 'A场未发草稿');
+    assert.equal(node('#event-judgment-reader').hidden, false);
+    actions.closeJudgment(); await actions.openJudgment('version');
+    assert.match(node('#event-judgment-messages').innerHTML, /A场已有回答/);
+    assert.equal(calls.filter((call) => call.url === '/api/current-event/judgment-discussion').length, 1);
+    assert.ok(calls.every((call) => !/trade-plan|match-run\/start/.test(call.url)));
+  } finally { currentEvent.unmount(); globalThis.document = originalDocument; globalThis.fetch = originalFetch; }
 });

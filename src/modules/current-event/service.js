@@ -35,7 +35,7 @@ export async function loadCurrentEventKnowledge() {
   };
 }
 
-export async function loadCurrentEventWorkspace(date = 'today') {
+export async function loadCurrentEventWorkspace(date = 'upcoming') {
   const [dashboard, recent, methods, versionUnderstanding] = await Promise.all([
     fetchCurrentEventDashboard(date),
     fetchRecentMatchRuns(12),
@@ -50,11 +50,16 @@ export async function loadCurrentEventWorkspace(date = 'today') {
   return {
     context,
     eventMaterials,
-    matches: dashboard.matches || [],
+    matches: (dashboard.matches || []).map((item, index) => ({
+      ...item, preparation: dashboard.preparation?.items?.[index] || null,
+    })),
+    preparation: dashboard.preparation || null,
     recentMatches: recent.matches || [],
     methods: methods.methods || [],
     versionUnderstanding: versionUnderstanding?.data || null,
     date: dashboard.date || date,
+    dateTo: dashboard.date_to || dashboard.date || date,
+    scheduleTruncated: dashboard.truncated === true,
     items: (payload.results || []).map((item) => ({
       title: item.concept || item.id || '赛事资料', summary: item.content || '', date: item.date || '',
     })),
@@ -189,23 +194,68 @@ export function judgmentObject(context = {}, desk = null, selected = null, team 
   };
 }
 
-// A perspective is an ephemeral conversation, never a match-run or knowledge writer.
+function judgmentSessionKey(value = {}, includeTeam = true) {
+  const fields = ['event', ...(includeTeam ? ['team'] : []), 'team_a', 'team_b', 'match_date', 'match_time', 'as_of', 'blocked'];
+  return JSON.stringify(fields.map((field) => {
+    const text = String(value[field] ?? '').trim();
+    if (['event', 'team', 'team_a', 'team_b'].includes(field)) return text.toLowerCase().replace(/\s+/g, ' ');
+    if (field === 'match_time') {
+      const time = text.replace('T', ' ').split(/\s+/).at(-1).match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+      if (time) return `${time[1].padStart(2, '0')}:${time[2]}`;
+    }
+    return text;
+  }));
+}
+
+// Conversations live only in this page session, never in a match-run or knowledge writer.
 export function createJudgmentController({
   load = fetchJudgmentContext, discuss = requestJudgmentDiscussion,
-  onContext = () => {}, onDiscussion = () => {},
+  onContext = () => {}, onDiscussion = () => {}, onSession = () => {},
 } = {}) {
   let generation = 0;
   let object = {};
   let methodId = '';
   let context = null;
-  let history = [];
   let pending = false;
-  const reset = () => { generation += 1; context = null; history = []; pending = false; };
+  const sessions = new Map();
+  const evictedKeys = new Set();
+  let session = null;
+  const invalidate = () => { generation += 1; context = null; pending = false; };
+  const snapshot = () => ({ object: { ...object }, methodId: session?.methodId || '', draft: session?.draft || '', pending,
+    exchanges: (session?.exchanges || []).map((row) => ({ ...row,
+      basis_updated: Boolean(row.revision && session.revisions[row.method_id] && row.revision !== session.revisions[row.method_id]),
+    })), truncated: Boolean(session?.truncated), evicted: Boolean(session?.evicted),
+    basisChanged: Boolean(session?.exchanges.some((row) => row.revision && session.revisions[row.method_id] && row.revision !== session.revisions[row.method_id])),
+  });
+  const notify = () => onSession(snapshot());
+  const activate = (value, restoreTeam = false) => {
+    let target = { ...value };
+    if (restoreTeam) {
+      const baseKey = judgmentSessionKey(target, false);
+      const prior = [...sessions.values()].reverse().find((entry) => judgmentSessionKey(entry.object, false) === baseKey);
+      if (prior) target = { ...target, team: prior.object.team || '' };
+    }
+    const key = judgmentSessionKey(target);
+    if (session && key === judgmentSessionKey(object)) { object = target; session.object = target; return snapshot(); }
+    invalidate(); object = target;
+    session = sessions.get(key) || { object: target, methodId: '', draft: '', exchanges: [], revisions: {},
+      truncated: false, evicted: evictedKeys.has(readingHash(key)) };
+    sessions.delete(key); sessions.set(key, session);
+    while (sessions.size > 10) {
+      const oldest = sessions.keys().next().value;
+      sessions.delete(oldest); evictedKeys.add(readingHash(oldest));
+      while (evictedKeys.size > 10) evictedKeys.delete(evictedKeys.values().next().value);
+    }
+    methodId = ''; notify(); return snapshot();
+  };
   return {
-    setObject(value = {}) { reset(); object = { ...value }; methodId = ''; },
-    stop() { reset(); methodId = ''; },
+    setObject(value = {}, { restoreTeam = false } = {}) { return activate(value, restoreTeam); },
+    getSession() { return snapshot(); },
+    setDraft(value = '') { if (session) session.draft = String(value).slice(0, 2000); },
+    stop() { invalidate(); methodId = ''; },
     async open(id, overrides = {}) {
-      reset(); methodId = id; object = { ...object, ...overrides };
+      activate({ ...object, ...overrides });
+      invalidate(); methodId = id; session.methodId = id; notify();
       const current = generation;
       if (object.blocked) {
         context = { status: 'unavailable', limitations: ['这场回放缺少赛前截止时间，暂不读取当前资料以免带入赛后信息。'], discussion_available: false };
@@ -214,7 +264,9 @@ export function createJudgmentController({
       try {
         const payload = await load(id, object);
         if (current !== generation) return null;
-        context = payload; onContext(payload); return payload;
+        context = payload;
+        session.revisions[id] = payload.revision || '';
+        onContext(payload); notify(); return payload;
       } catch {
         if (current !== generation) return null;
         context = { status: 'unavailable', limitations: ['这部分内容暂时读不到，比赛资料仍可正常查看。'], discussion_available: false };
@@ -228,16 +280,24 @@ export function createJudgmentController({
         onDiscussion({ pending: false, error: '这次问题最多2000字，可以缩短后再继续讨论。' }); return null;
       }
       const current = generation;
+      session.draft = text;
       pending = true; onDiscussion({ pending: true });
       try {
-        const boundedHistory = history.slice(-8).map((row) => ({ ...row,
-          content: row.content.length > 4000 ? `${row.content.slice(0, 3970)}\n（此前回答节选）` : row.content,
-        }));
+        const boundedHistory = session.exchanges.flatMap((row) => {
+          const priorAnswer = `（此前${row.method_title || '其他视角'}的讨论，不等于当前事实${row.revision && row.revision !== session.revisions[row.method_id] ? '；所用依据已有更新' : ''}）\n${row.answer}`;
+          return [{ role: 'user', content: row.question }, { role: 'assistant', content: priorAnswer }];
+        }).slice(-8).map((row) => ({ ...row, content: row.content.length > 4000 ? `${row.content.slice(0, 3970)}\n（此前回答节选）` : row.content }));
         const payload = await discuss(methodId, object, text, boundedHistory);
         if (current !== generation) return null;
         if (!payload?.answer) throw new Error('empty answer');
-        history.push({ role: 'user', content: text }, { role: 'assistant', content: payload.answer });
-        onDiscussion({ ...payload, question: text, pending: false }); return payload;
+        const exchange = { ...payload, question: text, method_id: methodId,
+          method_title: context.method?.title || '', revision: payload.context_revision || context.revision || '' };
+        if (payload.context_revision) session.revisions[methodId] = payload.context_revision;
+        session.exchanges.push(exchange);
+        if (session.exchanges.length > 4) { session.exchanges = session.exchanges.slice(-4); session.truncated = true; }
+        if (session.draft.trim() === text) session.draft = '';
+        pending = false;
+        onDiscussion({ ...exchange, pending: false }); notify(); return payload;
       } catch {
         if (current !== generation) return null;
         onDiscussion({ pending: false, error: '这次讨论暂时没有完成，你的问题已保留；可以稍后重试。' }); return null;

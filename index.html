@@ -1805,6 +1805,7 @@ html, body {
 #card-current-event .event-section-status { flex:0 0 auto; margin:3px 0 0; padding:6px 9px; border-radius:999px; background:var(--blue-light); color:var(--blue-deep); font-size:12px; font-weight:800; }
 #card-current-event .event-section-copy { max-width:680px; margin:12px 0 16px; color:var(--ink-2); font-size:15px; line-height:1.65; }
 #card-current-event .event-match-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:0; }
+#card-current-event [data-preparation-summary] { grid-column:1/-1; margin:0; text-align:left; }
 #card-current-event .event-match-button { display:grid; align-content:start; min-width:0; min-height:146px; padding:16px; border:1px solid var(--line); border-radius:12px; background:var(--bg-1); color:var(--ink-1); cursor:pointer; font:inherit; text-align:left; transition:border-color 120ms,background 120ms,box-shadow 120ms,transform 120ms; }
 #card-current-event .event-match-button:hover { border-color:var(--blue); box-shadow:0 7px 18px rgba(29,150,220,.08); transform:translateY(-1px); }
 #card-current-event .event-match-button.active { border-color:var(--blue); background:var(--blue-light); box-shadow:inset 4px 0 0 var(--blue),0 8px 20px rgba(29,150,220,.12); }
@@ -2104,14 +2105,14 @@ html, body {
               <div class="event-section-heading">
                 <div>
                   <p class="event-section-eyebrow">当前赛程</p>
-                  <h2 id="event-fixtures-heading">今天的比赛</h2>
+                  <h2 id="event-fixtures-heading">近期比赛</h2>
                 </div>
                 <p class="event-section-status">已确认赛程</p>
               </div>
               <p class="event-section-copy">选择一场比赛，查看双方信息、赛前方案和后续记录。</p>
               <div id="event-match-list" class="event-match-list"></div>
             </section>
-            <div id="event-match-desk" class="match-desk"><div class="tk-empty">选择今天的一场比赛后，在这里查看资料和当前方案。</div></div>
+            <div id="event-match-desk" class="match-desk"><div class="tk-empty">选择一场已确认比赛后，在这里查看资料和当前方案；对阵未定也可先读赛事和队伍内容。</div></div>
             <div id="event-match-message" class="trade-msg"></div>
             <section class="event-judgment-entry" aria-labelledby="event-judgment-heading">
               <h2 id="event-judgment-heading">想自己判断，可以从这里进入</h2>
