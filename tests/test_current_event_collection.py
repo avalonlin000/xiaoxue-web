@@ -294,3 +294,13 @@ def test_batch_reuses_configured_schedule_scope_and_does_not_fabricate_opponents
     assert len(report["tasks"]) == 1
     assert len(report["skipped"]) == 1
     assert report["tasks"][0]["match"]["team_a"] == "KC"
+
+
+def test_reader_tries_the_configured_extractor_before_the_mirror(monkeypatch):
+    # The mirror is a fallback: a dead mirror must not be paid for on every article.
+    monkeypatch.setattr(repo, "read_article", real_read_article)
+    content = "GEN 与 IG 在世界赛的公开资料。" * 30
+    response = type("Completed", (), {"returncode": 0, "stdout": json.dumps({"results": [{"url": "https://lolesports.com/news/test", "content": content, "error": ""}]})})()
+    mirror = type("Stream", (), {"__call__": lambda *a, **k: (_ for _ in ()).throw(AssertionError("不应先调用镜像"))})()
+    with patch.object(repo, "_public_dns", return_value=True), patch.object(repo.httpx, "stream", mirror), patch.object(repo.subprocess, "run", return_value=response):
+        assert repo.read_article("https://lolesports.com/news/test") == content

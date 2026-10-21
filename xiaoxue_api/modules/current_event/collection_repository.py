@@ -572,35 +572,50 @@ def _read_article(url: str) -> str:
     check_budget()
     if not _public_dns(url):
         raise ValueError("来源地址不可读取")
+    # The product's configured extract backend is the primary reader; the external
+    # mirror is only a fallback, so an unreachable mirror costs one timeout, not one
+    # per article. Do not install another scraper or bypass access controls.
     try:
-        with httpx.stream("GET", "https://r.jina.ai/" + url, timeout=remaining_timeout(6), follow_redirects=False, headers={"X-Return-Format": "text"}) as response:
-            response.raise_for_status()
-            chunks, length = [], 0
-            for chunk in response.iter_text():
-                check_budget()
-                chunks.append(chunk)
-                length += len(chunk)
-                if length >= 40000:
-                    break
-        text = "".join(chunks)[:40000]
-        _validate_article_text(text)
-        return text
+        return _read_with_extract_backend(url)
+    except CollectionBudgetExpired:
+        raise
+    except (OSError, ValueError, RuntimeError):
+        pass
+    try:
+        return _read_with_mirror(url)
     except CollectionBudgetExpired:
         raise
     except (OSError, ValueError, httpx.HTTPError):
-        # Reuse the installed product's configured reader; do not install another
-        # scraper, bypass access controls, or configure a different provider.
-        hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
-        script = "import sys,asyncio;sys.path.insert(0,sys.argv[1]);from tools.web_tools import web_extract_tool;print(asyncio.run(web_extract_tool([sys.argv[2]],char_limit=40000)))"
-        try:
-            completed = subprocess.run([str(hermes_root / "venv/bin/python"), "-c", script, str(hermes_root), url], capture_output=True, text=True, timeout=remaining_timeout(24), check=False)
-            payload = json.loads(completed.stdout) if not completed.returncode else {}
-            row = next((item for item in payload.get("results", []) if item.get("url") == url and not item.get("error")), {})
-            text = str(row.get("content") or "")[:40000]
-        except (OSError, ValueError, subprocess.TimeoutExpired):
-            raise ValueError("来源正文未能取得") from None
-        _validate_article_text(text)
-        return text
+        raise ValueError("来源正文未能取得") from None
+
+
+def _read_with_mirror(url: str) -> str:
+    with httpx.stream("GET", "https://r.jina.ai/" + url, timeout=remaining_timeout(6), follow_redirects=False, headers={"X-Return-Format": "text"}) as response:
+        response.raise_for_status()
+        chunks, length = [], 0
+        for chunk in response.iter_text():
+            check_budget()
+            chunks.append(chunk)
+            length += len(chunk)
+            if length >= 40000:
+                break
+    text = "".join(chunks)[:40000]
+    _validate_article_text(text)
+    return text
+
+
+def _read_with_extract_backend(url: str) -> str:
+    hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
+    script = "import sys,asyncio;sys.path.insert(0,sys.argv[1]);from tools.web_tools import web_extract_tool;print(asyncio.run(web_extract_tool([sys.argv[2]],char_limit=40000)))"
+    try:
+        completed = subprocess.run([str(hermes_root / "venv/bin/python"), "-c", script, str(hermes_root), url], capture_output=True, text=True, timeout=remaining_timeout(24), check=False)
+        payload = json.loads(completed.stdout) if not completed.returncode else {}
+        row = next((item for item in payload.get("results", []) if item.get("url") == url and not item.get("error")), {})
+        text = str(row.get("content") or "")[:40000]
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        raise ValueError("来源正文未能取得") from None
+    _validate_article_text(text)
+    return text
 
 
 def _validate_article_text(text: str) -> None:
