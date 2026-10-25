@@ -542,3 +542,14 @@
 - S5：新增 `xiaoxue_change_watch.py` 小时级"谁上场变了 / 价格到了"推送；日报保留 07:00 不退役。
 - 来源现状：gol.gg（JS 渲染、现拉不动）、ScoreGG（无公开首发接口）、lol.fandom（本机不通）→ C9/FUR/MVKE 真实首发与 LOL 价格仍需钧钧给来源。
 - 测试：xiaoxue-web 44 项（含 team_intake/price 10 项）、lol_data 28 项（排程器 10、告警 6、失败说明 5、变化推送 7）。
+
+## 2026-10-25 小白：本机零 Key 中文搜索接入全项目
+
+- 背景：Hermes 内置 `web.search_backend=tavily` 不稳定，项目采集/资讯/预测链路缺少可复用的免费中文搜索入口。
+- 服务：安装 `daidaiJ/websearch-mcpserver` v3.10.2，systemd 常驻 `127.0.0.1:8338`；`mode=mcphub`，Bing/360 作回退，无付费 Key。
+- Hermes：`web.search_backend=searxng`，`SEARXNG_URL=http://127.0.0.1:8338/searxng`；另接入 `agent-search-mcp`（搜狗/Bing 中文补充）与 `websearch-http`（smartsearch/cleanfetch）。
+- 项目：新增 `xiaoxue_api/core/web_search.py` 与 `scripts/search_web.py`；`collection_repository.search()`、产品 MCP 外部资讯/预测、`prediction_hunt.py`、`agent-reach` 路由均改为优先走本机搜索；`system_config.json` 新增 `services.web_search_url/health`。
+- 边界：不改数据库、不刷新比赛资料、不跑真实采集、不碰线上 `dist`；赔率仍只算网页线索，不冒充可核验价格。
+- 验证：`test_web_search.py` 5 项通过；`test_xiaoxue_product_mcp.py` 43 项 + 新增本地回退用例通过；`test_current_event_collection.py`/`test_supply_design.py` 共 44 项通过；真实只读搜索 `TES G2 赛前预测` 返回 8 条线索，产品 MCP 本地搜索返回 5 条结果；全量前端 99 通过、产品 MCP 64 通过。
+- 已知全量后端仍有 5 项基线失败（`test_event_screening_batches.py` 3 项、`test_match_desk_contract.py` 2 项）；在未改动的 HEAD worktree 复跑同样失败，确认与本次搜索改动无关。
+- 运行态：`websearch-mcpserver.service` active；Hermes 已自动发现 `websearch-http` 与 `agent-search`，现有会话需新会话或 `/reload-mcp` 才能看到新工具。

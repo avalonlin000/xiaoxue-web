@@ -38,14 +38,17 @@ if str(_LOL_LIBS) not in sys.path:
     sys.path.insert(0, str(_LOL_LIBS))
 from config import get_service_url  # noqa: E402
 
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(_PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(_PROJECT_ROOT))
+from xiaoxue_api.core.web_search import search_web  # noqa: E402
+
 API_BASE_URL = os.getenv("XIAOXUE_API_BASE_URL", get_service_url("workbench_api_url") + "/api").rstrip("/")
 REQUEST_TIMEOUT_SECONDS = 20.0
 EXTERNAL_SEARCH_TIMEOUT_SECONDS = 25.0
 EXTERNAL_NEWS_MAX_RECENCY_DAYS = 30
 EXTERNAL_NEWS_MAX_RESULTS = 8
 MCPORTER_PATH = "/home/ubuntu/.npm-global/bin/mcporter"
-HERMES_PYTHON_PATH = "/home/ubuntu/.hermes/hermes-agent/venv/bin/python"
-HERMES_AGENT_ROOT = "/home/ubuntu/.hermes/hermes-agent"
 MAX_TEXT_CHARS = 12_000
 
 
@@ -256,34 +259,12 @@ def _run_exa_search(query: str, limit: int) -> str:
     return result.stdout
 
 
-def _run_tavily_search(query: str, limit: int) -> dict[str, Any]:
-    """Use Hermes' existing generic search only as a clearly labelled fallback."""
-    command = (
-        "import json,sys; from tools.web_tools import web_search_tool; "
-        "payload=json.loads(sys.argv[1]); print(json.dumps(web_search_tool(payload['query'], limit=payload['limit'])))"
-    )
-    environment = dict(os.environ)
-    existing_pythonpath = environment.get("PYTHONPATH", "")
-    environment["PYTHONPATH"] = HERMES_AGENT_ROOT + (os.pathsep + existing_pythonpath if existing_pythonpath else "")
-    result = subprocess.run(
-        [HERMES_PYTHON_PATH, "-c", command, json.dumps({"query": query, "limit": limit}, ensure_ascii=False)],
-        capture_output=True,
-        check=False,
-        text=True,
-        timeout=EXTERNAL_SEARCH_TIMEOUT_SECONDS,
-        env=environment,
-    )
-    if result.returncode != 0 or not result.stdout.strip():
-        raise RuntimeError("Hermes Tavily 当前不可用")
-    try:
-        data: Any = json.loads(result.stdout)
-        if isinstance(data, str):
-            data = json.loads(data)
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("Hermes Tavily 返回格式无效") from exc
-    if not isinstance(data, dict):
-        raise RuntimeError("Hermes Tavily 返回格式无效")
-    return data
+def _run_local_search(query: str, limit: int) -> dict[str, Any]:
+    """Search the project's local zero-key service and return a parser-friendly payload."""
+    rows = search_web(query, limit=limit, timeout=EXTERNAL_SEARCH_TIMEOUT_SECONDS)
+    if not rows:
+        raise RuntimeError("本地免费搜索没有返回结果")
+    return {"provider": "local/searxng", "results": rows}
 
 
 def _parse_published_at(value: str) -> datetime | None:
@@ -359,12 +340,14 @@ def _parse_exa_news_results(raw: str, after: datetime, limit: int, exclude_predi
     return [item[2] for item in candidates[:limit]]
 
 
-def _parse_tavily_news_results(raw: dict[str, Any], limit: int, exclude_predictions: bool = True) -> list[dict[str, Any]]:
-    web = ((raw.get("data") or {}).get("web") or []) if isinstance(raw.get("data"), dict) else []
-    if not isinstance(web, list):
+def _parse_local_news_results(raw: dict[str, Any], limit: int, exclude_predictions: bool = True) -> list[dict[str, Any]]:
+    rows = raw.get("results") if isinstance(raw, dict) else []
+    if rows is None and isinstance(raw.get("data"), dict):
+        rows = raw["data"].get("web") or raw["data"].get("results")
+    if not isinstance(rows, list):
         return []
     candidates: list[tuple[int, dict[str, Any]]] = []
-    for item in web:
+    for item in rows:
         if not isinstance(item, dict):
             continue
         title = str(item.get("title") or "").strip()
@@ -377,8 +360,9 @@ def _parse_tavily_news_results(raw: dict[str, Any], limit: int, exclude_predicti
                 "title": title,
                 "url": url,
                 "source": _source_host(url),
-                "published_at": "",
-                "highlights": str(item.get("description") or item.get("content") or "").strip()[:800],
+                "published_at": str(item.get("published_at") or "").strip(),
+                "highlights": str(item.get("snippet") or item.get("description") or item.get("content") or "").strip()[:800],
+                "engine": str(item.get("engine") or "").strip(),
                 "freshness": "unverified",
             },
         ))
@@ -413,16 +397,17 @@ async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
         pass
 
+    local_query = f"英雄联盟 LOL {clean_query} 最新 消息"
     try:
-        tavily_raw = await asyncio.to_thread(_run_tavily_search, search_query, result_limit)
-        tavily_results = _parse_tavily_news_results(tavily_raw, result_limit, not include_predictions)
-        if tavily_results:
+        local_raw = await asyncio.to_thread(_run_local_search, local_query, result_limit)
+        local_results = _parse_local_news_results(local_raw, result_limit, not include_predictions)
+        if local_results:
             return _json({
                 **response,
                 "status": "fallback",
-                "provider": "hermes/tavily",
-                "results": tavily_results,
-                "notice": "Exa 没有返回可核验的近期结果；以下仅是未验证时效的备选链接，不能据此断言“最新”。",
+                "provider": "local/searxng",
+                "results": local_results,
+                "notice": "Exa 没有返回可核验的近期结果；以下来自本地免费搜索，发布时间未验证，不能据此断言“最新”。",
             })
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
         pass
@@ -442,7 +427,7 @@ async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit
     structured_output=False,
 )
 async def xiaoxue_search_predictions(query: str, limit: int = 8) -> str:
-    """只读搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + Tavily 前瞻。
+    """只读搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + 本地搜索前瞻。
 
     query 传对阵或主题，如「IG GEN」「S16 瑞士轮」。返回按来源分组的标题/链接/摘要，
     预测是他人观点，不是事实，引用需带来源与时间。

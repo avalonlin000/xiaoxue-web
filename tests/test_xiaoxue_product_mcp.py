@@ -165,22 +165,21 @@ An outdated rumor.
         self.assertNotIn("polymarket", json.dumps(payload, ensure_ascii=False).lower())
         self.assertNotIn("old-rumor", json.dumps(payload, ensure_ascii=False).lower())
 
-    async def test_external_news_marks_tavily_fallback_as_unverified_freshness(self) -> None:
-        tavily_output = {
-            "success": True,
-            "data": {
-                "web": [
-                    {"title": "LCK official series update", "url": "https://lolesports.com/news/lck-update", "content": "Official update."},
-                    {"title": "DK odds prediction", "url": "https://example.com/odds", "content": "Prediction."},
-                ]
-            },
+    async def test_external_news_marks_local_fallback_as_unverified_freshness(self) -> None:
+        local_output = {
+            "provider": "local/searxng",
+            "results": [
+                {"title": "LCK official series update", "url": "https://lolesports.com/news/lck-update",
+                 "snippet": "Official update.", "engine": "parallel_mcp"},
+                {"title": "DK odds prediction", "url": "https://example.com/odds",
+                 "snippet": "Prediction.", "engine": "bing"},
+            ],
         }
-        with mock.patch.object(adapter, "_run_exa_search", side_effect=RuntimeError("Exa unavailable")), \
-             mock.patch.object(adapter, "_run_tavily_search", return_value=tavily_output):
+        with mock.patch.object(adapter, "_run_exa_search", side_effect=RuntimeError("Exa unavailable")),              mock.patch.object(adapter, "_run_local_search", return_value=local_output):
             payload = json.loads(await adapter.xiaoxue_search_external_news("DK 最新消息", recency_days=7, limit=5))
 
         self.assertEqual(payload["status"], "fallback")
-        self.assertEqual(payload["provider"], "hermes/tavily")
+        self.assertEqual(payload["provider"], "local/searxng")
         self.assertEqual([item["title"] for item in payload["results"]], ["LCK official series update"])
         self.assertEqual(payload["results"][0]["freshness"], "unverified")
 

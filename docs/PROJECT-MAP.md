@@ -42,6 +42,8 @@
 | pure-ten-lineup（阵容分析） | `lineup` + `src/modules/lineup-handoff` | `/api/lineup-workflow/prepare` | BP 阵容 |
 | **version-understanding（版本理解）** | `version_understanding`（后端）+ current-event（前端展示） | `/api/version-understanding/global/current` | 数据库 `shared_version_analysis` |
 
+> **联网搜索正源（2026-10-25）**：统一走 `scripts/search_web.py` → 本机零 Key 搜索服务（`services.web_search_url`，默认 `http://127.0.0.1:8338/searxng/search`）。Hermes `web.search_backend=searxng`，`SEARXNG_URL=http://127.0.0.1:8338/searxng`。项目采集、产品 MCP 资讯/预测、`agent-reach` 普通搜索均优先此入口；`dsearch`/B站/Exa 只作兜底，不再依赖付费搜索 key。
+
 > 注意「版本理解」是最近重点：唯一正源 = 数据库 `shared_version_analysis` 表。正文在**当前赛事页**展示，并作为单场判断的共用依据；项目中心只保留开发状态。在开发视图里由 `version_understanding` 模块 + `read_version_context.py` 阵容分析脚本消费。三方（当前赛事前端/后端模块/阵容脚本）对齐着改。
 
 ## 四、文档权威等级（AI 该信谁、别信谁）

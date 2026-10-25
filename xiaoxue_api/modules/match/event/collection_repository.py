@@ -22,6 +22,8 @@ from zoneinfo import ZoneInfo
 
 import httpx
 
+from xiaoxue_api.core.web_search import search_web_json
+
 from .preparation import kickoff
 from .evidence import with_readable_evidence
 
@@ -590,8 +592,13 @@ def parse_search_results(payload) -> list[dict]:
             for item in rows if isinstance(item, dict) and is_public_url(item.get("url") or item.get("link") or "")][:SEARCH_RESULTS_PER_QUERY]
 
 
+def _search_via_local(query: str) -> str:
+    """项目直连本机零 Key 搜索服务（searxng 兼容端）。"""
+    return search_web_json(query, limit=SEARCH_RESULTS_PER_QUERY, timeout=remaining_timeout(20))
+
+
 def _search_via_hermes(query: str) -> str:
-    """Hermes 内置 web_search（当前后端 tavily）。返回原始 stdout，失败抛异常。"""
+    """Hermes 通用 web_search；当前配置同样指向本机零 Key 搜索服务。"""
     hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
     python = hermes_root / "venv/bin/python"
     if not python.is_file():
@@ -670,10 +677,11 @@ def _search_via_bilibili(query: str) -> str:
     return json.dumps({"results": rows}, ensure_ascii=False)
 
 
-# 实测有效顺序：Hermes（Tavily 后端，结果最对口）→ Exa → B站 → 必应。
-# 必应中国对英文电竞查询会返回词典和百科页，只留作最后一档。
+# 实测顺序：本机零 Key 搜索 → Hermes 通用搜索 → Exa → B站 → 必应。
+# 本机搜索服务在 8338，由 systemd 常驻；Hermes 仅作同源兼容回退。
 SEARCH_PROVIDERS = (
-    ("hermes/tavily", _search_via_hermes),
+    ("local/searxng", _search_via_local),
+    ("hermes/web", _search_via_hermes),
     ("agent-reach/exa", _search_via_exa),
     ("bilibili", _search_via_bilibili),
     ("domestic/bing", _search_via_domestic),
@@ -690,7 +698,8 @@ ENCYCLOPEDIA_HOSTS = ("baike.baidu.com", "zhidao.baidu.com", "jingyan.baidu.com"
 TRUSTED_HOSTS = ("lolesports.com", "leagueoflegends.com", "liquipedia.net", "lol.fandom.com", "gol.gg",
                  "op.gg", "invenglobal.com", "sheepesports.com", "dotesports.com", "oneesports.gg",
                  "esports.gg", "thespike.gg", "espn.com", "strafe.com", "bilibili.com", "hupu.com",
-                 "weibo.com", "scoregg.com", "wanplus.com", "17173.com")
+                 "weibo.com", "scoregg.com", "wanplus.com", "17173.com", "zhibo8.com", "sina.cn",
+                 "sina.com.cn", "163.com", "ithome.com", "smzdm.com", "qq.com", "huya.com", "douyu.com")
 # 这些站点的正文取不到：只当线索，永远不能顶掉文字来源。
 VIDEO_HOSTS = ("bilibili.com", "youtube.com", "youtu.be", "weibo.com", "douyin.com",
                "tiktok.com", "x.com", "twitter.com", "facebook.com", "instagram.com")
@@ -740,9 +749,9 @@ def relevant_leads(query: str, leads: list[dict], focus: tuple[str, ...] = ()) -
 
 
 def search(query: str, focus: tuple[str, ...] = ()) -> tuple[list[dict], str]:
-    """按 必应 → hermes/tavily → exa → B站 取结果，拿到能读正文的线索才收工。
+    """按本机搜索 → Hermes → Exa → B站 → 必应取结果，拿到能读正文的线索才收工。
 
-    视频和社媒线索读不到正文，不能顶掉文字来源；四个通道都只剩视频时，
+    视频和社媒线索读不到正文，不能顶掉文字来源；所有通道都只剩视频时，
     才把视频线索原样退回，让上游如实记下"只找到视频"。
     单一通道失败不让整轮采集失败，全部失败时才报“普通网页搜索未完成”。
     """
@@ -778,7 +787,7 @@ PREDICTION_HUNT_SCRIPT = Path("/home/ubuntu/.agents/skills/esports/opinion-sourc
 
 
 def search_predictions(query: str, limit: int = 8) -> dict:
-    """搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + Tavily 前瞻。
+    """搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + 本地搜索前瞻。
 
     这是他人观点，不是事实；调用方必须带来源与时间引用，不把多条预测平均成共识。
     """

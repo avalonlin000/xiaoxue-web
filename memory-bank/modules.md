@@ -93,7 +93,7 @@ xiaoxue-web/
 |------|-----|
 | **职责** | 将小雪的查询意图区分为内部事实、普通外部资料、正式日报舆情和分析判断 |
 | **内部事实** | LOL 数据库 / ScoreGG / Wiki / TK-RAG 优先 |
-| **普通联网** | `agent-reach`：Exa 搜索、Jina 正文、B站/YouTube/RSS 资料发现 |
+| **普通联网** | `scripts/search_web.py` → 本机零 Key 多源搜索（8338 / mcphub + Bing/360 回退）；`dsearch` 兜底；B站/RSS 资料发现；Exa 仅在已有可用额度时补充 |
 | **正式舆情** | `opinion-sources` + 豆包冻结包，只写 `public_opinion` |
 | **判断入口** | BP/阵容/盘口仍走 `lol-lineup-analysis` 和结构化数据，不由搜索器直接给结论 |
 | **执行契约** | `/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index/references/search-routing.md` |
