@@ -73,10 +73,10 @@
 本轮按真实代码和运行入口核对后的基线，供后续改动判断“缺能力”还是“只是展示需要调整”：
 
 - `config/project-center-content.json` 当前有 8 个一级用户模块、37 个树节点；8 个 `ability_ids` 全部有合同定义，树上没有无效能力引用。
-- `src/app/module-catalog.js` 当前有 6 个活动前端 loader：队伍资料、当前赛事、沉淀候选、TK 资料库、盘口记录、项目中心。
-- `src/modules/` 当前有 9 个目录；`daily` 与 `lineup-handoff` 是支撑/对话辅助入口，不因目录存在就增加新的主页面。
-- `src/main.js` 当前主页面为 `teams`、`event`、`stage`、`tk`、`project`，`market` 是隐藏辅助页面。
-- 后端 manifest 中的活跃模块均已由现有用户模块或支撑层节点覆盖；`analyst`、`weread_bridge`、`legacy_trades` 已于 2026-10-25 删除，不再作为兼容模块保留。
+- **2026-10-25 模块归并后：后端实现模块 7 个** —— `team`（队伍事实/画像/TS）、`match`（比赛：赛前工作区/范围覆盖/研究档案）、`knowledge`（TK 与版本理解）、`methods`（阵容与英雄资料）、`daily_content`（日报）、`platform`（外壳/统一写入口/项目中心）、`external`（Gol.gg 与足球）。
+- `src/app/module-catalog.js` 当前 6 个活动前端 loader：队伍资料、当前赛事、沉淀候选、足球、TK 资料库、项目中心；`market-notes` 已下线。
+- `src/main.js` 主页面为 `teams`、`event`、`stage`、`football`、`tk`、`project`；隐藏页 `market` 已移除。
+- 已删除：`analyst`、`weread_bridge`、`legacy_trades`、`market_notes`；空目录 `business_updates`、`pre_match`、`pro_stats` 已清理。用户能力域仍是合同里的 8 个，只是实现模块由 20 收敛为 7。
 - 稳定入口 `/api/project-center/overview` 与 `/api/project-center/modules` 当前可读，项目中心内容版本已更新为 `2026-10-12.1`（2026-10-12 增量核对：无节点漂移，仅版本标记随核对写回）；本快照不代表后续内容版本必须变更，只有实际写回内容时才升级版本。
 
 因此，后续“更新项目地图/项目中心”默认先做程序化对照；无真实漂移时不新增节点，若用户体验有问题则优先调整用户视图的信息层级和入口表达。

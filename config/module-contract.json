@@ -139,7 +139,7 @@
       "consumers": ["队伍资料页", "当前赛事", "阵容分析", "日报", "队伍专项 Skill"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["team", "business_mutations"],
+        "backend_capabilities": ["team", "platform"],
         "frontend_loaders": ["teams", "current-event"],
         "legacy_names": ["三维", "队伍资料总览", "*-team-profile Skill", "team_3d_data"]
       }
