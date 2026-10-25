@@ -76,6 +76,7 @@
 - **2026-10-25 模块归并后：后端实现模块 7 个** —— `team`（队伍事实/画像/TS）、`match`（比赛：赛前工作区/范围覆盖/研究档案）、`knowledge`（TK 与版本理解）、`methods`（阵容与英雄资料）、`daily_content`（日报）、`platform`（外壳/统一写入口/项目中心）、`external`（Gol.gg 与足球）。
 - `src/app/module-catalog.js` 当前 5 个活动前端 loader：队伍资料、当前赛事、足球、TK 资料库、项目中心；`market-notes`、`stage-review` 已下线。
 - `src/main.js` 主页面为 `teams`、`event`、`stage`、`football`、`tk`、`project`；隐藏页 `market` 已移除。
+- **正源与投影**：队伍描述的唯一正源是五项画像，三维为只读历史投影；交易内容唯一正源是交易 TK，原「盘口记录」为只读投影且页面/接口已退役。
 - 已删除：`analyst`、`weread_bridge`、`legacy_trades`、`market_notes`；**「沉淀候选」「盘口记录」两个概念已退役**（页面/入口/接口/工具/树节点移除，数据保留）；空目录 `business_updates`、`pre_match`、`pro_stats` 已清理。用户能力域仍是合同里的 8 个，只是实现模块由 20 收敛为 7。
 - 稳定入口 `/api/project-center/overview` 与 `/api/project-center/modules` 当前可读，项目中心内容版本已更新为 `2026-10-12.1`（2026-10-12 增量核对：无节点漂移，仅版本标记随核对写回）；本快照不代表后续内容版本必须变更，只有实际写回内容时才升级版本。
 
