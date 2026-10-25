@@ -2,6 +2,13 @@
 
 > 导航更新：2026-10-21 | 更新人：Codex（本次授权实施与快速收尾）
 
+## 2026-10-25（第二轮）· 收尾清理 + 工具归并第一批
+
+- 清掉「沉淀候选」残留：页面卡片、CSS、页面路由、项目中心文案与节点标签、workflows 目标。
+- MCP 工具 44 → 39：Gol.gg 6 个合成 `xiaoxue_get_gol_facts(kind=series|tournament|bp|entities|team|player)`；ScoreGG 3 个合成 `xiaoxue_get_score(kind=evidence|result|results)`。
+- 修复三处历史遗留：MCP 写操作白名单里残留的已删路由、boolean 链断裂、被删模块的测试引用。
+- 验证：后端 425 通过 / 5 项既有失败；前端 99 通过；MCP 单测 43 通过；合同校验通过；dist 已重建。
+
 ## 2026-10-25 · 模块归并到 7 个 + 两个概念退役（执行中）
 
 - 后端实现模块 20 → 7：team / match / knowledge / methods / daily_content / platform / external。
