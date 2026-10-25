@@ -1634,6 +1634,13 @@
       "page": "event",
       "entry_label": "打开当前赛事",
       "chat_prompt": "看看当前关注范围"
+    },
+    "football": {
+      "module_name": "足球观察台",
+      "entry_type": "web",
+      "page": "football",
+      "entry_label": "打开足球观察台",
+      "chat_prompt": "看看今天的足球"
     }
   }
 }

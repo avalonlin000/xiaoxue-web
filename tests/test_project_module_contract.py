@@ -35,6 +35,7 @@ class ProjectModuleContractTests(TestCase):
                 "daily_knowledge",
                 "knowledge_automation",
                 "attention_config",
+                "football",
             ],
         )
         for module in modules:
@@ -132,6 +133,6 @@ class ProjectModuleContractTests(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["schema"], "xiaoxue-module-contract-v1")
-        self.assertEqual(len(payload["modules"]), 8)
+        self.assertEqual(len(payload["modules"]), 9)
         self.assertTrue(all(item["read_capability"] for item in payload["modules"]))
         self.assertTrue(all(item["readback_capability"] for item in payload["modules"]))

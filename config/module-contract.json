@@ -395,7 +395,7 @@
       "consumers": ["日报", "TS", "知识导入", "巡检", "小白观察面"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["platform", "daily_content", "weread_bridge"],
+        "backend_capabilities": ["platform", "daily_content"],
         "frontend_loaders": [],
         "legacy_names": ["后台", "数据刷新", "定时任务", "巡检"]
       }
@@ -445,6 +445,56 @@
         "backend_capabilities": ["current_event", "platform"],
         "frontend_loaders": ["current-event", "teams"],
         "legacy_names": ["关注分级", "当前赛事配置", "队伍别名"]
+      }
+    },
+    {
+      "id": "football",
+      "display_name": "足球观察台",
+      "purpose": "读取公开足球赛程和可核实历史事实，给出半破与75分钟后两种赛前筛选结果；滚球盘口由钧钧自己核验。",
+      "ownership": "外部赛程与事实（足球）",
+      "user_entry": {
+        "natural_examples": ["看看今天足球有什么", "半破有哪些场"],
+        "web": "足球观察台"
+      },
+      "agent_entry": {
+        "skill": "xiaoxue",
+        "tools": [],
+        "behavior": "按需读取公开赛程；未上线前不作为主路径承诺。"
+      },
+      "source_of_truth": {
+        "label": "ESPN 公开赛程与比赛摘要",
+        "api": "/api/football/board",
+        "state": ["本地文件缓存"]
+      },
+      "read_capability": {
+        "id": "football.read",
+        "entry": "/api/football/board",
+        "empty": "没有可核实赛程时明确空态，不编造对阵。"
+      },
+      "bounded_write_capability": {
+        "id": "football.none",
+        "entry": null,
+        "scope": "只读，不写任何正源。"
+      },
+      "readback_capability": {
+        "entry": "/api/football/board",
+        "checks": ["比赛身份", "两种筛选结果", "资料缺口"]
+      },
+      "analysis_capability": {
+        "id": "football.screen",
+        "entry": "/api/football/board",
+        "boundary": "只做赛前筛选与资料，不给交易方向。"
+      },
+      "field_mapping": {
+        "display": {"matches": "比赛清单", "coverage": "覆盖范围", "readiness": "资料齐全度"}
+      },
+      "extension_kind": "structural_capability",
+      "consumers": ["足球观察台"],
+      "status": "partial",
+      "compatibility": {
+        "backend_capabilities": ["football"],
+        "frontend_loaders": ["football"],
+        "legacy_names": []
       }
     }
   ]

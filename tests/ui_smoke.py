@@ -31,7 +31,7 @@ with sync_playwright() as playwright:
     page.wait_for_load_state("networkidle")
 
     tabs = page.locator(".workspace-tab").all_inner_texts()
-    assert tabs == ["队伍资料", "当前赛事", "阶段整理", "TK资料库"], tabs
+    assert tabs == ['队伍资料', '当前赛事', '沉淀候选', '足球', 'TK资料库', '项目中心'], tabs
     assert page.get_by_role("button", name="队伍资料", exact=True).get_attribute("class").find("active") >= 0
     teams = visible_text(page)
     assert "队伍资料" in teams
