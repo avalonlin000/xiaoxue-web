@@ -46,7 +46,7 @@ class JudgmentEntryMCPTests(IsolatedAsyncioTestCase):
     async def test_judgment_catalogue_uses_the_same_api_and_is_bounded(self):
         payload = {"version": "r1", "methods": [{"id": f"view-{i}", "title": f"理解角度{i}", "purpose": "用途" * 3000, "status": "ready"} for i in range(7)]}
         with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value=payload)) as api:
-            raw = await adapter.xiaoxue_get_judgment_views()
+            raw = await adapter.xiaoxue_open_judgment()
         api.assert_awaited_once_with("GET", "/trading-methods")
         assert len(raw) <= 3000
         result = json.loads(raw)
@@ -91,7 +91,7 @@ class JudgmentEntryMCPTests(IsolatedAsyncioTestCase):
             page = json.loads(await adapter.xiaoxue_discuss_judgment("version", "怎么看"))
             pieces = [page["text"]]
             while page["next_offset"] is not None:
-                raw = await adapter.xiaoxue_get_judgment_reply(page["reply_id"], page["next_offset"])
+                raw = await adapter.xiaoxue_discuss_judgment(reply_id=page["reply_id"], offset=page["next_offset"])
                 assert len(raw) <= 3000
                 page = json.loads(raw)
                 pieces.append(page["text"])
@@ -99,7 +99,7 @@ class JudgmentEntryMCPTests(IsolatedAsyncioTestCase):
         assert "".join(pieces) == answer
         with mock.patch.object(adapter.time, "monotonic", return_value=adapter.time.monotonic() + 601):
             with self.assertRaises(ValueError):
-                await adapter.xiaoxue_get_judgment_reply(page["reply_id"])
+                await adapter.xiaoxue_discuss_judgment(reply_id=page["reply_id"])
 
 
 class XiaoxueProductMCPTests(IsolatedAsyncioTestCase):

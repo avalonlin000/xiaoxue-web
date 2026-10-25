@@ -898,23 +898,6 @@ def _material_summary(payload: dict, *, section: str = "", offset: int = 0, expe
     return output
 
 
-@mcp.tool(name="xiaoxue_get_judgment_views", structured_output=False,
-          annotations={"title": "查看可用判断角度", "readOnlyHint": True, "destructiveHint": False, "openWorldHint": False})
-async def xiaoxue_get_judgment_views(offset: int = 0) -> str:
-    """与工作台共用判断目录；选一个id后open读取对应已有内容，不要求用户记方法名称。"""
-    data = await _api_request("GET", "/trading-methods")
-    rows, offset = data.get("methods") or [], max(0, int(offset))
-    views = [{"id": _material_text(row.get("id"))[:64], "title": _material_text(row.get("title"))[:60],
-              "purpose": _material_text(row.get("purpose"))[:140], "status": str(row.get("status") or "")[:20],
-              "primary": row.get("primary", True) is not False, "channel": str(row.get("channel") or "workbench")[:24]}
-             for row in rows[offset:offset + 6]]
-    output = {"views": views, "total": len(rows), "next_offset": offset + len(views) if offset + len(views) < len(rows) else None}
-    while len(_json(output)) > 3000 and views:
-        views.pop()
-        output["next_offset"] = offset + len(views)
-    return _json(output)
-
-
 def _judgment_params(method_id: str, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
                      match_date: str = "", match_time: str = "", match_format: str = "", as_of: str = "") -> dict:
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", method_id):
@@ -929,13 +912,23 @@ def _judgment_params(method_id: str, event: str = "", team: str = "", team_a: st
 
 @mcp.tool(name="xiaoxue_open_judgment", structured_output=False,
           annotations={"title": "打开判断所需的已有内容", "readOnlyHint": True, "destructiveHint": False, "openWorldHint": False})
-async def xiaoxue_open_judgment(method_id: str, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
+async def xiaoxue_open_judgment(method_id: str = "", event: str = "", team: str = "", team_a: str = "", team_b: str = "",
                                match_date: str = "", match_time: str = "", match_format: str = "", as_of: str = "", offset: int = 0,
                                expected_revision: str = "") -> str:
-    """只读实际正文与依据，不触发搜索、模型或保存。充分研究时自主按next_offset继续相关正文及依据，不让用户翻页。
-
-    后页沿用相同对象/as_of，并将首屏revision作为expected_revision；revision_changed时丢弃旧页，从offset=0读新revision，不拼接两版。
+    """不传 method_id 时列出可用判断角度（与工作台同一份目录）；传了就读取该角度对应的已有内容与依据，只读、不触发搜索或保存。充分研究时自主按next_offset继续，不让用户翻页；后页沿用相同对象/as_of，首屏 revision 作为 expected_revision，revision_changed 时从 offset=0 重读新版本。
     """
+    if not method_id:
+        data = await _api_request("GET", "/trading-methods")
+        rows, offset = data.get("methods") or [], max(0, int(offset))
+        views = [{"id": _material_text(row.get("id"))[:64], "title": _material_text(row.get("title"))[:60],
+                  "purpose": _material_text(row.get("purpose"))[:140], "status": str(row.get("status") or "")[:20],
+                  "primary": row.get("primary", True) is not False, "channel": str(row.get("channel") or "workbench")[:24]}
+                 for row in rows[offset:offset + 6]]
+        output = {"views": views, "total": len(rows), "next_offset": offset + len(views) if offset + len(views) < len(rows) else None}
+        while len(_json(output)) > 3000 and views:
+            views.pop()
+            output["next_offset"] = offset + len(views)
+        return _json(output)
     data = await _api_request("GET", "/current-event/judgment-context", params=_judgment_params(method_id, event, team, team_a, team_b, match_date, match_time, match_format, as_of))
     metadata = {"method_id": method_id, "status": str(data.get("status") or "")[:30],
                 "revision": str(data.get("revision") or "")[:128], "needed": data.get("needed") or [],
@@ -964,9 +957,19 @@ _JUDGMENT_REPLIES: OrderedDict = OrderedDict()
 
 @mcp.tool(name="xiaoxue_discuss_judgment", structured_output=False,
           annotations={"title": "根据已有内容讨论判断", "readOnlyHint": False, "destructiveHint": False, "openWorldHint": False})
-async def xiaoxue_discuss_judgment(method_id: str, question: str, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
+async def xiaoxue_discuss_judgment(method_id: str = "", question: str = "", reply_id: str = "", offset: int = 0, event: str = "", team: str = "", team_a: str = "", team_b: str = "",
                                   match_date: str = "", match_time: str = "", match_format: str = "", history: list[dict] | None = None, as_of: str = "") -> str:
-    """沿用open时的完整对象及as_of，明确提问后才调用现有模型；历史截止视图目前不重推。讨论未保存、未采用。长答复自主按reply_id及next_offset读完，不让用户说继续，不重复提问或调用模型。"""
+    """沿用 open 时的完整对象及 as_of，明确提问后才调用现有模型；历史截止视图目前不重推。讨论未保存、未采用。传 reply_id 时读取同一答复的后续页（十分钟内有效），不重复调用模型。"""
+    if reply_id:
+        row = _JUDGMENT_REPLIES.get(reply_id)
+        if not row or time.monotonic() - row[0] > 600:
+            _JUDGMENT_REPLIES.pop(reply_id, None)
+            raise ValueError("这次未保存讨论已过期，请在原会话继续")
+        return _json(_text_page({"reply_id": reply_id, "saved": False}, row[1], offset))
+    if not method_id:
+        raise ValueError("讨论判断需要先给出判断入口")
+    if not question.strip():
+        raise ValueError("讨论判断需要先给出问题")
     params = _judgment_params(method_id, event, team, team_a, team_b, match_date, match_time, match_format, as_of)
     question = _clean_text(question, "问题")
     if len(question) > 2000:
@@ -981,17 +984,6 @@ async def xiaoxue_discuss_judgment(method_id: str, question: str, event: str = "
         _JUDGMENT_REPLIES.popitem(last=False)
     output = _text_page({"reply_id": reply_id, "saved": False, "context_revision": str(data.get("context_revision") or "")[:128]}, text)
     return _json(output)
-
-
-@mcp.tool(name="xiaoxue_get_judgment_reply", structured_output=False,
-          annotations={"title": "继续读取本次未保存讨论", "readOnlyHint": True, "destructiveHint": False, "openWorldHint": False})
-async def xiaoxue_get_judgment_reply(reply_id: str, offset: int = 0) -> str:
-    """十分钟内自主按next_offset读完同一reply_id答复，不让用户翻页，不重复模型请求，不写知识。"""
-    row = _JUDGMENT_REPLIES.get(reply_id)
-    if not row or time.monotonic() - row[0] > 600:
-        _JUDGMENT_REPLIES.pop(reply_id, None)
-        raise ValueError("这次未保存讨论已过期，请在原会话继续")
-    return _json(_text_page({"reply_id": reply_id, "saved": False}, row[1], offset))
 
 
 @mcp.tool(name="xiaoxue_collect_match_materials", structured_output=False,
