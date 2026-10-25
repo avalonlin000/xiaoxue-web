@@ -10,7 +10,7 @@ def test_query_requires_known_kind():
         raise AssertionError("unsupported query kind must fail")
 
 def test_explicit_gol_page_marks_unmatched_current_event_as_conflict(monkeypatch):
-    from xiaoxue_api.modules.current_event import service as current_event
+    from xiaoxue_api.modules.match.event import service as current_event
     monkeypatch.setattr(current_event, "gol_series_facts", lambda _id: {"games": [{"teams": [{"team": "Other A"}, {"team": "Other B"}]}]})
     monkeypatch.setattr(current_event, "_resolve_run_identity", lambda values: {**values, "team_a": values["team_a"], "team_b": values["team_b"]})
     monkeypatch.setattr(current_event, "_identity_payload", lambda value: value)

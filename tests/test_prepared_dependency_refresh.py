@@ -4,9 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
-from xiaoxue_api.modules.current_event import collection, collection_repository as repository
-from xiaoxue_api.modules.current_event.analysis_repository import analyze_scope as real_analyze_scope
-from xiaoxue_api.modules.current_event.collection_repository import dependency_manifest as real_dependency_manifest
+from xiaoxue_api.modules.match.event import collection, collection_repository as repository
+from xiaoxue_api.modules.match.event.analysis_repository import analyze_scope as real_analyze_scope
+from xiaoxue_api.modules.match.event.collection_repository import dependency_manifest as real_dependency_manifest
 
 
 @pytest.fixture(autouse=True)
@@ -21,7 +21,7 @@ def store(tmp_path, monkeypatch):
     monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "materials"))
     manifest = {"internal": "profile-v1", "library": "library-v1", "external": "sources-v1", "analysis": "methods-v1"}
     monkeypatch.setattr(repository, "dependency_manifest", lambda _: copy.deepcopy(manifest))
-    monkeypatch.setattr("xiaoxue_api.modules.current_event.analysis_repository.analyze_scope", lambda *_: ([], []))
+    monkeypatch.setattr("xiaoxue_api.modules.match.event.analysis_repository.analyze_scope", lambda *_: ([], []))
     return manifest
 
 
@@ -125,7 +125,7 @@ def test_batch_coverage_tracks_real_team_content_and_missing_team(store):
 def test_team_alias_focus_finds_late_fullname_analysis_not_first_8000_chars(store):
     body = "Unrelated tournament introduction. " * 400 + "\n\n## Team Liquid\n\n" + "Team Liquid force the opposition to react to side lane pressure before grouped fights. " * 8
     config = {"event": "S16", "aliases": ["Worlds 2026"], "team_aliases": {"TLAW": ["Team Liquid"]}, "source_hints": [{"url": "https://example.com/all-teams", "title": "All teams analysis", "source_category": "author_analysis"}]}
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value=config), patch.object(repository, "search", return_value=([], "")), patch.object(repository, "read_article", return_value=body):
+    with patch("xiaoxue_api.modules.match.event.service.get_current_event", return_value=config), patch.object(repository, "search", return_value=([], "")), patch.object(repository, "read_article", return_value=body):
         rows, _ = repository.collect_external({"scope": "team", "event": "S16", "team": "TLAW", "reference_date": "2026-10-20"})
     assert len(rows) == 1
     assert "Team Liquid force" in rows[0]["text"]
@@ -135,7 +135,7 @@ def test_team_alias_focus_finds_late_fullname_analysis_not_first_8000_chars(stor
 
 def test_scope_analysis_executes_original_method_without_fake_match(store):
     import json
-    from xiaoxue_api.modules.current_event import analysis_repository as analysis
+    from xiaoxue_api.modules.match.event import analysis_repository as analysis
 
     sections = [{"id": "version", "items": [{"text": "旧26.16认识", "applicability": "unverified"}]}, {"id": "digest", "selection_status": "screened", "items": [{"text": "官方26.20版本调整", "kind": "reported_information", "source_category": "official_background", "evidence_quote": "Patch 26.20 changes", "source_id": "source1"}]}]
     response = {"items": [{"method_id": "version", "text": "旧26.16认识需要在26.20重新检验。", "basis": "官方已明确比赛版本变化", "confirmation": "新版本比赛出现对应效果", "invalidation": "旧赢法不再适配", "source_ids": ["I1", "I2"]}]}
@@ -207,7 +207,7 @@ def test_team_scope_seeds_do_not_replace_current_news_discovery(store):
     config = {"event": "S16", "source_hints": [{"url": "https://example.com/version", "scopes": ["event"]}, {"url": "https://example.com/team1", "source_category": "author_analysis", "scopes": ["team"]}, {"url": "https://example.com/team2", "source_category": "author_analysis", "scopes": ["team"]}]}
     body = "KC control side lane waves before contesting neutral objectives. " * 10
     leads = [{"url": "https://example.com/new-interview", "title": "KC current interview", "published_at": "2026-10-19"}]
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value=config), patch.object(repository, "read_article", side_effect=lambda url: body + url) as reader, patch.object(repository, "search", return_value=(leads, "")) as search:
+    with patch("xiaoxue_api.modules.match.event.service.get_current_event", return_value=config), patch.object(repository, "read_article", side_effect=lambda url: body + url) as reader, patch.object(repository, "search", return_value=(leads, "")) as search:
         rows, _ = repository.collect_external({"scope": "team", "team": "KC", "event": "S16", "reference_date": "2026-10-20"})
     assert reader.call_count == 3
     assert search.call_count >= 2
@@ -236,7 +236,7 @@ def test_failed_revalidation_keeps_original_timestamp_and_short_negative_cache(s
 
 def test_dependency_manifest_ignores_other_team_and_capture_only_change(store):
     profiles = {"KC": {"profile": {"win_path": "边线"}, "updated_at": "2026-10-18"}, "GEN": {"profile": {"win_path": "资源团"}}}
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value={"event": "S16"}), patch("xiaoxue_api.modules.team.public.get_current_profile", side_effect=lambda team: profiles[team]), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.browse", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.list_match_trading_tk", return_value={}):
+    with patch("xiaoxue_api.modules.match.event.service.get_current_event", return_value={"event": "S16"}), patch("xiaoxue_api.modules.team.public.get_current_profile", side_effect=lambda team: profiles[team]), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.browse", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.list_match_trading_tk", return_value={}):
         before = real_dependency_manifest({"scope": "team", "event": "S16", "team": "KC"})
         profiles["GEN"]["profile"]["win_path"] = "其他队变化"
         profiles["KC"]["updated_at"] = "2026-10-20"
@@ -249,7 +249,7 @@ def test_dependency_manifest_ignores_other_team_and_capture_only_change(store):
 
 def test_public_evidence_missing_is_not_scheduled_as_model_failure(store):
     task = collection.prepare_scope({"scope": "event", "event": "S16"}, dispatch=False)["task"]
-    with patch.object(repository, "collect_scope_internal", return_value=([{"id": "version", "items": [{"text": "旧版本"}]}], [])), patch.object(repository, "collect_external", return_value=([], [])), patch.object(repository, "summarize_materials", return_value=([], [])), patch("xiaoxue_api.modules.current_event.analysis_repository.analyze_scope", side_effect=real_analyze_scope), patch.object(repository, "call_digest_model", side_effect=AssertionError("无公开证据不重跑模型")):
+    with patch.object(repository, "collect_scope_internal", return_value=([{"id": "version", "items": [{"text": "旧版本"}]}], [])), patch.object(repository, "collect_external", return_value=([], [])), patch.object(repository, "summarize_materials", return_value=([], [])), patch("xiaoxue_api.modules.match.event.analysis_repository.analyze_scope", side_effect=real_analyze_scope), patch.object(repository, "call_digest_model", side_effect=AssertionError("无公开证据不重跑模型")):
         collection.run_collection(task["id"])
     assert not repository.read(task["id"])["task"]["next_recovery_at"]
 

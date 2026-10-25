@@ -7,9 +7,9 @@ from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from workflow_contracts import build_daily_content_files
-import xiaoxue_api.modules.current_event.public as current_event_public
+import xiaoxue_api.modules.match.event.public as current_event_public
 from xiaoxue_api.modules.team.public import list_schedules
-from xiaoxue_api.modules.current_event.public import get_current_event_scope_leagues, match_in_current_event_scope
+from xiaoxue_api.modules.match.event.public import get_current_event_scope_leagues, match_in_current_event_scope
 
 from . import repository
 

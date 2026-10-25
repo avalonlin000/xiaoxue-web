@@ -11,9 +11,9 @@ class PublicRouteContractTests(unittest.TestCase):
         from xiaoxue_api.modules.platform.service import health
 
         payload = health()
-        self.assertEqual(payload["modules"]["research_subjects"]["status"], "disabled")
-        self.assertEqual(payload["capabilities"]["research_subjects"]["effect"], "write")
-        self.assertEqual(payload["capabilities"]["current_event"]["effect"], "temporary")
+        self.assertNotIn("research_subjects", payload["modules"])
+        self.assertIn("match", payload["modules"])
+        self.assertEqual(payload["capabilities"]["match"]["effect"], "temporary")
 
     def test_primary_routes_exist_once(self):
         expected = {

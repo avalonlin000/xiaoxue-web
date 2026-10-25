@@ -4,7 +4,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.current_event import service as current_event_service
+from xiaoxue_api.modules.match.event import service as current_event_service
 from xiaoxue_api.modules.team.ts import service as fundamentals_service
 
 

@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pytest
 import httpx
 
-from xiaoxue_api.modules.current_event import collection, collection_repository as repo
+from xiaoxue_api.modules.match.event import collection, collection_repository as repo
 
 real_read_article = repo.read_article
 
@@ -17,7 +17,7 @@ MATCH = {"team_a": "KC", "team_b": "MVK", "event": "Worlds", "match_date": "2026
 def isolated_sources(tmp_path, monkeypatch):
     # Reader unit tests must not share production caches or configured seed URLs.
     monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "isolated-materials"))
-    monkeypatch.setattr("xiaoxue_api.modules.current_event.service.get_current_event", lambda: {"event": "unit-test"})
+    monkeypatch.setattr("xiaoxue_api.modules.match.event.service.get_current_event", lambda: {"event": "unit-test"})
     monkeypatch.setattr(repo, "dependency_manifest", lambda _: {"internal": "test", "library": "test", "external": "test", "analysis": "test"})
     for name in ("search", "read_article", "call_digest_model"):
         monkeypatch.setattr(repo, name, lambda *args, **kwargs: pytest.fail("单测禁止真实网络或模型请求"))
@@ -368,7 +368,7 @@ def test_prepared_list_reads_only_selected_date(store):
 
 def test_batch_reuses_configured_schedule_scope_and_does_not_fabricate_opponents(store):
     rows = [{"team_a": "KC", "team_b": "MVK", "date": "2026-10-19", "time": "02:00", "stage": "Worlds", "format": "BO3"}, {"team_a": "TBD", "team_b": "MVK", "date": "2026-10-19", "time": "04:00", "stage": "Worlds"}]
-    with patch("xiaoxue_api.modules.current_event.collection.get_current_event", return_value={"event": "Worlds"}), patch("xiaoxue_api.modules.current_event.collection.list_schedules", return_value=rows) as schedules:
+    with patch("xiaoxue_api.modules.match.event.collection.get_current_event", return_value={"event": "Worlds"}), patch("xiaoxue_api.modules.match.event.collection.list_schedules", return_value=rows) as schedules:
         report = collection.prepare_date("2026-10-19", dispatch=False)
     # Read one extra row so a full batch can honestly report truncation.
     schedules.assert_called_once_with({"date_from": "2026-10-19", "date_to": "2026-10-19", "event": "Worlds"}, 201)

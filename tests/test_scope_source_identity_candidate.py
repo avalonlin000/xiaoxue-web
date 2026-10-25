@@ -9,7 +9,7 @@ STAGED = Path('/home/ubuntu/.hermes/team/deliveries/verified-changes/xiaoxue-pre
 
 
 def load_candidate(name, path):
-    spec = importlib.util.spec_from_file_location('xiaoxue_api.modules.current_event.' + name, path)
+    spec = importlib.util.spec_from_file_location('xiaoxue_api.modules.match.event.' + name, path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

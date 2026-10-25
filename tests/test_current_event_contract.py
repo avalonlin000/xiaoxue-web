@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from xiaoxue_api.modules.current_event.service import build_current_event
+from xiaoxue_api.modules.match.event.service import build_current_event
 
 
 class CurrentEventContractTests(unittest.TestCase):

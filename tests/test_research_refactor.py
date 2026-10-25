@@ -5,8 +5,8 @@ import json
 
 import pytest
 
-from xiaoxue_api.modules.current_event import analysis_repository as analysis
-from xiaoxue_api.modules.current_event import collection, collection_repository as repo, service
+from xiaoxue_api.modules.match.event import analysis_repository as analysis
+from xiaoxue_api.modules.match.event import collection, collection_repository as repo, service
 
 REAL_MANIFEST = repo.dependency_manifest
 
@@ -84,7 +84,7 @@ def test_future_match_event_alias_reuses_prepared_task_without_rekeying_old_reco
 
 
 def test_upcoming_dashboard_and_paged_tool_read_same_saved_revision_without_dispatch():
-    from xiaoxue_api.modules.current_event import presentation
+    from xiaoxue_api.modules.match.event import presentation
     task = collection.prepare_materials(MATCH, dispatch=False)["task"]
     repo._save(repo.root() / task["id"] / "latest.json", {"status": "partial", "revision": "r1",
         "limitations": ["首发未核实"], "summary": "可读正文",
@@ -177,7 +177,7 @@ def test_saved_scope_analysis_exposes_its_actual_sources_without_rewriting_cache
 
 
 def test_readable_analysis_sources_preserve_old_background_without_leaking_audit():
-    from xiaoxue_api.modules.current_event.evidence import readable_evidence
+    from xiaoxue_api.modules.match.event.evidence import readable_evidence
     rows = readable_evidence([
         {"text": "旧版本解释，未核实本届适用。", "kind": "version_background", "id": "I9"},
         {"text": "统计结构", "display_text": "双方同口径的近期结果", "kind": "cycle"},
@@ -192,7 +192,7 @@ def test_readable_analysis_sources_preserve_old_background_without_leaking_audit
 
 
 def test_shared_team_digest_is_reused_without_system_inference_feedback():
-    from xiaoxue_api.modules.current_event import evidence
+    from xiaoxue_api.modules.match.event import evidence
     result = {"revision": "r1", "sections": [{"id": "digest", "selection_status": "screened", "items": [article()]}, {"id": "analysis", "items": [{"text": "系统此前猜测"}]}]}
     with patch.object(collection, "get_scope_materials", return_value={"result": result}) as read:
         sections = evidence.prepared_sections(MATCH)
@@ -203,7 +203,7 @@ def test_shared_team_digest_is_reused_without_system_inference_feedback():
 
 def prepared_article_sections(*, missing_team="", incomplete=False, changed_hash=False, empty_selection=False):
     """Both parent bodies were screened, not merely fetched or summarized elsewhere."""
-    from xiaoxue_api.modules.current_event import evidence
+    from xiaoxue_api.modules.match.event import evidence
     body = {"source_id": "source-1", "content_hash": "a" * 64,
             "verification": "source_text", "url": "https://example.org/aaa",
             "text": "AAA force opponents to split. BBB can challenge the side lane."}
@@ -289,7 +289,7 @@ def test_keywords_in_tk_do_not_generate_a_trade_direction():
 
 
 def test_shared_source_keeps_provenance_and_does_not_repeat_conditions():
-    from xiaoxue_api.modules.current_event.evidence import public_inputs
+    from xiaoxue_api.modules.match.event.evidence import public_inputs
     original = article(source_title="作者的原始报道", verification="ai_summary", source="作者甲",
                        applicability="previous_patch", conditions="仅旧版本样本", counterevidence="本场版本未核实")
     first = public_inputs([{"id": "digest", "selection_status": "screened", "items": [original]}])
@@ -302,7 +302,7 @@ def test_shared_source_keeps_provenance_and_does_not_repeat_conditions():
 
 
 def test_knowledge_extraction_is_not_upgraded_to_original_source_in_consumers():
-    from xiaoxue_api.modules.current_event.evidence import public_inputs, readable_evidence, with_readable_evidence
+    from xiaoxue_api.modules.match.event.evidence import public_inputs, readable_evidence, with_readable_evidence
     item = article(source_kind="knowledge_extract", source="原文中文整理")
     section = {"id": "digest", "selection_status": "screened", "items": [item]}
     original = json.dumps(section)
@@ -317,7 +317,7 @@ def test_knowledge_extraction_is_not_upgraded_to_original_source_in_consumers():
 
 
 def test_pending_digest_and_current_sources_do_not_enter_historical_replay():
-    from xiaoxue_api.modules.current_event import evidence
+    from xiaoxue_api.modules.match.event import evidence
     assert not evidence.public_inputs([{"id": "digest", "selection_status": "pending", "items": [article()]}])
     assert not evidence.public_inputs([{"id": "digest", "items": [article()]}])
     with patch.object(collection, "get_scope_materials", side_effect=AssertionError("不得读取现时资料")):
@@ -377,7 +377,7 @@ def test_shared_author_source_is_readable_even_without_new_match_specific_source
 
 
 def test_cancelled_automatic_match_pauses_without_discarding_readable_result():
-    from xiaoxue_api.modules.current_event.preparation import ZONE
+    from xiaoxue_api.modules.match.event.preparation import ZONE
     now = datetime.now(ZONE)
     row = {"team_a": "AAA", "team_b": "BBB", "stage": "S16", "date": (now + timedelta(days=1)).date().isoformat(), "time": "18:00"}
     with patch.object(collection, "list_schedules", return_value=[row]):

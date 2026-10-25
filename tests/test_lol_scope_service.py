@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.lol_scope import service
+from xiaoxue_api.modules.match.scope import service
 
 
 SCHEMA = """

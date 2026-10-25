@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from xiaoxue_api.modules.current_event import lolesports_facts as facts
+from xiaoxue_api.modules.match.event import lolesports_facts as facts
 
 
 def _fixture(path: str):

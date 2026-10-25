@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from xiaoxue_api.modules.research_subjects import service
+from xiaoxue_api.modules.match.archive import service
 
 
 class ResearchSubjectsServiceTests(unittest.TestCase):

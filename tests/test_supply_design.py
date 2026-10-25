@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from xiaoxue_api.modules.current_event import analysis_repository as analysis
-from xiaoxue_api.modules.current_event import collection, collection_repository as repo
+from xiaoxue_api.modules.match.event import analysis_repository as analysis
+from xiaoxue_api.modules.match.event import collection, collection_repository as repo
 
 
 def test_limitations_split_structural_from_transient():

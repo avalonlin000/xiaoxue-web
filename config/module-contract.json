@@ -247,7 +247,7 @@
       "consumers": ["当前赛事页", "TS", "画像", "TK", "阵容分析", "交易判断"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["current_event"],
+        "backend_capabilities": ["match"],
         "frontend_loaders": ["current-event"],
         "legacy_names": ["单场推演", "match run", "赛前底稿"]
       }
@@ -294,7 +294,7 @@
       "consumers": ["当前赛事", "日报", "阵容分析", "交易系统"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["methods", "current_event"],
+        "backend_capabilities": ["methods", "match"],
         "frontend_loaders": ["current-event"],
         "legacy_names": ["BP 长报告", "阵容八步法", "版本理解"]
       }
@@ -348,7 +348,7 @@
       "consumers": ["日报页", "阶段整理页", "当前赛事", "对话"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["daily_content", "team", "knowledge", "current_event"],
+        "backend_capabilities": ["daily_content", "team", "knowledge", "match"],
         "frontend_loaders": ["stage-review", "current-event"],
         "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
       }
@@ -442,7 +442,7 @@
       "consumers": ["赛程", "日报", "当前赛事", "队伍资料"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["current_event", "platform"],
+        "backend_capabilities": ["match", "platform"],
         "frontend_loaders": ["current-event", "teams"],
         "legacy_names": ["关注分级", "当前赛事配置", "队伍别名"]
       }

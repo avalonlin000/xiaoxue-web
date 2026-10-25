@@ -16,9 +16,9 @@ import time
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from xiaoxue_api.modules.current_event.public import get_collection_task, prepare_date, prepare_upcoming, prepare_scope, prepare_scope_batch, resume_collection, run_collection_bounded
-from xiaoxue_api.modules.current_event.collection_repository import WORKER_POOLS, worker_slot_paths
-from xiaoxue_api.modules.current_event.preparation import kickoff
+from xiaoxue_api.modules.match.event.public import get_collection_task, prepare_date, prepare_upcoming, prepare_scope, prepare_scope_batch, resume_collection, run_collection_bounded
+from xiaoxue_api.modules.match.event.collection_repository import WORKER_POOLS, worker_slot_paths
+from xiaoxue_api.modules.match.event.preparation import kickoff
 
 
 def _scheduler_directory() -> Path:

@@ -3,8 +3,8 @@ from unittest.mock import patch
 
 import pytest
 
-from xiaoxue_api.modules.current_event import service
-from xiaoxue_api.modules.current_event import judgment
+from xiaoxue_api.modules.match.event import service
+from xiaoxue_api.modules.match.event import judgment
 
 
 MATCH = {"team_a": "AAA", "team_b": "BBB", "event": "S16 世界赛", "match_date": "2099-10-20", "match_time": "18:00"}
@@ -161,7 +161,7 @@ def test_match_entry_without_match_does_not_create_one():
 
 
 def test_new_routes_are_registered_without_business_writes():
-    from xiaoxue_api.modules.current_event.presentation import router
+    from xiaoxue_api.modules.match.event.presentation import router
     routes = {(route.path, next(iter(route.methods))) for route in router.routes}
     assert ("/api/current-event/judgment-context", "GET") in routes
     assert ("/api/current-event/judgment-discussion", "POST") in routes
@@ -190,7 +190,7 @@ def test_match_context_includes_user_records_without_adopting_them(monkeypatch):
 
 
 def test_match_context_reuses_event_background_when_no_match_result_exists(monkeypatch):
-    from xiaoxue_api.modules.current_event import collection
+    from xiaoxue_api.modules.match.event import collection
     monkeypatch.setattr(service, "get_match_run", lambda _: {})
     monkeypatch.setattr(collection, "get_prepared_materials", lambda *_a, **_k: {"result": None})
     calls = []

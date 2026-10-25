@@ -8,7 +8,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from xiaoxue_api.modules.current_event import public as current_event_public
+from xiaoxue_api.modules.match.event import public as current_event_public
 from xiaoxue_api.modules.daily_content import repository, service
 
 

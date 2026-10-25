@@ -2,7 +2,7 @@ from unittest.mock import patch
 
 import pytest
 
-from xiaoxue_api.modules.current_event import collection, collection_repository as repository
+from xiaoxue_api.modules.match.event import collection, collection_repository as repository
 
 
 @pytest.fixture(autouse=True)
@@ -15,7 +15,7 @@ def no_live_requests(tmp_path, monkeypatch):
 @pytest.fixture
 def store(tmp_path, monkeypatch):
     monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "materials"))
-    monkeypatch.setattr("xiaoxue_api.modules.current_event.analysis_repository.analyze_scope", lambda *_: ([], []))
+    monkeypatch.setattr("xiaoxue_api.modules.match.event.analysis_repository.analyze_scope", lambda *_: ([], []))
     monkeypatch.setattr(repository, "dependency_manifest", lambda _: {"internal": "test", "library": "test", "external": "test", "analysis": "test"})
     return tmp_path / "materials"
 
@@ -231,7 +231,7 @@ def test_budget_exhaustion_does_not_replace_previous_readable_result(store):
 def test_configured_source_hint_and_event_alias_read_real_english_body(store):
     config = {"event": "S16 世界赛", "aliases": ["Worlds 2026"], "source_hints": [{"url": "https://example.com/worlds-analysis", "title": "独立作者分析", "source_category": "author_analysis", "weight": "low"}]}
     body = "Worlds 2026 " + "teams adapt their strategic priorities after reviewing early-game pressure. " * 8
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value=config), patch.object(repository, "search", return_value=([], "")), patch.object(repository, "read_article", return_value=body) as reader:
+    with patch("xiaoxue_api.modules.match.event.service.get_current_event", return_value=config), patch.object(repository, "search", return_value=([], "")), patch.object(repository, "read_article", return_value=body) as reader:
         rows, _ = repository.collect_external({"scope": "event", "event": "S16 世界赛", "reference_date": "2026-10-20"})
     assert reader.call_count == 1
     assert rows[0]["source_category"] == "author_analysis"

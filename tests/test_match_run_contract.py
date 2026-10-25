@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.current_event import service as current_event_service
+from xiaoxue_api.modules.match.event import service as current_event_service
 
 
 IDENTITY = {
@@ -30,7 +30,7 @@ class MatchRunContractTests(unittest.TestCase):
                 patch.object(current_event_service, "_trading_notes", return_value=[]),
                 patch.object(current_event_service, "get_match_workspace", return_value={}),
                 patch.object(current_event_service, "_trade_plan", return_value={}) as plan,
-                patch("xiaoxue_api.modules.current_event.collection.get_prepared_materials", return_value={}),
+                patch("xiaoxue_api.modules.match.event.collection.get_prepared_materials", return_value={}),
             ):
                 desk = current_event_service.get_match_desk(**IDENTITY)
         self.assertEqual(build.call_count, 1)

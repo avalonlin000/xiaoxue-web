@@ -1,7 +1,7 @@
 from datetime import datetime
 from unittest.mock import patch
 
-from xiaoxue_api.modules.current_event import collection, collection_repository as repo
+from xiaoxue_api.modules.match.event import collection, collection_repository as repo
 
 
 MATCH = {"team_a": "AAA", "team_b": "BBB", "event": "Worlds", "match_date": "2099-10-20", "match_time": "00:30"}

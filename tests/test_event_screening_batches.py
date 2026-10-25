@@ -12,12 +12,12 @@ def candidate(monkeypatch, tmp_path):
     base = Path(os.environ.get('XIAOXUE_EVENT_CANDIDATE_DIR', Path(__file__).parents[1]))
     paths = ((base / 'content-repository/collection_repository.py',
               base / 'collection/collection.py' if (base / 'collection/collection.py').is_file() else
-              Path(__file__).parents[1] / 'xiaoxue_api/modules/current_event/collection.py')
+              Path(__file__).parents[1] / 'xiaoxue_api/modules/match/event/collection.py')
              if (base / 'content-repository').is_dir() else
-             (base / 'xiaoxue_api/modules/current_event/collection_repository.py', base / 'xiaoxue_api/modules/current_event/collection.py'))
+             (base / 'xiaoxue_api/modules/match/event/collection_repository.py', base / 'xiaoxue_api/modules/match/event/collection.py'))
     modules = []
     for name, path in zip(('_event_batch_repo', '_event_batch_collection'), paths):
-        spec = importlib.util.spec_from_file_location('xiaoxue_api.modules.current_event.' + name, path)
+        spec = importlib.util.spec_from_file_location('xiaoxue_api.modules.match.event.' + name, path)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         modules.append(module)

@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pytest
 
-from xiaoxue_api.modules.current_event import collection_repository as repo
+from xiaoxue_api.modules.match.event import collection_repository as repo
 
 
 MATCH = {"team_a": "KC", "team_b": "MVK", "match_date": "2026-10-19"}
@@ -29,7 +29,7 @@ def test_screening_receives_retained_official_calendar_and_current_cutoff(tmp_pa
     import hashlib
     monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "materials"))
     url = "https://lolesports.com/news/worlds-primer"
-    monkeypatch.setattr("xiaoxue_api.modules.current_event.service.get_current_event",
+    monkeypatch.setattr("xiaoxue_api.modules.match.event.service.get_current_event",
                         lambda: {"participant_sources": [{"url": url}]})
     repo._save(repo.root() / "sources" / hashlib.sha256(url.encode()).hexdigest()[:24] / "body.json",
                {"url": url, "body": "**Swiss Stage - October 23**\n\n**Quarterfinal draw - October 31**\n\nUnrelated navigation"})

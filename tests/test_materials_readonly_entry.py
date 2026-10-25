@@ -1,7 +1,7 @@
 import sqlite3
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.current_event import repository, service
+from xiaoxue_api.modules.match.event import repository, service
 
 
 def test_empty_match_entry_reads_never_create_business_tables(tmp_path, monkeypatch):
@@ -40,7 +40,7 @@ def test_reading_a_trade_plan_never_saves_draft_or_locks_business_record(monkeyp
 
 
 def test_virtual_prematch_desk_redacts_existing_postmatch_materials(monkeypatch):
-    from xiaoxue_api.modules.current_event import collection
+    from xiaoxue_api.modules.match.event import collection
     monkeypatch.setattr(service, "get_match_context", lambda *_a, **_k: {})
     monkeypatch.setattr(service, "_team_evidence", lambda *_: {})
     monkeypatch.setattr(service, "_match_trading_framework", lambda *_: {})

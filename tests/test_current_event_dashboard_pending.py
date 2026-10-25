@@ -10,7 +10,7 @@ from __future__ import annotations
 import unittest
 from unittest.mock import patch
 
-from xiaoxue_api.modules.current_event import service
+from xiaoxue_api.modules.match.event import service
 
 
 PLACEHOLDER_ROW = {

@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "match",
+    "name": "比赛",
+    "version": "1.0.0",
+    "purpose": "围绕一场比赛组织已确认事实、范围覆盖、资料准备和临时记录；不把临时状态写成长期结论。",
+    "examples": ["聊聊明天 HLE 打 GEN", "看看这场的资料准备", "记录这场首发变化"],
+    "inputs": {"optional": ["team_a", "team_b", "date", "event", "focus"]},
+    "effect": "temporary",
+    "reads": ["正式赛程与赛果", "资料准备任务", "单场运行记录"],
+    "writes": ["单场运行记录"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"long_term_write": False},
+    "settings": {},
+    "dependencies": ["database"],
+    "health": {"checks": ["database"], "reason_code": "match_unavailable"},
+    "tests": ["tests/test_match_desk_contract.py", "tests/test_current_event_contract.py"],
+    "order": 130,
+}

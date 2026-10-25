@@ -14,7 +14,7 @@ from unittest.mock import patch
 
 from xiaoxue_api.core import database
 from xiaoxue_api.modules.business_mutations import service as mutations
-from xiaoxue_api.modules.lol_scope import service as scope
+from xiaoxue_api.modules.match.scope import service as scope
 
 LEAGUE = "S16全球总决赛"
 
