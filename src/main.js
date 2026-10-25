@@ -9,11 +9,10 @@ import {
   fetchUpcomingSchedule,
 } from './modules/teams/public.js';
 import { actions as tkLibraryActions } from './modules/tk-library/public.js';
-import { actions as marketNotesActions } from './modules/market-notes/public.js';
 
 const appContext = createAppContext();
 const primaryPages = new Set(['teams', 'event', 'stage', 'tk', 'project']);
-const pages = new Set([...primaryPages, 'market', 'football']);
+const pages = new Set([...primaryPages, 'football']);
 let page = 'event';
 let projectView = 'book';
 
@@ -41,7 +40,6 @@ function showPage(nextPage, { view = projectView, history = true } = {}) {
   for (const name of pages) content.classList.toggle(`page-${name}`, !isProject && page === name);
   appContext.events.emit('page:changed', { page });
   if (isProject) appContext.events.emit('project-center:shown', { view: projectView });
-  if (page === 'market') marketNotesActions.load().catch(() => {});
   if (page === 'tk') {
     tkLibraryActions.populateTeams(teamsActions.snapshot().teams);
     if (!tkLibraryActions.getState().library.initialized) tkLibraryActions.load(true);
@@ -54,7 +52,6 @@ function bindShell() {
     const pageTarget = event.target.closest('[data-shell-page]');
     if (pageTarget) showPage(pageTarget.dataset.shellPage);
     const actionTarget = event.target.closest('[data-shell-action]');
-    if (actionTarget?.dataset.shellAction === 'open-market-helper') showPage('market');
   });
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
@@ -78,19 +75,8 @@ async function init() {
   const frontendPromise = loadAndMountModules(MODULE_LOADERS, {
     appContext,
     events: appContext.events,
-    marketNotes: {
-      bindHandlers: true,
-      getSelectedTeam: () => appContext.selectedTeam,
-      getTeamInfo: code => teamsActions.getTeamInfo(code),
-      getUpcomingSchedule: fetchUpcomingSchedule,
-      getMatchContext: fetchMatchContext,
-      onTkDraft: draft => tkLibraryActions.openDraft(draft),
-    },
     football: {
-      onTkDraft: draft => {
-        showPage('market');
-        marketNotesActions.openFootballDraft(draft);
-      },
+      onTkDraft: draft => tkLibraryActions.openDraft(draft),
     },
     tkLibrary: {
       bindHandlers: true,

@@ -193,7 +193,7 @@
       "status": "available",
       "compatibility": {
         "backend_capabilities": ["tk_knowledge", "market_notes"],
-        "frontend_loaders": ["tk-library", "market-notes"],
+        "frontend_loaders": ["tk-library"],
         "legacy_names": ["market_notes", "trade_records", "队伍交易备注"]
       }
     },

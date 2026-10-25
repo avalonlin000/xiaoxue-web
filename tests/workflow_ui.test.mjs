@@ -4,9 +4,7 @@ import test from 'node:test';
 
 import {
   buildDailyContentView,
-  buildMarketReviewPayload,
   buildPreMatchContentView,
-  requestMarketReview,
 } from '../src/workflow-ui.js';
 
 
@@ -17,7 +15,7 @@ test('the workbench navigation includes match work and periodic organization', (
 
   assert.deepEqual(tabs, ['队伍资料', '当前赛事', '沉淀候选', '足球', 'TK资料库', '项目中心']);
   assert.doesNotMatch(html, /id="card-today-content"|id="card-analyst"|BP 问小雪/);
-  assert.match(html, /data-shell-action="open-market-helper"/);
+  assert.doesNotMatch(html, /data-shell-action="open-market-helper"|id="card-trades"/);
 });
 
 test('the frontend never renders schedule or matchup lists', () => {
@@ -111,27 +109,3 @@ test('the frontend does not host the post-match review conversation', () => {
 });
 
 
-test('buildMarketReviewPayload keeps review writes unconfirmed by default', () => {
-  const payload = buildMarketReviewPayload({
-    result: '赢',
-    actualScore: '2-1',
-    correctPoints: '看对资源团',
-    wrongPoints: '低估换线',
-  });
-
-  assert.equal(payload.result, '赢');
-  assert.equal(payload.actual_score, '2-1');
-  assert.deepEqual(payload.destinations, ['trading_tk']);
-  assert.equal(payload.confirmed, false);
-});
-
-test('requestMarketReview turns network failures into a user-facing result', async () => {
-  const result = await requestMarketReview(
-    async () => { throw new Error('connection reset'); },
-    '/api/trading-tk/trading_tk_team_1.md',
-    { method: 'PATCH' },
-  );
-
-  assert.equal(result.ok, false);
-  assert.match(result.detail, /网络请求失败/);
-});

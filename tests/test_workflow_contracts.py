@@ -156,9 +156,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
 
     def test_modules_use_isolated_workflow_contracts(self) -> None:
         from xiaoxue_api.modules.daily_content.public import resolve_date
-        from xiaoxue_api.modules.legacy_trades.service import list_trades
 
-        self.assertEqual(list_trades("lol", limit=1).get("source"), "trading_tk")
         self.assertEqual(resolve_date("2026-07-12"), "2026-07-12")
 
     def test_lineup_prepare_endpoint_exposes_contract(self) -> None:

@@ -76,7 +76,7 @@
 - `src/app/module-catalog.js` 当前有 6 个活动前端 loader：队伍资料、当前赛事、沉淀候选、TK 资料库、盘口记录、项目中心。
 - `src/modules/` 当前有 9 个目录；`daily` 与 `lineup-handoff` 是支撑/对话辅助入口，不因目录存在就增加新的主页面。
 - `src/main.js` 当前主页面为 `teams`、`event`、`stage`、`tk`、`project`，`market` 是隐藏辅助页面。
-- 后端 manifest 中的活跃模块均已由现有用户模块或支撑层节点覆盖；`legacy_trades` 属于兼容/非主线能力，不补成新的用户模块；`analyst`、`weread_bridge` 已于 2026-10-25 删除。
+- 后端 manifest 中的活跃模块均已由现有用户模块或支撑层节点覆盖；`analyst`、`weread_bridge`、`legacy_trades` 已于 2026-10-25 删除，不再作为兼容模块保留。
 - 稳定入口 `/api/project-center/overview` 与 `/api/project-center/modules` 当前可读，项目中心内容版本已更新为 `2026-10-12.1`（2026-10-12 增量核对：无节点漂移，仅版本标记随核对写回）；本快照不代表后续内容版本必须变更，只有实际写回内容时才升级版本。
 
 因此，后续“更新项目地图/项目中心”默认先做程序化对照；无真实漂移时不新增节点，若用户体验有问题则优先调整用户视图的信息层级和入口表达。

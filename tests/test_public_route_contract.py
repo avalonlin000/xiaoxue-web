@@ -5,20 +5,6 @@ import main
 
 
 class PublicRouteContractTests(unittest.TestCase):
-    def test_legacy_trades_is_read_only_deprecated_compatibility(self):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        spec = client.get("/openapi.json").json()
-        self.assertEqual(sorted(spec["paths"]["/api/trades"]), ["get"])
-        self.assertEqual(sorted(spec["paths"].get("/api/trades/{trade_id}", {})), [])
-        listed = client.get("/api/trades?limit=1")
-        self.assertEqual(listed.status_code, 200)
-        self.assertEqual(listed.headers.get("deprecation"), "true")
-        self.assertIn("/api/trading-tk", listed.headers.get("link", ""))
-        rejected = client.post("/api/trades", json={"match_name": "retirement-contract-test"})
-        self.assertEqual(rejected.status_code, 410)
-
     def test_market_notes_is_read_only_tk_projection(self):
         from fastapi.testclient import TestClient
 

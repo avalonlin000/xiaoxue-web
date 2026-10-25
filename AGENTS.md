@@ -19,7 +19,7 @@
 
 ## 项目事实
 
-- 盘口/交易记录正源是交易 TK，正式写入使用 `/api/trading-tk`；`/api/market-notes` 是只读投影，旧 `/api/trades` 只读兼容，均不恢复旧表写入。
+- 盘口/交易记录正源是交易 TK，正式写入使用 `/api/trading-tk`；`/api/market-notes` 是只读投影；旧 `/api/trades` 与 `legacy_trades` 模块已于 2026-10-25 退役，均不恢复旧表写入。
 - 队伍交易备注跟随队伍 TK，使用 `type=trading_note`；队伍不明确时不落库。
 - BP 后阵容分析由 `lol-lineup-analysis` 提供判断，前端只整理输入、复制提示和复盘沉淀。
 - 固定工作流配置以 `config/workflows.json` 为准；今日内容、队伍别名和市场枚举优先改配置，不回写 `main.py` 常量。

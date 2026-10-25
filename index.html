@@ -2067,7 +2067,6 @@ html, body {
       世界赛 知识图
     </a>
 
-    <button class="btn-tool" data-shell-action="open-market-helper">盘口记录</button>
 
     <div class="status">
       <span class="dot"></span>
@@ -2223,95 +2222,6 @@ html, body {
             </div>
             <div id="stage-review-summary" class="tk-library-freshness">正在读取待整理内容…</div>
             <div id="stage-review-list" class="stage-review-list"><div class="tk-empty">读取中…</div></div>
-          </div>
-        </div>
-
-        <!-- Market notes card -->
-        <div class="card" id="card-trades">
-          <div class="card-head">
-            <span class="badge" style="background:linear-gradient(135deg,var(--pink),var(--blue))">MARKET</span> 盘口记录
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">交易时自由记录区；保存原始判断，赛后由你和小雪在对话里复盘</span>
-            <span style="flex:1"></span>
-            <button class="compare-close" data-market-action="refresh">刷新</button>
-          </div>
-          <div class="card-body">
-            <div class="trade-shell">
-              <div class="trade-form">
-                <div class="trade-workspace-note" data-slice="D146">
-                  <strong>盘口记录：</strong>这里保留你的原始判断、盘口/方向、比分观察、市场分歧点、不碰项和备注；后续 7 天 / 30 天复盘从这里回溯。
-                </div>
-                <div class="trade-workspace-note">
-                  <strong>交易 TK：</strong>写“小雪记到 HLE：虐菜大人头”这类精华感悟，会挂回该队队伍 TK，并在日报相关比赛下优先显示；队伍不明确时不写正式 TK。
-                  <div class="trade-actions" style="margin-top:8px">
-                    <input id="team-trading-note-input" placeholder="小雪记到 HLE：虐菜大人头" style="flex:1;min-width:260px">
-                    <button class="btn-tk-new" data-market-action="save-team-note">记到队伍</button>
-                    <span class="trade-msg" id="team-trading-note-msg"></span>
-                  </div>
-                </div>
-                <div class="trade-games" id="trade-games">
-                  <button class="trade-game active" data-game="lol">LOL</button>
-                  <button class="trade-game" data-game="cs">CS</button>
-                  <button class="trade-game" data-game="valorant">无畏</button>
-                  <button class="trade-game" data-game="football">足球</button>
-                </div>
-                <div class="trade-grid">
-                  <div class="trade-field full"><label>对象</label><input id="trade-match" placeholder="如 T1 vs GEN"><div class="trade-help">可手动填写，或从当前队伍带入一个空白记录。</div></div>
-                  <div class="trade-field"><label>时间</label><input id="trade-time" type="datetime-local"></div>
-                  <div class="trade-field"><label>信心</label><select id="trade-confidence"><option>中</option><option>高</option><option>低</option></select></div>
-                  <div class="trade-field"><label>盘口 / 方向</label><input id="trade-winner" placeholder="手动写：让分 / 独赢 / 观望 / 放弃"></div>
-                  <div class="trade-field"><label>大小 / 总局数</label><select id="trade-total"><option>未写</option><option>放弃</option><option>大</option><option>小</option></select></div>
-                  <div class="trade-field full"><label>比分 / 临场观察</label><input id="trade-score" placeholder="比分判断或临场观察，如 2-1、首局前十分钟资源差"></div>
-                  <div class="trade-field"><label>结果</label><select id="trade-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option><option>放弃</option></select><div class="trade-help">复盘辅助字段，保存为备注固定行“结果：...”，不改数据库结构。</div></div>
-                  <div class="trade-field full"><label>我的判断 / 市场分歧点 / 不碰项</label><textarea class="trade-judgment" id="trade-reason" placeholder="我的判断：\n市场分歧点：\n不碰项：\n\n手写盘口与临场观察；这里不自动交易、不自动生成结论。"></textarea><div class="trade-help">推荐按三段手写：我的判断 → 市场分歧点 → 不碰项。</div></div>
-                  <div class="trade-field full"><label>备注 / 复盘原始记录</label><textarea id="trade-review" placeholder="可选：BP、首发、临场观察、赛后复盘再补；结果可先写在这里，后续再结构化"></textarea></div>
-                </div>
-                <div class="trade-actions">
-                  <button class="btn-save" data-market-action="save">保存为盘口 TK</button>
-                  <button class="compare-close" data-market-action="prefill">只带入对象</button>
-                  <span class="trade-msg" id="trade-msg"></span>
-                </div>
-              </div>
-              <div class="trade-board">
-                <div class="trade-workspace-note">
-                  <strong>原始记录：</strong>这里只筛选盘口交易 TK（只读投影），方便小雪在后台读取；前端不承载赛后复盘对话，也不自动评价交易。
-                  <div class="trade-actions" style="margin-top:8px;flex-wrap:wrap">
-                    <button class="compare-close" data-market-action="range-7d">最近 7 天</button>
-                    <button class="compare-close" data-market-action="range-30d">最近 30 天</button>
-                    <button class="compare-close" data-market-action="range-all">全部最近记录</button>
-                    <select id="trade-result-filter" style="min-width:130px">
-                      <option value="all">结果：全部</option>
-                      <option value="未结算">结果：未结算</option>
-                      <option value="赢">结果：赢</option>
-                      <option value="输">结果：输</option>
-                      <option value="走水">结果：走水</option>
-                      <option value="放弃">结果：放弃</option>
-                    </select>
-                    <input id="trade-keyword-filter" placeholder="队伍/比赛关键词" style="min-width:180px">
-                  </div>
-                  <div class="trade-help" id="trade-filter-summary">当前筛选：全部最近记录 / 全部结果。</div>
-                </div>
-                <div class="market-review-panel" id="market-review-panel" hidden>
-                  <div class="market-review-head">
-                    <b id="market-review-title">单场复盘</b>
-                    <button class="compare-close" data-market-action="close-review">关闭</button>
-                  </div>
-                  <div class="trade-grid">
-                    <div class="trade-field"><label>结果</label><select id="market-review-result"><option>未结算</option><option>赢</option><option>输</option><option>走水</option><option>放弃</option></select></div>
-                    <div class="trade-field full"><label>实际发生</label><textarea id="market-review-actual" placeholder="比分、关键转折或BP兑现情况"></textarea></div>
-                    <div class="trade-field full"><label>判断对在哪里</label><textarea id="market-review-correct" placeholder="只写真正兑现的判断"></textarea></div>
-                    <div class="trade-field full"><label>判断错/漏在哪里</label><textarea id="market-review-wrong" placeholder="具体哪条逻辑、条件或执行出了问题"></textarea></div>
-                    <div class="trade-field full"><label>下次调整</label><textarea id="market-review-calibration" placeholder="下次遇到什么情况，判断应怎样改"></textarea></div>
-                  </div>
-                  <div class="trade-actions">
-                    <button class="compare-close" data-market-action="preview-review">生成预览</button>
-                    <button class="btn-save" data-market-action="commit-review">确认写回本条记录</button>
-                    <span class="trade-msg" id="market-review-message"></span>
-                  </div>
-                  <div class="market-review-preview" id="market-review-preview"></div>
-                </div>
-                <div class="trade-list" id="trade-list"><div class="tk-empty">暂无盘口记录</div></div>
-              </div>
-            </div>
           </div>
         </div>
 

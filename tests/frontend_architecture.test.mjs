@@ -4,7 +4,7 @@ import test from 'node:test';
 
 
 const root = new URL('../', import.meta.url);
-const activeModules = ['current-event', 'teams', 'tk-library', 'market-notes', 'project-center'];
+const activeModules = ['current-event', 'teams', 'tk-library', 'project-center'];
 
 
 test('active frontend modules have view service data and public layers', () => {
@@ -55,17 +55,11 @@ test('views never call feature data adapters directly', () => {
   }
 });
 
-test('market notes behavior is owned by its module instead of the shell', () => {
-  const shell = readFileSync(new URL('src/main.js', root), 'utf8');
+test('market notes surface is retired', () => {
   const html = readFileSync(new URL('index.html', root), 'utf8');
-  for (const legacyName of [
-    'function loadTrades', 'function saveTradeRecord', 'function deleteTrade',
-    'function tradeToTK', 'window.loadTrades', 'window.saveTradeRecord',
-  ]) {
-    assert.doesNotMatch(shell, new RegExp(legacyName.replace('.', '\\.')));
-  }
-  const marketCard = html.match(/<div class="card" id="card-trades">([\s\S]*?)<!-- TK Library/)?.[1] || '';
-  assert.doesNotMatch(marketCard, /onclick="(?:loadTrades|saveTradeRecord|deleteTrade|tradeToTK|setTrade)/);
+  const shell = readFileSync(new URL('src/main.js', root), 'utf8');
+  assert.doesNotMatch(html, /id="card-trades"|open-market-helper|盘口记录/);
+  assert.doesNotMatch(shell, /market-notes/);
 });
 
 test('the shell stays a composition layer without legacy feature handlers', () => {

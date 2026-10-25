@@ -525,7 +525,6 @@ async def _api_request(
         "/stage-review/candidates",
         "/trading-tk",
         "/tk/search",
-        "/market-notes",
         "/team-trading-notes",
         "/research/match-brief",
     }
@@ -1927,17 +1926,6 @@ async def xiaoxue_delete_tk(filename: str) -> str:
         raise RuntimeError(f"TK 删除被拒（{exc.response.status_code}）") from exc
     except httpx.HTTPError as exc:
         raise RuntimeError("TK 删除适配器当前不可用；本次没有写入") from exc
-
-
-@mcp.tool(
-    name="xiaoxue_list_market_notes",
-    annotations={"title": "读取交易 TK 中的盘口判断（兼容）", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_list_market_notes(limit: int = 10) -> str:
-    """兼容读取交易 TK 中 category=market 的盘口判断；不读取盘口记录表。"""
-
-    return _json(await _api_request("GET", "/market-notes", params={"game": "lol", "limit": _bounded_limit(limit, maximum=30)}))
 
 
 PUBLIC_TOOL_FUNCTIONS = tuple(tool.name for tool in mcp._tool_manager.list_tools())
