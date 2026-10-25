@@ -2,6 +2,15 @@
 
 > 导航更新：2026-10-21 | 更新人：Codex（本次授权实施与快速收尾）
 
+## 2026-10-25（第四轮）· 首发来源接通 + 网关重启
+
+- 首发来源解决：新增 `scripts/sync_rosters_from_lolesports.py`，从 lolesports 官方接口同步 19 支 S16 队伍名单；保留已知首发，空位置按位置补；旧记录置 inactive 保留历史。默认 dry-run，`--apply` 才写库。
+- 已执行 --apply：19 支队全部更新；11 支原先没有名单的队伍补齐；GEN/HLE/T1/DK 等原本的首发保持不变（Kiin/Canyon/Chovy/Ruler/Duro 等）。
+- 覆盖变化：`/api/lol-scope/coverage` 首发缺口 16 → **0**（lineup ok 8/8）；缺口总数 24 → **8（只剩价格）**。
+- 备份：`/home/ubuntu/lol_data/backups/rosters-20261025-152425.csv`（同步前 145 行）。
+- Hermes 网关已重启（`hermes-gateway.service`），MCP 工具 37 → 最终 **35**（清掉 ScoreGG 合并后残留的两个工具），工具清单已在网关侧热载。
+- 价格：探测了 oddsportal（可访问但 JS 渲染）、the-odds-api / odds-api.io（均需 API key）、pinnacle/bwin（拒绝）。没有免密可用的赔率接口，需要用户提供 key 或接受"不接价格"。
+
 ## 2026-10-25（第三轮）· 工具归并第二批 + 边界确定
 
 - MCP 工具 39 → 37：判断目录与判断正文合并为 `xiaoxue_open_judgment`（不传 method_id 列目录）；讨论与续读合并为 `xiaoxue_discuss_judgment`（传 reply_id 读后续页）。
