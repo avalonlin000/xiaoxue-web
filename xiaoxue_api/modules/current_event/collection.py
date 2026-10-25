@@ -178,6 +178,8 @@ def _schedule_recovery(task_id: str) -> None:
 def _claim_current_task(task_id: str) -> dict | None:
     task = repository.read(task_id)["task"]
     if task and task.get("automatic_schedule") and task["state"] in {"queued", "running"}:
+        if task.get("next_check_at", "") > repository.now():
+            return None
         try:
             config = get_current_event()
             if not config.get("event"):
@@ -198,14 +200,16 @@ def _claim_current_task(task_id: str) -> dict | None:
                     continue
             if match["match_key"] not in keys:
                 if overflow:
-                    repository.update_task(task_id, {"message": "当日赛程较多，暂不能完整核对本场，保留资料等待后续检查。"}, generation=task["generation"], attempt=task["attempts"])
+                    repository.update_task(task_id, {"message": "当日赛程较多，暂不能完整核对本场，保留资料等待后续检查。",
+                                                    "next_check_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(timespec="seconds")}, generation=task["generation"], attempt=task["attempts"])
                     return None
                 repository.pause_scheduled_task(task, "赛程或关注范围已调整，停止本场自动准备；原资料仍保留。")
                 return None
         except (OSError, sqlite3.Error, ValueError, KeyError, TypeError):
             # Unknown schedule state is not proof of cancellation, nor license
             # to spend on stale automatic work. A later tick can check again.
-            repository.update_task(task_id, {"message": "赛程暂时无法核对，保留原资料，等待下次检查。"}, generation=task["generation"], attempt=task["attempts"])
+            repository.update_task(task_id, {"message": "赛程暂时无法核对，保留原资料，等待下次检查。",
+                                            "next_check_at": (datetime.now(timezone.utc) + timedelta(minutes=10)).isoformat(timespec="seconds")}, generation=task["generation"], attempt=task["attempts"])
             return None
     return repository.claim(task_id)
 
@@ -236,7 +240,8 @@ def _call_stage(operation, *args):
 
 def _stage_result(sections: list, limitations: list) -> dict:
     return {"sections": sections, "limitations": limitations,
-            "failed": bool(any(section.get("incomplete") for section in sections)
+            "failed": bool(isinstance(limitations, repository.IncompleteCollection)
+                           or any(section.get("incomplete") for section in sections)
                            or (not sections and limitations and not isinstance(limitations, repository.PendingInputs)))}
 
 
@@ -245,18 +250,23 @@ def _worker_command() -> list[str]:
     return [sys.executable, "-c", script, str(Path(__file__).resolve().parents[3])]
 
 
-def run_collection_bounded(task_id: str, *, budget_seconds: float = 720, worker_slot_fd: int | None = None) -> None:
+def run_collection_bounded(task_id: str, *, budget_seconds: float = 720, worker_slot_fd: int | None = None,
+                           refresh_stages: list[str] | None = None, pool: str = "match") -> None:
     """Background/CLI worker: kill the complete process group at the wall cap."""
     if not 0 < budget_seconds <= 720:
         raise ValueError("资料任务预算必须在0至720秒之间")
-    with repository.collection_worker_slot(worker_slot_fd) as slot_fd:
-        _run_collection_in_slot(task_id, budget_seconds=budget_seconds, worker_slot_fd=slot_fd)
+    with repository.collection_worker_slot(worker_slot_fd, pool=pool) as slot_fd:
+        _run_collection_in_slot(task_id, budget_seconds=budget_seconds, worker_slot_fd=slot_fd,
+                                refresh_stages=refresh_stages)
 
 
-def _run_collection_in_slot(task_id: str, *, budget_seconds: float, worker_slot_fd: int) -> None:
+def _run_collection_in_slot(task_id: str, *, budget_seconds: float, worker_slot_fd: int,
+                            refresh_stages: list[str] | None = None) -> None:
     task = _claim_current_task(task_id)
     if not task:
         return
+    if refresh_stages:
+        task["refresh_stages"] = [str(name) for name in refresh_stages]
     try:
         process = subprocess.Popen(_worker_command(), stdin=subprocess.PIPE, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, text=True, start_new_session=True, pass_fds=(worker_slot_fd,))
@@ -278,12 +288,41 @@ def _run_collection_in_slot(task_id: str, *, budget_seconds: float, worker_slot_
         _schedule_recovery(task_id)
 
 
+TRANSIENT_GAP_HINTS = ("本轮先整理已取得原文", "预算已用完", "等待自动恢复", "调用未完成",
+                       "资料准备未完成", "下一次有限恢复会继续", "本次未完成")
+
+
+def _has_facts(stage: dict) -> bool:
+    return any(section.get("id") == "facts" and section.get("items") for section in stage.get("sections", []))
+
+
+def classify_limitations(limitations: list[str]) -> list[dict]:
+    """把缺口分成结构性与本轮未完成：结构性缺口不影响"已整理"。"""
+    rows, seen = [], set()
+    for text in limitations:
+        value = str(text or "").strip()
+        if not value or value in seen:
+            continue
+        seen.add(value)
+        kind = "transient" if any(hint in value for hint in TRANSIENT_GAP_HINTS) else "structural"
+        rows.append({"kind": kind, "text": value})
+    return rows
+
+
 def _run_claimed_collection(task: dict) -> None:
     task_id = task["id"]
     if task.get("subject"):
         _run_scope_collection(task)
         return
     stages = repository.read_checkpoint(task).get("stages", {})
+    for name in task.get("refresh_stages") or []:
+        stages.pop(name, None)
+    if stages.get("internal") and not _has_facts(stages["internal"]):
+        # 事实区块属于交付合同：历史任务缺少时自动重建内部阶段，不重跑外部检索。
+        stages.pop("internal", None)
+    if (stages.get("analysis") or {}).get("failed"):
+        # 失败的分析不留档：下一次有限恢复用新预算重跑，避免一次超时永久缺失。
+        stages.pop("analysis", None)
     sections, limitations = [], []
     try:
         if "internal" not in stages:
@@ -313,6 +352,7 @@ def _run_claimed_collection(task: dict) -> None:
                 stages["external"] = _stage_result(external, missing)
             except Exception:
                 stages["external"] = {"sections": [], "limitations": ["外部资料本次未能完成，已保留其他内容"]}
+            stages["external"]["checked_at"] = repository.now()
             if not repository.checkpoint(task, stages):
                 return
         repository.reuse_unchanged_derived(task, stages)
@@ -335,13 +375,14 @@ def _run_claimed_collection(task: dict) -> None:
             try:
                 analysis, missing = _call_stage(repository.analyze_materials, task["match"], sections)
             except Exception:
-                analysis, missing = [], ["本场方法分析未完成，其他内容仍可读"]
-            stages["analysis"] = _stage_result(analysis, missing)
-            if not repository.checkpoint(task, stages):
-                return
+                analysis, missing = [], ["本场方法分析本次未完成，下一次有限恢复会继续"]
+            if analysis:
+                stages["analysis"] = _stage_result(analysis, missing)
+                if not repository.checkpoint(task, stages):
+                    return
             sections.extend(analysis)
             limitations.extend(missing)
-        order = {"digest": 0, "shared_digest": 1, "analysis": 2, "comparison": 3}
+        order = {"facts": 0, "digest": 1, "shared_digest": 2, "analysis": 3, "comparison": 4}
         sections.sort(key=lambda section: order.get(section.get("id"), 4))
         result = None
         if any(section.get("items") for section in sections):
@@ -354,8 +395,15 @@ def _run_claimed_collection(task: dict) -> None:
             own = next((section for section in sections if section.get("id") == "analysis" and section.get("items")), None)
             author_analysis = any(item.get("kind") == "author_analysis" for section in (digest, shared) if section for item in section.get("items", []))
             own_scope = "supported" if own and any(item.get("inference_scope") == "supported" for item in own["items"]) else "conditional" if own else "unavailable"
-            ready = bool(author_analysis and own_scope == "supported")
-            result = {"match": match, "updated_at": repository.now(), "as_of": repository.now(), "status": "ok" if ready and not limitations else "partial", "summary": f"{match['team_a']} vs {match['team_b']}：{summary}" + ("个人方法分析已备好。" if own else ""), "sections": sections, "limitations": list(dict.fromkeys(limitations)),
+            gaps = classify_limitations(limitations)
+            facts = next((section for section in sections if section.get("id") == "facts" and section.get("items")), None)
+            analysis_declared = bool(own) or any("方法" in gap["text"] for gap in gaps)
+            ready = bool(facts and (digest or shared) and analysis_declared
+                         and not any(gap["kind"] == "transient" for gap in gaps))
+            result = {"match": match, "updated_at": repository.now(), "as_of": repository.now(),
+                      "status": "ok" if ready else "partial",
+                      "summary": f"{match['team_a']} vs {match['team_b']}：{summary}" + ("个人方法分析已备好。" if own else ""),
+                      "sections": sections, "limitations": list(dict.fromkeys(limitations)), "gaps": gaps,
                       "delivery": {"public_analysis": "screened" if digest or shared else "unavailable", "public_author_analysis": "available" if author_analysis else "unavailable",
                                    "personal_analysis": "prepared" if own else "unavailable", "personal_analysis_scope": own_scope, "ready": ready},
                       "conditional_capabilities": {"live_bp": "unverified", "market_quotes": "unverified"}}
@@ -526,6 +574,8 @@ def _run_scope_collection(task: dict) -> None:
             except Exception:
                 sections, limitations = [], ["部分预备内容暂不可读，其他内容继续准备"]
             stages[name] = _stage_result(sections, limitations)
+            if name == "external":
+                stages[name]["checked_at"] = repository.now()
             if not repository.checkpoint(task, stages):
                 return
         repository.reuse_unchanged_derived(task, stages)

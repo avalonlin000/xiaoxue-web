@@ -306,9 +306,12 @@ def _source_host(url: str) -> str:
     return urlparse(url).netloc.lower().removeprefix("www.")
 
 
-def _is_excluded_news_result(title: str, url: str) -> bool:
+def _is_excluded_news_result(title: str, url: str, exclude_predictions: bool = True) -> bool:
     text = f"{title} {url}".lower()
-    return any(marker in text for marker in ("polymarket", "kalshi", "odds", "prediction", "betting", "赔率", "预测"))
+    markers = ("polymarket", "kalshi", "odds", "betting", "赔率")
+    if exclude_predictions:
+        markers = markers + ("prediction", "预测", "前瞻")
+    return any(marker in text for marker in markers)
 
 
 def _news_source_weight(url: str) -> int:
@@ -327,7 +330,7 @@ def _news_source_weight(url: str) -> int:
     return 0
 
 
-def _parse_exa_news_results(raw: str, after: datetime, limit: int) -> list[dict[str, Any]]:
+def _parse_exa_news_results(raw: str, after: datetime, limit: int, exclude_predictions: bool = True) -> list[dict[str, Any]]:
     pattern = re.compile(
         r"(?ms)^Title:\s*(?P<title>.*?)\nURL:\s*(?P<url>.*?)\nPublished:\s*(?P<published>.*?)\nAuthor:\s*(?P<author>.*?)\nHighlights:\s*(?P<highlights>.*?)(?:\n---\s*|\Z)"
     )
@@ -336,7 +339,7 @@ def _parse_exa_news_results(raw: str, after: datetime, limit: int) -> list[dict[
         title = match.group("title").strip()
         url = match.group("url").strip()
         published_at = _parse_published_at(match.group("published"))
-        if not title or not url or _is_excluded_news_result(title, url) or published_at is None:
+        if not title or not url or _is_excluded_news_result(title, url, exclude_predictions) or published_at is None:
             continue
         if published_at.date() < after.date():
             continue
@@ -356,7 +359,7 @@ def _parse_exa_news_results(raw: str, after: datetime, limit: int) -> list[dict[
     return [item[2] for item in candidates[:limit]]
 
 
-def _parse_tavily_news_results(raw: dict[str, Any], limit: int) -> list[dict[str, Any]]:
+def _parse_tavily_news_results(raw: dict[str, Any], limit: int, exclude_predictions: bool = True) -> list[dict[str, Any]]:
     web = ((raw.get("data") or {}).get("web") or []) if isinstance(raw.get("data"), dict) else []
     if not isinstance(web, list):
         return []
@@ -366,7 +369,7 @@ def _parse_tavily_news_results(raw: dict[str, Any], limit: int) -> list[dict[str
             continue
         title = str(item.get("title") or "").strip()
         url = str(item.get("url") or "").strip()
-        if not title or not url or _is_excluded_news_result(title, url):
+        if not title or not url or _is_excluded_news_result(title, url, exclude_predictions):
             continue
         candidates.append((
             _news_source_weight(url),
@@ -388,7 +391,7 @@ def _parse_tavily_news_results(raw: dict[str, Any], limit: int) -> list[dict[str
     annotations={"title": "搜索近期 LOL 外部资讯", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
     structured_output=False,
 )
-async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit: int = 5) -> str:
+async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit: int = 5, include_predictions: bool = False) -> str:
     """只读搜索近期 LOL 外部资讯：Exa 优先，过滤赔率/预测与窗口外结果；降级结果不宣称时效。"""
 
     clean_query = _clean_text(query, "资讯查询", min_length=2)
@@ -404,7 +407,7 @@ async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit
 
     try:
         exa_raw = await asyncio.to_thread(_run_exa_search, search_query, result_limit)
-        exa_results = _parse_exa_news_results(exa_raw, after, result_limit)
+        exa_results = _parse_exa_news_results(exa_raw, after, result_limit, not include_predictions)
         if exa_results:
             return _json({**response, "status": "ok", "provider": "agent-reach/exa", "results": exa_results})
     except (OSError, RuntimeError, subprocess.TimeoutExpired):
@@ -412,7 +415,7 @@ async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit
 
     try:
         tavily_raw = await asyncio.to_thread(_run_tavily_search, search_query, result_limit)
-        tavily_results = _parse_tavily_news_results(tavily_raw, result_limit)
+        tavily_results = _parse_tavily_news_results(tavily_raw, result_limit, not include_predictions)
         if tavily_results:
             return _json({
                 **response,
@@ -430,6 +433,49 @@ async def xiaoxue_search_external_news(query: str, recency_days: int = 14, limit
         "provider": "agent-reach/exa",
         "results": [],
         "notice": "暂未找到可核验的近期来源；没有用旧内容或赔率预测代替。",
+    })
+
+
+@mcp.tool(
+    name="xiaoxue_search_predictions",
+    annotations={"title": "搜索赛前预测与前瞻", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+    structured_output=False,
+)
+async def xiaoxue_search_predictions(query: str, limit: int = 8) -> str:
+    """只读搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + Tavily 前瞻。
+
+    query 传对阵或主题，如「IG GEN」「S16 瑞士轮」。返回按来源分组的标题/链接/摘要，
+    预测是他人观点，不是事实，引用需带来源与时间。
+    """
+    clean_query = _clean_text(query, "预测查询", min_length=2)
+    result_limit = _bounded_limit(limit, maximum=12)
+    script = "/home/ubuntu/.agents/skills/esports/opinion-sources/scripts/prediction_hunt.py"
+    try:
+        completed = await asyncio.to_thread(
+            lambda: subprocess.run(
+                ["/usr/bin/python3", script, clean_query, "--limit", str(result_limit)],
+                capture_output=True, text=True, timeout=150, check=False,
+            )
+        )
+        payload = json.loads(completed.stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
+        return _json({"query": clean_query, "status": "unavailable",
+                      "error": f"预测采集脚本不可用: {type(exc).__name__}"})
+
+    sections = {
+        "hupu_posts": payload.get("hupu_search") or [],
+        "hupu_board": payload.get("hupu_board") or [],
+        "bilibili": payload.get("bili") or [],
+        "web": payload.get("web") or [],
+    }
+    total = sum(len(v) for v in sections.values())
+    return _json({
+        "query": clean_query,
+        "status": "ok" if total else "empty",
+        "provider": "domestic/prediction_hunt",
+        "counts": {k: len(v) for k, v in sections.items()},
+        "notice": "以下为他人预测/前瞻，观点非事实；引用时带来源与时间，不与他人预测平均成共识。",
+        **sections,
     })
 
 

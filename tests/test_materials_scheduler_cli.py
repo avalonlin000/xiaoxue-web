@@ -42,7 +42,7 @@ def test_live_worker_slots_stop_second_tick_starting_more_workers(monkeypatch, t
     setup_tick(monkeypatch, tmp_path, [task(index) for index in range(3)])
     locks = []
     for slot in range(2):
-        path = tmp_path / ".scheduler" / f"worker-{slot}.lock"
+        path = tmp_path / ".scheduler" / f"worker-match-{slot}.lock"
         path.parent.mkdir(parents=True, exist_ok=True)
         handle = path.open("a")
         fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -50,6 +50,25 @@ def test_live_worker_slots_stop_second_tick_starting_more_workers(monkeypatch, t
     try:
         assert cli.scheduler_tick()["dispatched"] == []
         cli._spawn_worker.assert_not_called()
+    finally:
+        for handle in locks:
+            handle.close()
+
+
+def test_scope_pool_keeps_running_when_match_slots_are_busy(monkeypatch, tmp_path):
+    tasks = [task(1), task(2, subject={"scope": "event", "event": "S16"})]
+    setup_tick(monkeypatch, tmp_path, tasks)
+    locks = []
+    for slot in range(2):
+        path = tmp_path / ".scheduler" / f"worker-match-{slot}.lock"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        handle = path.open("a")
+        fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        locks.append(handle)
+    try:
+        result = cli.scheduler_tick(now_value=datetime(2026, 10, 20, tzinfo=timezone.utc))
+        assert result["dispatched"] == [tasks[1]["id"]]
+        assert cli._spawn_worker.call_args.args[2] == "scope"
     finally:
         for handle in locks:
             handle.close()
@@ -80,6 +99,14 @@ def test_tick_skips_live_leases_and_completed_outputs(monkeypatch, tmp_path):
     setup_tick(monkeypatch, tmp_path, rows)
     result = cli.scheduler_tick(now_value=now)
     assert result["dispatched"] == [rows[2]["id"]]
+
+
+def test_schedule_failure_waits_until_next_check_instead_of_worker_respawn_loop(monkeypatch, tmp_path):
+    now = datetime(2026, 10, 20, tzinfo=timezone.utc)
+    rows = [task(1, next_check_at=(now + timedelta(minutes=10)).isoformat()),
+            task(2, next_check_at=(now - timedelta(seconds=1)).isoformat())]
+    setup_tick(monkeypatch, tmp_path, rows)
+    assert cli.scheduler_tick(now_value=now)["dispatched"] == [rows[1]["id"]]
 
 
 def test_partial_without_retry_deadline_is_not_restarted_by_periodic_tick(monkeypatch, tmp_path):
@@ -127,18 +154,19 @@ def test_worker_command_inherits_the_cross_process_slot(monkeypatch, tmp_path):
 def test_manual_worker_reuses_held_slot_instead_of_claiming_another(monkeypatch, tmp_path):
     monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path))
     called = []
-    def run(key, *, worker_slot_fd):
+    def run(key, *, worker_slot_fd, pool="match"):
         assert key == task(1)["id"]
+        assert pool == "match"
         # The inherited descriptor remains open/locked until the bounded task
         # finishes; canonical collection validates this fd rather than waiting
         # for a second worker slot held by its own parent.
         called.append(worker_slot_fd)
-        held = cli._try_lock(tmp_path / ".scheduler" / "worker-0.lock")
+        held = cli._try_lock(tmp_path / ".scheduler" / "worker-match-0.lock")
         assert held is None
     monkeypatch.setattr(cli, "run_collection_bounded", run)
     cli._run_with_slot(task(1)["id"])
     assert len(called) == 1
-    released = cli._try_lock(tmp_path / ".scheduler" / "worker-0.lock")
+    released = cli._try_lock(tmp_path / ".scheduler" / "worker-match-0.lock")
     assert released is not None
     released.close()
 

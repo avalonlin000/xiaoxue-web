@@ -45,7 +45,8 @@ def test_two_analysis_lines_can_be_ready_without_claiming_realtime_bp_or_quotes(
     task = collection.prepare_materials(MATCH, dispatch=False)["task"]
     digest = [{"id": "digest", "title": "公开分析", "selection_status": "screened", "summary": "已有作者分析", "items": [{"text": "作者有依据的本场分析", "kind": "author_analysis"}]}]
     own = [{"id": "analysis", "title": "个人方法", "items": [{"text": "根据本场事实推导", "verification": "system_inference", "inference_scope": "supported"}]}]
-    with patch.object(repo, "collect_internal", return_value=([], [])), patch.object(repo, "collect_external", return_value=([], [])), patch.object(repo, "summarize_materials", return_value=(digest, [])), patch.object(repo, "analyze_materials", return_value=(own, [])):
+    facts = [{"id": "facts", "title": "本场事实", "items": [{"text": "赛程与本届战绩", "verification": "official_api"}]}]
+    with patch.object(repo, "collect_internal", return_value=(facts, [])), patch.object(repo, "collect_external", return_value=([], [])), patch.object(repo, "summarize_materials", return_value=(digest, [])), patch.object(repo, "analyze_materials", return_value=(own, [])):
         collection.run_collection(task["id"])
     data = collection.get_collection_task(task["id"])
     assert data["task"]["state"] == "completed"
@@ -163,6 +164,72 @@ def test_existing_hermes_search_shape_and_private_text_leads():
     assert repo.parse_search_results("Title: secret\nURL: http://127.0.0.1/private") == []
 
 
+def test_exa_text_keeps_publication_dates_and_all_requested_candidates():
+    text = "\n---\n".join(
+        f"Title: Report {index}\nURL: https://example.com/report-{index}\n"
+        f"Published: {'N/A' if index == 7 else '2026-10-21T08:30:00.000Z'}\n"
+        "Author: Reporter\nHighlights:\nA reported change."
+        for index in range(8)
+    )
+    rows = repo.parse_search_results({"content": [{"type": "text", "text": text}]})
+    assert len(rows) == 8
+    assert rows[0]["published_at"] == "2026-10-21T08:30:00.000Z"
+    assert rows[-1]["published_at"] == ""
+    assert all(row["verification"] == "search_lead" for row in rows)
+
+
+def test_collector_reads_relevant_results_after_failed_top_hits(store):
+    leads = [{"url": f"https://example.com/report-{index}", "title": f"Report {index}",
+              "published_at": "2026-10-18T12:00:00Z"} for index in range(8)]
+    def read(url):
+        if int(url.rsplit("-", 1)[1]) < 6:
+            raise ValueError("unreadable candidate")
+        return "KC and MVK coaches explained their recent preparation and objective control. " * 6 + url
+    with patch.object(repo, "search", return_value=(leads, "")), patch.object(repo, "read_article", side_effect=read):
+        rows, _ = repo.collect_external(MATCH)
+    assert {row["url"] for row in rows} == {leads[6]["url"], leads[7]["url"]}
+
+
+def test_collection_time_reserves_processing_and_keeps_articles_recoverable(store):
+    elapsed = [0.0]
+    leads = [{"url": f"https://example.com/time-{index}", "title": f"Report {index}"}
+             for index in range(8)]
+    def read(url):
+        elapsed[0] += 100
+        return "KC and MVK coaches explained preparation and objective control. " * 8 + url
+    with patch.object(repo, "monotonic", side_effect=lambda: elapsed[0]), \
+         patch.object(repo, "search", return_value=(leads, "")), \
+         patch.object(repo, "read_article", side_effect=read), repo.collection_budget(720):
+        rows, missing = repo.collect_external(MATCH)
+        assert repo.remaining_timeout(720) >= 200
+    assert len(rows) >= 2
+    stage = collection._stage_result([{"id": "news", "items": rows}], missing)
+    assert stage["sections"][0]["items"] == rows
+    assert stage["failed"] is True
+
+
+def test_body_count_budget_keeps_partial_articles_recoverable(store, monkeypatch):
+    monkeypatch.setattr(repo, "MATCH_READ_ATTEMPTS", 2)
+    leads = [{"url": f"https://example.com/count-{index}", "title": f"Report {index}"}
+             for index in range(4)]
+    with patch.object(repo, "search", return_value=(leads, "")), \
+         patch.object(repo, "read_article", side_effect=lambda url: "KC and MVK explained their recent training and preparation. " * 8 + url):
+        rows, missing = repo.collect_external(MATCH)
+    assert len(rows) == 2
+    assert collection._stage_result([{"id": "news", "items": rows}], missing)["failed"] is True
+
+
+def test_existing_exa_reader_is_used_when_primary_extraction_fails(monkeypatch):
+    monkeypatch.setattr(repo, "read_article", real_read_article)
+    content = "KC and MVK published their preparation and coaching interview. " * 8
+    with patch.object(repo, "_public_dns", return_value=True), \
+         patch.object(repo, "_read_with_extract_backend", side_effect=ValueError("primary unavailable")), \
+         patch.object(repo, "_read_with_exa", return_value=content) as exa, \
+         patch.object(repo, "_read_with_mirror", side_effect=AssertionError("working reader must avoid dead mirror")):
+        assert repo.read_article("https://example.com/interview") == content
+    exa.assert_called_once_with("https://example.com/interview")
+
+
 def test_stale_worker_cannot_finish_after_another_worker_recovers(store):
     task = collection.prepare_materials(MATCH, dispatch=False)["task"]
     old = repo.claim(task["id"])
@@ -240,10 +307,24 @@ def test_news_directory_is_not_counted_as_a_read_article():
     assert any("目录" in text for text in limitations)
 
 
+@pytest.mark.parametrize("url", [
+    "https://www.sheepesports.com/en/lol/teams/Anyone%27s%20Legend",
+    "https://liquipedia.net/leagueoflegends/Anyone%27s_Legend/Played_Matches",
+])
+def test_team_news_index_and_score_archive_do_not_fill_article_target(url):
+    with patch.object(repo, "search", return_value=([{"title": "KC team stats", "url": url}], "")), \
+         patch.object(repo, "read_article") as reader:
+        articles, _ = repo.collect_external(MATCH)
+    reader.assert_not_called()
+    assert not articles
+
+
 def test_recovery_resumes_completed_internal_stage_instead_of_recollecting(store):
     task = collection.prepare_materials(MATCH, dispatch=False)["task"]
     old = repo.claim(task["id"])
-    assert repo.checkpoint(old, {"internal": {"sections": [{"id": "strength", "title": "实力资料", "items": [{"text": "已取得的资料"}]}], "limitations": []}})
+    assert repo.checkpoint(old, {"internal": {"sections": [
+        {"id": "facts", "title": "本场事实", "items": [{"text": "赛程与战绩"}]},
+        {"id": "strength", "title": "实力资料", "items": [{"text": "已取得的资料"}]}], "limitations": []}})
     repo.update_task(task["id"], {"lease_until": "2000-01-01T00:00:00+00:00"})
     with patch.object(repo, "collect_internal", side_effect=AssertionError("不应重复采集已完成步骤")) as internal, patch.object(repo, "collect_external", return_value=([], ["外部来源不可用"])):
         collection.run_collection(task["id"])

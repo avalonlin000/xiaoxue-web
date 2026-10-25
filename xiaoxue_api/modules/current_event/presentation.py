@@ -42,6 +42,17 @@ from xiaoxue_api.modules.current_event.service import (
 
 
 router = APIRouter(prefix="/api", tags=["current-event"])
+
+
+@router.get("/predictions")
+def search_predictions_api(q: str = Query(..., min_length=2, max_length=60),
+                           limit: int = Query(8, ge=3, le=12)) -> dict:
+    """只读：赛前预测搜集（虎扑/B站/Tavily），供 Agent 与前端查询他人观点。"""
+    from .collection_repository import search_predictions
+    try:
+        return search_predictions(q.strip(), limit)
+    except (ValueError, OSError, RuntimeError) as exc:
+        raise HTTPException(status_code=503, detail=f"预测采集暂不可用: {type(exc).__name__}") from None
 router.add_event_handler("startup", collection.resume_pending_collections)
 
 

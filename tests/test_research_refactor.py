@@ -411,6 +411,9 @@ def test_unknown_schedule_defers_automatic_work_without_cancelling_or_calling_mo
     after = collection.get_collection_task(task["id"])["task"]
     assert after["state"] == "queued" and after["attempts"] == 0
     assert "等待" in after["message"]
+    assert after["next_check_at"] > repo.now()
+    with patch.object(collection, "list_schedules", side_effect=AssertionError("下次检查前不重复查询")):
+        assert collection._claim_current_task(task["id"]) is None
 
 
 def test_rescheduling_keeps_distinct_identity_and_does_not_pause_manual_research():

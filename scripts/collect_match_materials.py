@@ -17,6 +17,7 @@ import time
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from xiaoxue_api.modules.current_event.public import get_collection_task, prepare_date, prepare_upcoming, prepare_scope, prepare_scope_batch, resume_collection, run_collection_bounded
+from xiaoxue_api.modules.current_event.collection_repository import WORKER_POOLS, worker_slot_paths
 from xiaoxue_api.modules.current_event.preparation import kickoff
 
 
@@ -38,13 +39,14 @@ def _try_lock(path: Path):
 
 
 @contextmanager
-def _worker_slot():
-    """Manual batches and scheduler children share the same two process slots."""
+def _worker_slot(pool: str = "match"):
+    """手动批次也遵守分池席位：单场比赛与赛事/队伍资料互不抢占。"""
     handle = None
     directory = _scheduler_directory()
+    paths = worker_slot_paths(pool, directory)
     while handle is None:
-        for slot in range(2):
-            handle = _try_lock(directory / f"worker-{slot}.lock")
+        for path in paths:
+            handle = _try_lock(path)
             if handle is not None:
                 break
         if handle is None:
@@ -56,11 +58,19 @@ def _worker_slot():
 
 
 def _run_with_slot(task_id: str) -> None:
-    with _worker_slot() as slot:
-        run_collection_bounded(task_id, worker_slot_fd=slot.fileno())
+    pool = "scope" if _is_scope_task(task_id) else "match"
+    with _worker_slot(pool) as slot:
+        run_collection_bounded(task_id, worker_slot_fd=slot.fileno(), pool=pool)
 
 
-def _spawn_worker(task_id: str, slot) -> None:
+def _is_scope_task(task_id: str) -> bool:
+    try:
+        return bool((get_collection_task(task_id).get("task") or {}).get("subject"))
+    except (OSError, LookupError, ValueError):
+        return False
+
+
+def _spawn_worker(task_id: str, slot, pool: str = "match") -> None:
     # The parent closes its copy after dispatch; the inherited open-file
     # description keeps this slot locked until the entire bounded job returns.
     # Afterwards one lightweight tick drains the next due work, including newly
@@ -68,10 +78,10 @@ def _spawn_worker(task_id: str, slot) -> None:
     script = (
         "import sys,os;sys.path.insert(0,sys.argv[1]);"
         "from scripts.collect_match_materials import run_collection_bounded,scheduler_tick;"
-        "run_collection_bounded(sys.argv[2],worker_slot_fd=int(sys.argv[3]));"
+        "run_collection_bounded(sys.argv[2],worker_slot_fd=int(sys.argv[3]),pool=sys.argv[4]);"
         "os.close(int(sys.argv[3]));scheduler_tick()"
     )
-    subprocess.Popen([sys.executable, "-c", script, str(Path(__file__).resolve().parents[1]), task_id, str(slot.fileno())],
+    subprocess.Popen([sys.executable, "-c", script, str(Path(__file__).resolve().parents[1]), task_id, str(slot.fileno()), pool],
                      pass_fds=(slot.fileno(),), start_new_session=True,
                      stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
@@ -106,6 +116,9 @@ def scheduler_tick(*, now_value: datetime | None = None) -> dict:
         tasks = {row["id"]: row for row in [*scope["tasks"], *matches["tasks"]]}
         pending = []
         for task in tasks.values():
+            check_at = _timestamp(task.get("next_check_at") or "")
+            if check_at and check_at > now_value:
+                continue
             if int(task.get("attempts") or 0) >= 3:
                 continue
             state = task.get("state")
@@ -132,17 +145,20 @@ def scheduler_tick(*, now_value: datetime | None = None) -> dict:
             return (0 if urgent else 1 if recovery else 2 if not match else 3, start.isoformat() if match and start else "", task.get("created_at") or "", task["id"])
         pending.sort(key=priority)
         dispatched = []
-        for slot_number in range(2):
-            if not pending:
-                break
-            slot = _try_lock(directory / f"worker-{slot_number}.lock")
-            if slot is None:
-                continue
-            handles.append(slot)
-            task = pending.pop(0)
-            _spawn_worker(task["id"], slot)
-            dispatched.append(task["id"])
-        return {"status": "checked", "event": scope["event"], "queued": len(pending) + len(dispatched),
+        for pool in ("match", "scope"):
+            pool_pending = [task for task in pending if bool(task.get("subject")) == (pool == "scope")]
+            for path in worker_slot_paths(pool, directory):
+                if not pool_pending:
+                    break
+                slot = _try_lock(path)
+                if slot is None:
+                    continue
+                handles.append(slot)
+                task = pool_pending.pop(0)
+                _spawn_worker(task["id"], slot, pool)
+                dispatched.append(task["id"])
+        remaining = len([task for task in pending if task["id"] not in set(dispatched)])
+        return {"status": "checked", "event": scope["event"], "queued": remaining + len(dispatched),
                 "dispatched": dispatched, "truncated": matches.get("truncated", False), "skipped": [*scope.get("skipped", []), *matches.get("skipped", [])]}
     finally:
         for handle in handles:

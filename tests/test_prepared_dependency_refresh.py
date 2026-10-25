@@ -1,4 +1,5 @@
 import copy
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
 
 import pytest
@@ -166,6 +167,33 @@ def test_scheduler_submission_does_not_reset_pending_recovery_attempt(store):
     assert repeated["generation"] == task["generation"] and repeated["attempts"] == 1
 
 
+def test_new_analysis_timestamp_does_not_make_old_external_search_fresh(store):
+    values, task = complete_scope()
+    directory = repository.root() / task["id"]
+    old = (datetime.now(timezone.utc) - timedelta(hours=7)).isoformat()
+    checkpoint = repository._load(directory / "checkpoint.json")
+    checkpoint["stages"]["external"]["checked_at"] = old
+    repository._save(directory / "checkpoint.json", checkpoint)
+    latest = repository._load(directory / "latest.json")
+    latest.update(updated_at=repository.now(), external_checked_at=old)
+    repository._save(directory / "latest.json", latest)
+    repeated = collection.prepare_scope(values, dispatch=False)["task"]
+    assert repeated["generation"] == task["generation"] + 1
+    stages = repository.read_checkpoint(repeated)["stages"]
+    assert "internal" in stages
+    assert "external" not in stages and "digest" not in stages
+
+
+def test_collector_upgrade_is_not_blocked_by_exhausted_recovery(store, monkeypatch):
+    values, task = complete_scope()
+    repository.update_task(task["id"], {"attempts": 3, "next_recovery_at": ""})
+    monkeypatch.setattr(repository, "COLLECTOR_VERSION", repository.COLLECTOR_VERSION + 1)
+    repeated = collection.prepare_scope(values, dispatch=False)["task"]
+    assert repeated["generation"] == task["generation"] + 1
+    assert repeated["attempts"] == 0
+    assert "external" not in repository.read_checkpoint(repeated)["stages"]
+
+
 def test_old_profile_is_only_background_not_current_team_coverage(store):
     config = {"event": "S16", "confirmed_teams": ["KC"]}
     task = collection.prepare_scope({"scope": "team", "event": "S16", "team": "KC"}, dispatch=False)["task"]
@@ -175,14 +203,17 @@ def test_old_profile_is_only_background_not_current_team_coverage(store):
         assert collection.get_scope_coverage()["teams_readable"] == 0
 
 
-def test_team_scope_skips_event_only_seeds_and_stops_after_two_real_team_sources(store):
+def test_team_scope_seeds_do_not_replace_current_news_discovery(store):
     config = {"event": "S16", "source_hints": [{"url": "https://example.com/version", "scopes": ["event"]}, {"url": "https://example.com/team1", "source_category": "author_analysis", "scopes": ["team"]}, {"url": "https://example.com/team2", "source_category": "author_analysis", "scopes": ["team"]}]}
     body = "KC control side lane waves before contesting neutral objectives. " * 10
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value=config), patch.object(repository, "read_article", side_effect=[body, body + " Extra independent explanation."]) as reader, patch.object(repository, "search", side_effect=AssertionError("已有两份团队正文不盲目重搜")) as search:
+    leads = [{"url": "https://example.com/new-interview", "title": "KC current interview", "published_at": "2026-10-19"}]
+    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value=config), patch.object(repository, "read_article", side_effect=lambda url: body + url) as reader, patch.object(repository, "search", return_value=(leads, "")) as search:
         rows, _ = repository.collect_external({"scope": "team", "team": "KC", "event": "S16", "reference_date": "2026-10-20"})
-    assert reader.call_count == 2
-    assert search.call_count == 0
-    assert len(rows) == 2
+    assert reader.call_count == 3
+    assert search.call_count >= 2
+    assert len(rows) == 3
+    assert any(row["url"] == leads[0]["url"] for row in rows)
+    assert all("/version" not in row["url"] for row in rows)
 
 
 def test_failed_revalidation_keeps_original_timestamp_and_short_negative_cache(store):

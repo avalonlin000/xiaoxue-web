@@ -12,11 +12,12 @@ import os
 from pathlib import Path
 import re
 import shutil
+import urllib.request
 import socket
 import subprocess
 import time
 from time import monotonic
-from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode
+from urllib.parse import urlparse, urlsplit, urlunsplit, parse_qsl, urlencode, quote
 from zoneinfo import ZoneInfo
 
 import httpx
@@ -24,7 +25,14 @@ import httpx
 from .preparation import kickoff
 from .evidence import with_readable_evidence
 
-COLLECTOR_VERSION = 5
+COLLECTOR_VERSION = 10
+# Per-match depth agreed with 钧钧 (2026-10-22): aim at ten usable articles, and
+# allow more reads because roughly half of the pages fetched are navigation text.
+MATCH_ARTICLE_TARGET = 10
+MATCH_READ_ATTEMPTS = 24
+SEARCH_QUERIES_PER_RUN = 6
+SEARCH_RESULTS_PER_QUERY = 8
+TEAM_ARTICLE_TARGET = 6
 _deadline = ContextVar("collection_deadline", default=None)
 _source_counts = ContextVar("collection_source_counts", default=None)
 _attempt_number = ContextVar("collection_attempt_number", default=1)
@@ -36,6 +44,11 @@ class CollectionBudgetExpired(TimeoutError):
 
 class PendingInputs(list):
     """Evidence not available/applicable yet, not a transient execution fault."""
+    pass
+
+
+class IncompleteCollection(list):
+    """Usable source text was retained, but discovery still needs recovery."""
     pass
 
 
@@ -92,12 +105,23 @@ def root() -> Path:
     return Path(os.environ.get("XIAOXUE_COLLECTION_DIR", str(Path(__file__).resolve().parents[3] / "data" / "current_event_materials")))
 
 
+WORKER_POOLS = {"match": 2, "scope": 1}
+
+
+def worker_slot_paths(pool: str, directory: Path | None = None) -> list[Path]:
+    """分池：单场比赛和赛事/队伍共用资料各自占用席位，互不抢占。"""
+    if pool not in WORKER_POOLS:
+        raise ValueError("未知的资料并发池")
+    base = directory or (root() / ".scheduler")
+    return [base / f"worker-{pool}-{index}.lock" for index in range(WORKER_POOLS[pool])]
+
+
 @contextmanager
-def collection_worker_slot(worker_slot_fd: int | None = None):
-    """Share exactly two worker slots across API, CLI and scheduler processes."""
+def collection_worker_slot(worker_slot_fd: int | None = None, pool: str = "match"):
+    """Share bounded worker slots per pool across API, CLI and scheduler processes."""
     directory = root() / ".scheduler"
     directory.mkdir(parents=True, exist_ok=True)
-    slots = [directory / f"worker-{index}.lock" for index in range(2)]
+    slots = worker_slot_paths(pool, directory)
     if worker_slot_fd is not None:
         supplied = os.fstat(worker_slot_fd)
         if not any(path.exists() and (path.stat().st_dev, path.stat().st_ino) == (supplied.st_dev, supplied.st_ino) for path in slots):
@@ -188,10 +212,18 @@ def submit(identity: dict, *, refresh: bool = False, automatic_schedule: bool = 
         previous = _load(directory / "task.json")
         latest = _load(directory / "latest.json")
         if previous:
+            saved = _load(directory / "checkpoint.json") or {}
             active = previous["state"] == "queued" or (previous["state"] == "running" and previous.get("lease_until", "") > now())
             changed = {name for name, value in dependencies.items() if value != previous.get("dependencies", {}).get(name)}
+            if previous.get("collector_version", (latest or {}).get("collector_version")) != COLLECTOR_VERSION:
+                changed.add("external")
+            # Reinterpreting a profile or an existing article is not a new web
+            # check. Only the external stage can advance this freshness clock.
+            checked_at = ((latest or {}).get("external_checked_at")
+                          or (saved.get("stages", {}).get("external") or {}).get("checked_at")
+                          or (latest or {}).get("updated_at"))
             fresh = (latest and latest.get("collector_version") == COLLECTOR_VERSION
-                     and datetime.fromisoformat(latest["updated_at"]) > datetime.now(timezone.utc) - timedelta(minutes=source_refresh_minutes(identity)))
+                     and checked_at and datetime.fromisoformat(checked_at) > datetime.now(timezone.utc) - timedelta(minutes=source_refresh_minutes(identity)))
             if active or (fresh and previous["state"] != "paused" and not refresh and not changed):
                 return {"task": previous, "result": latest}
             recovery_window = datetime.fromisoformat(previous["updated_at"]) > datetime.now(timezone.utc) - timedelta(minutes=source_refresh_minutes(identity))
@@ -201,7 +233,7 @@ def submit(identity: dict, *, refresh: bool = False, automatic_schedule: bool = 
             "id": task_id, identity_field(identity): identity, "state": "queued", "created_at": (previous or {}).get("created_at", now()),
             "updated_at": now(), "generation": (previous or {}).get("generation", 0) + 1,
             "attempts": 0, "progress": [], "lease_until": "", "message": "正在准备比赛资料",
-            "dependencies": dependencies,
+            "dependencies": dependencies, "collector_version": COLLECTOR_VERSION,
         }
         if automatic_schedule:
             task["automatic_schedule"] = True
@@ -263,7 +295,7 @@ def claim(task_id: str) -> dict | None:
             task.update(state="failed", message="资料准备未能完成，已保留已有成果", updated_at=now())
             _save(directory / "task.json", task)
             return None
-        task.update(state="running", attempts=task["attempts"] + 1, updated_at=now(), lease_until=(datetime.now(timezone.utc) + timedelta(minutes=13)).isoformat(timespec="seconds"))
+        task.update(state="running", attempts=task["attempts"] + 1, updated_at=now(), next_check_at="", lease_until=(datetime.now(timezone.utc) + timedelta(minutes=13)).isoformat(timespec="seconds"))
         _save(directory / "task.json", task)
         return task
 
@@ -332,9 +364,12 @@ def finish(task: dict, result: dict | None, *, message: str = "") -> None:
         current = _load(directory / "task.json")
         if not _owns_task(current, task):
             return
+        saved = _load(directory / "checkpoint.json") or {}
+        stages = saved.get("stages", {}) if saved.get("generation") == current["generation"] else {}
         if result:
             result["collector_version"] = COLLECTOR_VERSION
             result["dependencies"] = task.get("dependencies", {})
+            result["external_checked_at"] = (stages.get("external") or {}).get("checked_at", "")
             basis = _content_basis({key: result.get(key) for key in ("match", "subject", "sections", "limitations", "summary", "status", "delivery", "conditional_capabilities", "collector_version", "dependencies")})
             revision = hashlib.sha256(json.dumps(basis, ensure_ascii=False, sort_keys=True).encode()).hexdigest()[:20]
             result["revision"] = revision
@@ -344,8 +379,6 @@ def finish(task: dict, result: dict | None, *, message: str = "") -> None:
             _save(directory / "latest.json", result)
         readable_message = "资料已准备，可直接阅读" if result and result["status"] == "ok" else "部分资料已整理，可先阅读；仍有内容待补" if result else "本次准备失败，已有资料仍可阅读"
         current.update(state=("completed" if result["status"] == "ok" else "partial") if result else "failed", updated_at=now(), lease_until="", message=message or readable_message)
-        saved = _load(directory / "checkpoint.json") or {}
-        stages = saved.get("stages", {}) if saved.get("generation") == current["generation"] else {}
         expected = {"internal", "external", "digest", "analysis"} if current.get("subject") else {"internal", "library", "external", "digest", "analysis"}
         retryable = (not result or bool(expected - set(stages))
                      or any(stage.get("failed") or ("failed" not in stage and stage.get("limitations") and not stage.get("sections")) for stage in stages.values()))
@@ -439,7 +472,7 @@ def dependency_manifest(identity: dict) -> dict:
         internal["recent"] = {team: safely(lambda: list_score_match_results(team=team, date_to=identity["match_date"], limit=2)) for team in teams}
     source_config = {key: config.get(key) for key in ("event", "aliases", "team_aliases", "source_hints", "confirmed_teams", "participant_sources")}
     methods = {name: [_fingerprint(safely(lambda: {"text": (SKILLS / path).read_text()})) for path in paths] for name, (_, paths) in METHODS.items()}
-    return {"internal": _fingerprint(internal), "library": _fingerprint(library), "external": _fingerprint(source_config),
+    return {"internal": _fingerprint(internal), "library": _fingerprint(library), "external": _fingerprint({"config": source_config, "collector_version": COLLECTOR_VERSION}),
             "analysis": _fingerprint({"methods": methods, "version": version_item, "evidence_contract": PUBLIC_EVIDENCE_VERSION})}
 
 
@@ -528,7 +561,18 @@ def parse_search_results(payload) -> list[dict]:
             payload = json.loads(payload)
         except ValueError:
             # Exa MCP text format is a discovery list, never a read article.
-            return [{"title": match[0].strip(), "url": match[1].strip(), "published_at": "", "verification": "search_lead"} for match in re.findall(r"Title:\s*([^\n]+).*?URL:\s*(https?://\S+)", payload, re.S) if is_public_url(match[1].strip())][:6]
+            rows = []
+            for block in re.split(r"(?m)(?=^Title:[ \t]*)", payload):
+                title = re.search(r"(?m)^Title:[ \t]*([^\n]+)", block)
+                url = re.search(r"(?m)^URL:[ \t]*(https?://\S+)", block)
+                published = re.search(r"(?m)^Published(?: Date)?:[ \t]*([^\n]+)", block)
+                if not title or not url or not is_public_url(url[1]):
+                    continue
+                date_value = published[1].strip() if published else ""
+                rows.append({"title": title[1].strip(), "url": url[1],
+                             "published_at": date_value if re.match(r"\d{4}-\d{2}-\d{2}", date_value) else "",
+                             "verification": "search_lead"})
+            return rows[:SEARCH_RESULTS_PER_QUERY]
     if isinstance(payload, list):
         rows = payload
     elif isinstance(payload, dict):
@@ -539,28 +583,198 @@ def parse_search_results(payload) -> list[dict]:
             return parse_search_results("\n".join(item.get("text", "") for item in payload["content"] if isinstance(item, dict)))
     else:
         rows = []
-    return [{"title": str(item.get("title") or "来源原文")[:200], "url": item.get("url") or item.get("link") or "", "published_at": item.get("publishedDate") or item.get("published_at") or item.get("published_date") or "", "verification": "search_lead"} for item in rows if isinstance(item, dict) and is_public_url(item.get("url") or item.get("link") or "")][:6]
+    return [{"title": str(item.get("title") or "来源原文")[:200], "url": item.get("url") or item.get("link") or "",
+             "published_at": item.get("publishedDate") or item.get("published_at") or item.get("published_date") or "",
+             "snippet": re.sub(r"\s+", " ", str(item.get("snippet") or item.get("description") or item.get("content") or ""))[:400],
+             "verification": "search_lead"}
+            for item in rows if isinstance(item, dict) and is_public_url(item.get("url") or item.get("link") or "")][:SEARCH_RESULTS_PER_QUERY]
+
+
+def _search_via_hermes(query: str) -> str:
+    """Hermes 内置 web_search（当前后端 tavily）。返回原始 stdout，失败抛异常。"""
+    hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
+    python = hermes_root / "venv/bin/python"
+    if not python.is_file():
+        raise RuntimeError("Hermes 搜索后端未就绪")
+    script = "import sys; sys.path.insert(0,sys.argv[1]); from tools.web_tools import web_search_tool; print(web_search_tool(sys.argv[2],limit=3))"
+    completed = subprocess.run([str(python), "-c", script, str(hermes_root), query],
+                               capture_output=True, text=True, timeout=remaining_timeout(20), check=False)
+    if completed.returncode or not completed.stdout.strip():
+        raise RuntimeError("Hermes 搜索未返回")
+    return completed.stdout
+
+
+def _search_via_exa(query: str) -> str:
+    """Exa（免费公共端点，易被 429 限流）。"""
+    binary = shutil.which("mcporter")
+    if not binary:
+        raise RuntimeError("mcporter 不可用")
+    completed = subprocess.run([binary, "call", "exa.web_search_exa", "--args", json.dumps({
+        "query": query, "numResults": SEARCH_RESULTS_PER_QUERY,
+        "objective": "Find substantive reporting, player or coach interviews and reasoned match analysis about the specified current League of Legends event and teams. Prioritize original, recent sources with publication dates. Return distinct articles with dates and URLs, not category pages, navigation, betting advertisements or AI-generated summaries."
+    }), "--output", "json"], capture_output=True, text=True, timeout=remaining_timeout(22), check=False)
+    if completed.returncode or not completed.stdout.strip():
+        raise RuntimeError("Exa 未返回")
+    return completed.stdout
+
+
+def compact_query(query: str) -> str:
+    """必应中国对长查询会返回无关兜底结果；压成四个以内的核心词再搜。"""
+    text = re.sub(r"-site:\S+", " ", query)
+    tokens = [word for word in re.findall(r"[A-Za-z][A-Za-z0-9.]{2,}", text) if word.casefold() not in SEARCH_STOPWORDS]
+    cjk_runs = re.findall(r"[\u4e00-\u9fff]+", text)
+    event = max(cjk_runs, key=len)[:14] if cjk_runs else ""
+    lowered = query.casefold()
+    intent = ("复盘" if re.search(r"\breview\b", lowered) or "复盘" in query else
+              "赛前分析" if any(word in lowered for word in ("preview", "analysis")) else
+              "赔率" if "odds" in lowered or "赔率" in query else
+              "采访" if "interview" in lowered or "采访" in query else
+              "版本" if "version" in lowered or "版本" in query else "")
+    parts = ([event] if event else []) + tokens[:3] + ([intent] if intent else [])
+    return " ".join(dict.fromkeys(parts)) or query[:40]
+
+
+def _search_via_domestic(query: str) -> str:
+    """国内直连搜索（必应中国），Exa 与 Hermes 都不可用时兜底。"""
+    script = Path("/home/ubuntu/.local/bin/dsearch")
+    if not script.is_file():
+        raise RuntimeError("dsearch 不可用")
+    completed = subprocess.run(["/usr/bin/python3", str(script), compact_query(query), "-n", str(SEARCH_RESULTS_PER_QUERY)],
+                               capture_output=True, text=True, timeout=remaining_timeout(20), check=False)
+    if completed.returncode or not completed.stdout.strip():
+        raise RuntimeError("dsearch 未返回")
+    return completed.stdout
+
+
+def _search_via_bilibili(query: str) -> str:
+    """B站搜索：单场赛前分析、锐评、数据复盘的主要中文来源，不需要 key。"""
+    keyword = compact_query(query)
+    url = "https://api.bilibili.com/x/web-interface/search/all/v2?keyword=" + quote(keyword)
+    request = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) Chrome/124",
+                                                   "Referer": "https://www.bilibili.com"})
+    with urllib.request.urlopen(request, timeout=remaining_timeout(15)) as response:
+        payload = json.loads(response.read().decode("utf-8"))
+    rows = []
+    for group in ((payload.get("data") or {}).get("result") or []):
+        if group.get("result_type") != "video":
+            continue
+        for video in (group.get("data") or [])[:SEARCH_RESULTS_PER_QUERY]:
+            if not isinstance(video, dict) or not video.get("bvid"):
+                continue
+            rows.append({"title": re.sub(r"<[^>]+>", "", str(video.get("title") or "")),
+                         "url": f"https://www.bilibili.com/video/{video['bvid']}",
+                         "snippet": re.sub(r"\s+", " ", str(video.get("description") or ""))[:400],
+                         "published_at": datetime.fromtimestamp(video["pubdate"]).isoformat() if video.get("pubdate") else ""})
+    if not rows:
+        raise RuntimeError("B站无结果")
+    return json.dumps({"results": rows}, ensure_ascii=False)
+
+
+SEARCH_PROVIDERS = (
+    ("bilibili", _search_via_bilibili),
+    ("domestic/bing", _search_via_domestic),
+    ("hermes/tavily", _search_via_hermes),
+    ("agent-reach/exa", _search_via_exa),
+)
+
+
+ENCYCLOPEDIA_HOSTS = ("baike.baidu.com", "zhidao.baidu.com", "jingyan.baidu.com", "wenku.baidu.com",
+                     "iciba.com", "3dmgame.com", "gamersky.com", "douban.com", "cctv.com", "zhihu.com")
+TRUSTED_HOSTS = ("lolesports.com", "leagueoflegends.com", "liquipedia.net", "lol.fandom.com", "gol.gg",
+                 "op.gg", "invenglobal.com", "sheepesports.com", "dotesports.com", "oneesports.gg",
+                 "esports.gg", "thespike.gg", "espn.com", "strafe.com", "bilibili.com", "hupu.com",
+                 "weibo.com", "scoregg.com", "wanplus.com", "17173.com")
+SEARCH_STOPWORDS = {"the", "and", "with", "for", "match", "analysis", "review", "preview", "league",
+                    "legends", "site", "http", "https", "com", "www"}
+
+
+def query_tokens(query: str) -> set[str]:
+    """关键词集合：英文词 + 中文二元片，用于丢掉搜索引擎的无关兜底结果。"""
+    tokens = {word.casefold() for word in re.findall(r"[A-Za-z]{3,}", query) if word.casefold() not in SEARCH_STOPWORDS}
+    run = ""
+    for char in query + " ":
+        if "\u4e00" <= char <= "\u9fff":
+            run += char
+            continue
+        for index in range(len(run) - 1):
+            tokens.add(run[index:index + 2])
+        run = ""
+    return tokens
+
+
+def relevant_leads(query: str, leads: list[dict]) -> list[dict]:
+    """丢弃与查询无关的结果，并按来源可信度排序；不因搜索引擎兜底污染候选。"""
+    tokens = query_tokens(query)
+    kept = []
+    for lead in leads:
+        host = (urlparse(lead.get("url", "")).hostname or "").lower()
+        if any(host == bad or host.endswith("." + bad) for bad in ENCYCLOPEDIA_HOSTS):
+            continue
+        haystack = f"{lead.get('title', '')} {lead.get('snippet', '')} {host}".casefold()
+        if tokens and not any(token in haystack for token in tokens):
+            continue
+        lead = {**lead, "host_rank": 0 if any(host == good or host.endswith("." + good) for good in TRUSTED_HOSTS) else 1}
+        kept.append(lead)
+    kept.sort(key=lambda lead: lead["host_rank"])
+    return kept
 
 
 def search(query: str) -> tuple[list[dict], str]:
-    binary = shutil.which("mcporter")
-    if binary:
-        command = [binary, "call", "exa.web_search_exa", "--args", json.dumps({"query": query, "numResults": 3}), "--output", "json"]
-    else:
-        hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
-        python = hermes_root / "venv/bin/python"
-        if not python.is_file():
-            return [], "普通网页搜索后端未就绪"
-        script = "import sys; sys.path.insert(0,sys.argv[1]); from tools.web_tools import web_search_tool; print(web_search_tool(sys.argv[2],limit=3))"
-        command = [str(python), "-c", script, str(hermes_root), query]
-    try:
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=remaining_timeout(22), check=False)
-        if completed.returncode:
-            return [], "普通网页搜索未完成"
-        results = parse_search_results(completed.stdout)
-        return results, "" if results else "搜索未返回可核对的来源"
-    except (OSError, subprocess.TimeoutExpired):
-        return [], "普通网页搜索暂不可用"
+    """按 hermes/tavily → exa → 必应 的顺序取结果，任一通道出结果即返回。
+
+    单一通道失败不再让整轮采集失败；全部失败时才报“普通网页搜索未完成”，
+    并在错误里带上各通道的失败原因，便于判断是限流还是网络。
+    """
+    errors: list[str] = []
+    for name, provider in SEARCH_PROVIDERS:
+        try:
+            raw = provider(query)
+        except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+            errors.append(f"{name}: {type(exc).__name__}")
+            continue
+        try:
+            results = parse_search_results(raw)
+        except (ValueError, TypeError) as exc:
+            errors.append(f"{name}: parse {type(exc).__name__}")
+            continue
+        results = relevant_leads(query, results)
+        if results:
+            return results, ""
+        errors.append(f"{name}: 无相关结果")
+    return [], "普通网页搜索未完成（" + "；".join(errors) + "）"
+
+
+PREDICTION_HUNT_SCRIPT = Path("/home/ubuntu/.agents/skills/esports/opinion-sources/scripts/prediction_hunt.py")
+
+
+def search_predictions(query: str, limit: int = 8) -> dict:
+    """搜集「别人怎么预测」：虎扑预测帖 + 虎扑LOL版 + B站预测视频 + Tavily 前瞻。
+
+    这是他人观点，不是事实；调用方必须带来源与时间引用，不把多条预测平均成共识。
+    """
+    if not PREDICTION_HUNT_SCRIPT.is_file():
+        return {"status": "unavailable", "reason": "预测采集脚本缺失", "query": query}
+    completed = subprocess.run(
+        ["/usr/bin/python3", str(PREDICTION_HUNT_SCRIPT), query, "--limit", str(max(3, min(limit, 12)))],
+        capture_output=True, text=True, timeout=150, check=False,
+    )
+    if completed.returncode:
+        return {"status": "unavailable", "reason": "预测采集未完成", "query": query}
+    payload = json.loads(completed.stdout or "{}")
+    sections = {
+        "hupu_posts": payload.get("hupu_search") or [],
+        "hupu_board": payload.get("hupu_board") or [],
+        "bilibili": payload.get("bili") or [],
+        "web": payload.get("web") or [],
+    }
+    return {
+        "status": "ok" if any(sections.values()) else "empty",
+        "query": query,
+        "provider": "domestic/prediction_hunt",
+        "counts": {k: len(v) for k, v in sections.items()},
+        "notice": "他人预测/前瞻，观点非事实；引用需带来源与时间。",
+        **sections,
+    }
 
 
 def read_article(url: str) -> str:
@@ -580,6 +794,12 @@ def _read_article(url: str) -> str:
     except CollectionBudgetExpired:
         raise
     except (OSError, ValueError, RuntimeError):
+        pass
+    try:
+        return _read_with_exa(url)
+    except CollectionBudgetExpired:
+        raise
+    except (OSError, ValueError, subprocess.TimeoutExpired):
         pass
     try:
         return _read_with_mirror(url)
@@ -608,12 +828,31 @@ def _read_with_extract_backend(url: str) -> str:
     hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
     script = "import sys,asyncio;sys.path.insert(0,sys.argv[1]);from tools.web_tools import web_extract_tool;print(asyncio.run(web_extract_tool([sys.argv[2]],char_limit=40000)))"
     try:
-        completed = subprocess.run([str(hermes_root / "venv/bin/python"), "-c", script, str(hermes_root), url], capture_output=True, text=True, timeout=remaining_timeout(24), check=False)
+        completed = subprocess.run([str(hermes_root / "venv/bin/python"), "-c", script, str(hermes_root), url], capture_output=True, text=True, timeout=remaining_timeout(12), check=False)
         payload = json.loads(completed.stdout) if not completed.returncode else {}
         row = next((item for item in payload.get("results", []) if item.get("url") == url and not item.get("error")), {})
         text = str(row.get("content") or "")[:40000]
     except (OSError, ValueError, subprocess.TimeoutExpired):
         raise ValueError("来源正文未能取得") from None
+    _validate_article_text(text)
+    return text
+
+
+def _read_with_exa(url: str) -> str:
+    binary = shutil.which("mcporter")
+    if not binary:
+        raise ValueError("已有正文备用工具不可用")
+    completed = subprocess.run(
+        [binary, "call", "exa.web_fetch_exa", "--args",
+         json.dumps({"urls": [url], "maxCharacters": 40000}), "--output", "json"],
+        capture_output=True, text=True, timeout=remaining_timeout(16), check=False,
+    )
+    if completed.returncode:
+        raise ValueError("来源正文未能取得")
+    payload = json.loads(completed.stdout)
+    if payload.get("isError"):
+        raise ValueError("来源正文未能取得")
+    text = "\n".join(row.get("text", "") for row in payload.get("content", []) if isinstance(row, dict))[:40000]
     _validate_article_text(text)
     return text
 
@@ -682,7 +921,9 @@ def collect_external(identity: dict) -> tuple[list[dict], list[str]]:
     from .service import get_current_event
     config = get_current_event()
     aliases = [str(value).strip() for value in config.get("aliases", []) if str(value).strip()]
-    configured = str(identity["event"]).casefold() in {str(config.get("event") or "").casefold(), *(value.casefold() for value in aliases)}
+    configured = str(identity["event"]).casefold() in {
+        str(value).casefold() for value in [config.get("event"), *aliases, *config.get("leagues", [])] if value
+    }
     hints = []
     if configured:
         for hint in config.get("source_hints", [])[:8]:
@@ -702,78 +943,116 @@ def collect_external(identity: dict) -> tuple[list[dict], list[str]]:
     team_aliases = config.get("team_aliases") or {} if configured else {}
     team_terms = [term for team in teams for term in [team, *team_aliases.get(team, [])] if isinstance(term, str) and term.strip()]
     subject = " ".join(teams)
+    english_event = next((value for value in aliases if re.search(r"[A-Za-z]{3,}", value)), identity["event"]) if configured else identity["event"]
+    english_teams = {team: next((name for name in team_aliases.get(team, []) if re.search(r"[A-Za-z]{3,}", name)), team) for team in teams}
+    english_subject = " vs ".join(english_teams.values())
     queries = [
-        f"League of Legends {identity['event']} {subject} {date_value} {'match analysis review' if is_past else 'analyst tactical preview analysis'} {exclusions}",
-        f"{identity['event']} {subject} 赛前分析 战术 复盘 {date_value[:7]}",
-        *[f"League of Legends {team} official roster announcement interview {date_value[:7]} {exclusions}" for team in teams],
+        f"League of Legends {english_event} {english_subject} {'match analysis review' if is_past else 'match preview analysis'} {date_value[:4]} {exclusions}",
+        f"{identity['event']} {subject} 赛前 采访 备战 人员变化 {date_value[:7]}",
+        *[f"League of Legends {english_event} {english_teams[team]} player coach interview roster preparation {date_value[:7]} {exclusions}" for team in teams],
+        f"{identity['event']} {subject} 战术 复盘 近期表现 {date_value[:7]}",
+        f"League of Legends {english_event} {english_subject} recent matches form champion pool patch analysis {exclusions}",
     ]
     articles, limitations, seen, bodies = [], [], set(), {}
+    incomplete = False
+    def source_time_available():
+        # Two model stages may each take 100s. Reserve that time plus durable
+        # publication, and allow one last bounded 30s source operation.
+        try:
+            return remaining_timeout(720) >= 250
+        except CollectionBudgetExpired:
+            return False
     body_reads = 0
-    for query in [None, *queries[:6]]:
-        check_budget()
-        if query is None:
-            leads, error = hints, ""
-        else:
-            if identity.get("scope") == "team" and len(articles) >= 2 and any(item.get("source_category") == "author_analysis" for item in articles):
-                break
-            if not consume_source_budget("search", 6):
-                limitations.append("本轮检索预算已用完，保留已取得内容")
-                break
+    target = TEAM_ARTICLE_TARGET if identity.get("scope") == "team" else MATCH_ARTICLE_TARGET
+    # Discovery has its own bounded pass. Background seeds cannot satisfy it,
+    # and one query's top unreadable hits cannot hide later usable candidates.
+    discovered = []
+    for query in queries[:SEARCH_QUERIES_PER_RUN]:
+        if not source_time_available():
+            incomplete = True
+            break
+        if not consume_source_budget("search", SEARCH_QUERIES_PER_RUN):
+            incomplete = True
+            limitations.append("本轮检索预算已用完，保留已取得内容")
+            break
+        try:
             leads, error = search(query)
+        except CollectionBudgetExpired:
+            incomplete = True
+            break
+        discovered.append(leads[:SEARCH_RESULTS_PER_QUERY])
         if error:
             limitations.append(error)
-        for lead in leads[:8 if query is None else 2]:
-            url = canonical_source_url(lead["url"])
-            if url in seen:
+    candidates = [leads[index] for index in range(SEARCH_RESULTS_PER_QUERY) for leads in discovered if index < len(leads)]
+    hints_by_url = {canonical_source_url(lead["url"]): lead for lead in hints}
+    for lead in [*candidates, *hints]:
+        if len(articles) >= target:
+            break
+        if not source_time_available():
+            incomplete = True
+            break
+        url = canonical_source_url(lead["url"])
+        if url in seen:
+            continue
+        seen.add(url)
+        hint = hints_by_url.get(url, {})
+        lead = {**hint, **lead, "published_at": lead.get("published_at") or hint.get("published_at", "")}
+        host = (urlparse(url).hostname or "").lower()
+        path = urlparse(url).path
+        if (re.search(r"/(?:all|category|tag|search|Played_Matches)/?$", path, re.I)
+                or (host.endswith("sheepesports.com") and re.search(r"/lol/teams/[^/]+/?$", path, re.I))):
+            limitations.append("发现资讯目录，未将目录摘要当作已读报道")
+            continue
+        if any(host == domain or host.endswith("." + domain) for domain in ("bilibili.com", "youtube.com", "youtu.be", "facebook.com", "instagram.com", "douyin.com", "tiktok.com")):
+            limitations.append("发现视频或社交线索，但未取得对应正文，不将网页标题当作已读材料")
+            continue
+        try:
+            if body_reads >= MATCH_READ_ATTEMPTS or not consume_source_budget("body", MATCH_READ_ATTEMPTS):
+                incomplete = True
+                limitations.append("本轮正文预算已用完，保留已取得内容")
+                break
+            body_reads += 1
+            source_record = read_shared_source(url)
+            text = source_record["body"]
+            if source_record.get("freshness") == "revalidation_failed":
+                limitations.append("部分来源重核暂未完成，保留原取得时间的旧原文，不当作新消息")
+            relevant = [line.strip() for line in text.splitlines()
+                        if len(line.strip()) >= 40 and "![" not in line
+                        and not re.match(r"\s*(#|\||\[.*?\]\(https?://|Title:|URL Source:)", line)]
+            cleaned = "\n".join(relevant)
+            if team_terms:
+                focused = focused_team_text(text, team_terms)
+                if focused:
+                    cleaned = focused
+            excerpt = cleaned[:8000]
+            subjects = team_terms or [identity["event"], *(aliases if configured else [])]
+            if len(excerpt) < 120 or not any(re.search(rf"(?i)(?<!\w){re.escape(team)}(?!\w)", excerpt) for team in subjects):
+                limitations.append("部分网页未取得与双方相关的有效正文，未把标题或导航算作材料")
                 continue
-            seen.add(url)
-            host = (urlparse(url).hostname or "").lower()
-            if re.search(r"/(?:all|category|tag|search)/?$", urlparse(url).path, re.I):
-                limitations.append("发现资讯目录，未将目录摘要当作已读报道")
+            body_hash = hashlib.sha256(re.sub(r"\s+", " ", text).strip().encode()).hexdigest()
+            if body_hash in bodies:
+                bodies[body_hash]["source_urls"].append(url)
                 continue
-            if any(host == domain or host.endswith("." + domain) for domain in ("bilibili.com", "youtube.com", "youtu.be", "facebook.com", "instagram.com", "douyin.com", "tiktok.com")):
-                limitations.append("发现视频或社交线索，但未取得对应正文，不将网页标题当作已读材料")
-                continue
-            try:
-                if body_reads >= 8 or not consume_source_budget("body", 8):
-                    limitations.append("本轮正文预算已用完，保留已取得内容")
-                    break
-                body_reads += 1
-                source_record = read_shared_source(url)
-                text = source_record["body"]
-                if source_record.get("freshness") == "revalidation_failed":
-                    limitations.append("部分来源重核暂未完成，保留原取得时间的旧原文，不当作新消息")
-                relevant = [line.strip() for line in text.splitlines()
-                            if len(line.strip()) >= 40 and "![" not in line
-                            and not re.match(r"\s*(#|\||\[.*?\]\(https?://|Title:|URL Source:)", line)]
-                cleaned = "\n".join(relevant)
-                if team_terms:
-                    focused = focused_team_text(text, team_terms)
-                    if focused:
-                        cleaned = focused
-                excerpt = cleaned[:8000]
-                subjects = team_terms or [identity["event"], *(aliases if configured else [])]
-                if len(excerpt) < 120 or not any(re.search(rf"(?i)(?<!\w){re.escape(team)}(?!\w)", excerpt) for team in subjects):
-                    limitations.append("部分网页未取得与双方相关的有效正文，未把标题或导航算作材料")
-                    continue
-                body_hash = hashlib.sha256(re.sub(r"\s+", " ", text).strip().encode()).hexdigest()
-                if body_hash in bodies:
-                    bodies[body_hash]["source_urls"].append(url)
-                    continue
-                article = {**lead, "url": url, "source_urls": [url], "source_id": hashlib.sha256(url.encode()).hexdigest()[:24], "content_hash": body_hash,
-                                 "source": host, "captured_at": source_record.get("captured_at"), "freshness": source_record.get("freshness"), "verification": "source_text", "relevance": "team_background", "text_limited": len(cleaned) > 8000,
-                                 "text": excerpt, "is_excerpt": True, "body": text, "body_limited": len(text) >= 40000}
-                if teams:
-                    article["related_teams"] = [team for team in teams if any(re.search(rf"(?i)(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", excerpt) for term in [team, *team_aliases.get(team, [])])]
-                bodies[body_hash] = article
-                articles.append(article)
-            except (OSError, ValueError, httpx.HTTPError):
-                limitations.append("部分来源正文暂不可读，已继续核对其他来源")
+            article = {**lead, "url": url, "source_urls": [url], "source_id": hashlib.sha256(url.encode()).hexdigest()[:24], "content_hash": body_hash,
+                       "source": host, "captured_at": source_record.get("captured_at"), "freshness": source_record.get("freshness"), "verification": "source_text", "relevance": "team_background", "text_limited": len(cleaned) > 8000,
+                       "text": excerpt, "is_excerpt": True, "body": text, "body_limited": len(text) >= 40000}
+            if teams:
+                article["related_teams"] = [team for team in teams if any(re.search(rf"(?i)(?<![A-Za-z0-9]){re.escape(term)}(?![A-Za-z0-9])", excerpt) for term in [team, *team_aliases.get(team, [])])]
+            bodies[body_hash] = article
+            articles.append(article)
+        except CollectionBudgetExpired:
+            incomplete = True
+            break
+        except (OSError, ValueError, httpx.HTTPError):
+            limitations.append("部分来源正文暂不可读，已继续核对其他来源")
     if not articles:
         limitations.append("外部正文尚未取得，当前不能视为完整研究成果")
     if any(not item.get("published_at") for item in articles):
         limitations.append("部分原文缺少可核验发布时间，仅作背景材料，不代表最新消息")
-    return articles, list(dict.fromkeys(limitations))
+    if incomplete:
+        limitations.append("本轮先整理已取得原文，其余来源等待自动恢复")
+    notices = list(dict.fromkeys(limitations))
+    return articles, IncompleteCollection(notices) if incomplete else notices
 
 
 def focused_team_text(text: str, terms: list[str]) -> str:
@@ -822,17 +1101,62 @@ def call_digest_model(packet: dict) -> str:
     return completed.stdout
 
 
+def official_event_calendar(identity: dict | None = None) -> list[dict]:
+    """Read already retained official dates; never search while interpreting."""
+    from .service import get_current_event
+    config = get_current_event()
+    if identity and identity.get("event") and str(identity["event"]).casefold() not in {
+        str(value).casefold() for value in [config.get("event"), *config.get("aliases", []), *config.get("leagues", [])] if value
+    }:
+        return []
+    months = r"January|February|March|April|May|June|July|August|September|October|November|December|janeiro|fevereiro|março|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro|月"
+    calendar = []
+    for source in config.get("participant_sources", []):
+        url = canonical_source_url(source.get("url", ""))
+        host = (urlparse(url).hostname or "").lower()
+        if host not in {"lolesports.com", "www.lolesports.com", "leagueoflegends.com", "www.leagueoflegends.com"}:
+            continue
+        record = _load(root() / "sources" / (hashlib.sha256(url.encode()).hexdigest()[:24]) / "body.json") or {}
+        if record.get("url") != url:
+            continue
+        lines = [line.strip() for line in record.get("body", "").splitlines()
+                 if len(line) < 350 and re.search(r"\d", line) and re.search(months, line, re.I)]
+        if lines:
+            calendar.append({"url": url, "date_lines": "\n".join(lines)[:2400]})
+    return calendar[:1]
+
+
+MARKET_PATTERN = re.compile(r"赔率|盘口|概率|预测市场|胜率|odds|moneyline|market")
+
+
+def select_digest_items(items: list[dict], limit: int = 8) -> list[dict]:
+    """按信息类别配额输出：本场变化优先，市场预期最多一条，背景少量，不靠赔率凑数。"""
+    updates, market, background = [], [], []
+    for item in items:
+        text = f"{item.get('text', '')} {item.get('event_key', '')}"
+        if item.get("relevance") == "match_update" and not MARKET_PATTERN.search(text):
+            updates.append(item)
+        elif MARKET_PATTERN.search(text):
+            market.append(item)
+        else:
+            background.append(item)
+    selected = updates[:5] + background[:2] + market[:1]
+    return selected[:limit]
+
+
 def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]]:
     from .evidence import source_fingerprints, unseen_source_sections
     original = sections
     sections = unseen_source_sections(identity, sections)
     sources = [item for section in sections if section.get("id") in {"news", "library"}
-               for item in section.get("items", [])[:6]
+               for item in section.get("items", [])[:MATCH_ARTICLE_TARGET]
                if item.get("verification") in {"source_text", "knowledge_extract"} and item.get("text")]
     if not sources and sections != original:
         return [{"id": "digest", "title": "本场值得知道", "selection_status": "screened", "items": [],
                  "summary": "已复用双方筛选过的相同原文，本次没有新增待筛内容。"}], []
-    if identity.get("scope") != "event" or (len(sources) <= 2 and all(len(row["text"]) <= 1600 for row in sources)):
+    event_scope = identity.get("scope") == "event"
+    if ((not event_scope and sum(len(row["text"][:8000]) for row in sources) <= 6400)
+            or (len(sources) <= 2 and all(len(row["text"]) <= 1600 for row in sources))):
         return _summarize_materials_once(identity, sections)
     # Keep each source's complete evidence window. Successful batches survive a
     # later model failure; recovery does not pay to read them again.
@@ -844,17 +1168,22 @@ def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict
     windows = [{**row, "text": row["text"][start:start + 1600],
                 "excerpt_start": start, "excerpt_end": min(start + 1600, len(row["text"][:8000]))}
                for row in sources for start in range(0, len(row["text"][:8000]), 1600)]
+    if not event_scope:
+        # Cover different authors first; a long first article must not occupy
+        # every batch before the first readable publication.
+        windows.sort(key=lambda row: row["excerpt_start"])
     batches, incomplete = [], False
     for offset in range(0, len(windows), 2):
         check_budget()
         subset = windows[offset:offset + 2]
-        cache_key = _fingerprint({"subject": identity, "sources": subset,
+        cache_key = _fingerprint({"subject": identity, "sources": subset, "calendar": official_event_calendar(identity),
+                                  "as_of_date": now()[:10],
                                   "prompt": prompt_revision, "screening": 2})
         path = root() / "screening" / (cache_key + ".json")
         cached = _load(path)
         if cached is not None:
             batch, missing = cached["sections"], []
-        elif remaining_timeout(720) < 130:
+        elif remaining_timeout(720) < 240:
             # Leave time for interpretation and durable publication. Continue
             # loading later cached batches rather than discarding their work.
             batch, missing = [], ["本轮先交付已筛选内容，其余来源沿断点恢复"]
@@ -865,7 +1194,7 @@ def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict
         incomplete = incomplete or bool(missing)
         batches.append(next((section.get("items", []) for section in batch if section.get("id") == "digest"), []))
     if incomplete and not any(batches):
-        return [], ["本次赛事信息粗筛未完成，保留原文和已完成断点等待恢复"]
+        return [], ["本次信息粗筛未完成，保留原文和已完成断点等待恢复"]
     # Interleave batches so a long official source cannot crowd out every author
     # analysis. Merge the same event/quote across sources without another model.
     items, seen = [], set()
@@ -881,12 +1210,13 @@ def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict
                 continue
             seen.update(keys)
             items.append(item)
-    items = items[:8]
-    notice = ["部分赛事来源仍在整理，已筛选内容可先阅读"] if incomplete else []
-    summary = ("已筛选部分来源，" if incomplete else "已粗筛，") + f"保留 {len(items)} 条与本届赛事有关的内容。"
+    items = select_digest_items(items)
+    notice = ["部分来源仍在整理，已筛选内容可先阅读"] if incomplete else []
+    subject_label = "本届赛事" if event_scope else "本队" if identity.get("scope") == "team" else "本场"
+    summary = ("已筛选部分来源，" if incomplete else "已粗筛，") + f"保留 {len(items)} 条与{subject_label}有关的内容。"
     if not items and not incomplete:
-        summary = "已粗筛，未发现值得补充的赛事信息，不以旧闻或泛泛表态凑数。"
-    return [{"id": "digest", "title": "本届赛事值得知道", "selection_status": "screened",
+        summary = "已粗筛，未发现值得补充的信息，不以旧闻或泛泛表态凑数。"
+    return [{"id": "digest", "title": subject_label + "值得知道", "selection_status": "screened",
              "incomplete": incomplete, "summary": summary, "items": items,
              "screened_sources": source_fingerprints(sources) if not incomplete else []}], notice
 
@@ -898,12 +1228,12 @@ def _summarize_materials_once(identity: dict, sections: list[dict]) -> tuple[lis
     for section in sections:
         if section.get("id") not in {"news", "library"}:
             continue
-        for item in section.get("items", [])[:6]:
+        for item in section.get("items", [])[:MATCH_ARTICLE_TARGET]:
             if item.get("verification") in {"source_text", "knowledge_extract"} and item.get("text"):
                 sources[f"S{len(sources) + 1}"] = item
     if not sources:
         return [], []
-    packet = {identity_field(identity): identity, "sources": [
+    packet = {identity_field(identity): identity, "as_of": now(), "official_event_calendar": official_event_calendar(identity), "sources": [
         {"id": key, "title": row.get("title", ""), "url": row.get("url", ""), "published_at": row.get("published_at", ""),
          "text": row["text"][:8000], "source_kind": row.get("verification"), "source_category": row.get("source_category", "unclassified"),
          "weight": row.get("weight", "normal"), "relevance": row.get("relevance", "team_background")}
@@ -994,7 +1324,14 @@ def collect_internal(identity: dict) -> tuple[list[dict], list[str]]:
     from xiaoxue_api.modules.profiles.public import get_current_profile
 
     from .evidence import prepared_sections
+    from .lolesports_facts import facts
     sections, limitations, player_names, regions = prepared_sections(identity), [], set(), set()
+    try:
+        fact_sections, fact_limits = facts(identity)
+        sections.extend(fact_sections)
+        limitations.extend(fact_limits)
+    except Exception:
+        limitations.append("本场事实：赛程与战绩区块本次未生成")
     try:
         context = get_match_context(identity["team_a"], identity["team_b"], event=identity["event"])
         rows = []

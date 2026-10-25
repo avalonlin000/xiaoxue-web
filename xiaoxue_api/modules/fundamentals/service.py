@@ -36,22 +36,30 @@ def list_teams(scope: str = "all", limit: int = 80, team: str = "") -> dict:
 
 def _list_teams_uncached(scope: str = "all", limit: int = 80, team: str = "") -> dict:
     rows = repository.list_team_rows(scope, limit, team)
-    stage_name = repository.active_stage()
+    scope_key = (scope or "").lower()
+    # 按赛区看 = 看国内评分；国际赛池收敛后，国内队不该在国际池里找自己。
+    stage_name = repository.domestic_stage() if scope_key in {"lpl", "lck"} else repository.active_stage()
     stage_ts = repository.get_stage_ts_snapshot_map(stage_name)
     baseline_map = repository.get_regular_baseline_map(stage_name)
     stage_display = repository.get_stage_display_map(stage_name)
     cycle_signals = repository.get_stage_cycle_signal_map(stage_name)
     starters_by_team = repository.list_starters_by_team([row["team_id"] for row in rows])
     is_msi = (scope or "").lower() == "msi"
+    # 国际赛池已收敛（只含当届参赛队）时，"全部"视图只出池内队伍：
+    # 否则德杯/已淘汰队会带着旧国内评分混进世界赛榜单。
+    intl_stage = repository.intl_stage()
+    intl_pool_only = bool(intl_stage) and stage_name == intl_stage and (scope or "").lower() in {"", "all"}
     teams = []
     for row in rows:
         code = row["short_name"]
+        ts_row = stage_ts.get(code.upper())
+        if intl_pool_only and ts_row is None:
+            continue
         profile_markdown = _profile_markdown(code)
         has_profile = bool(profile_markdown)
         tk_count = _tk_count(code)
         has_3d = bool(row["dim_1_value"] or row["dim_2_value"] or row["dim_3_value"])
         players = _starter_cards(starters_by_team.get(row["team_id"], []))
-        ts_row = stage_ts.get(code.upper())
         baseline_row = baseline_map.get(code.upper())
         display_row = stage_display.get(code.upper())
         cycle_row = cycle_signals.get(code.upper())
@@ -330,6 +338,15 @@ def _build_match_context(team_a: dict, team_b: dict) -> dict:
     }
 
 
-def can_compare_team_ratings(team_a: dict, team_b: dict) -> bool:
-    """The existing cycle method allows only a known, shared domestic scale."""
+def can_compare_team_ratings(team_a: dict, team_b: dict, *, stage: str | None = None) -> bool:
+    """只有同一归一化池内的展示分可以直接比较。
+
+    国内阶段按赛区各自归一化，只允许同赛区比较；国际赛是跨赛区单池，
+    展示层在同一池内统一归一化，因此池内跨赛区可以直接比较——前提是两边
+    都拿到了本池的展示分，池外队伍仍视为不可比。
+    """
+    stage = stage if stage is not None else repository.active_stage()
+    intl_stage = repository.intl_stage()
+    if intl_stage and stage == intl_stage:
+        return team_a.get("power_score") is not None and team_b.get("power_score") is not None
     return team_a.get("region") in {"LPL", "LCK"} and team_a.get("region") == team_b.get("region")

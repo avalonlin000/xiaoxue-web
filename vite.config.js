@@ -5,8 +5,8 @@ export default defineConfig({
     host: '0.0.0.0',
     port: 5173,
     proxy: {
-      '/api': 'http://localhost:8880',
-      '/tk-graph': 'http://localhost:8880',
+      '/api': process.env.XIAOXUE_API_PROXY || 'http://localhost:8880',
+      '/tk-graph': process.env.XIAOXUE_API_PROXY || 'http://localhost:8880',
     },
   },
   build: {

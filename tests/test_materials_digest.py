@@ -1,6 +1,8 @@
 import json
 from unittest.mock import patch
 
+import pytest
+
 from xiaoxue_api.modules.current_event import collection_repository as repo
 
 
@@ -21,6 +23,62 @@ def test_digest_contains_chinese_readable_result_and_original_source():
     assert "待核实" in item["source"]
     assert item["why_relevant"].startswith("用于了解")
     assert sections[0]["selection_status"] == "screened"
+
+
+def test_screening_receives_retained_official_calendar_and_current_cutoff(tmp_path, monkeypatch):
+    import hashlib
+    monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "materials"))
+    url = "https://lolesports.com/news/worlds-primer"
+    monkeypatch.setattr("xiaoxue_api.modules.current_event.service.get_current_event",
+                        lambda: {"participant_sources": [{"url": url}]})
+    repo._save(repo.root() / "sources" / hashlib.sha256(url.encode()).hexdigest()[:24] / "body.json",
+               {"url": url, "body": "**Swiss Stage - October 23**\n\n**Quarterfinal draw - October 31**\n\nUnrelated navigation"})
+    with patch.object(repo, "call_digest_model", return_value='{"items":[]}') as model:
+        repo.summarize_materials(MATCH, [{"id": "news", "items": [ARTICLE]}])
+    packet = model.call_args.args[0]
+    assert packet["as_of"]
+    assert packet["official_event_calendar"][0]["url"] == url
+    assert "October 31" in packet["official_event_calendar"][0]["date_lines"]
+    assert "Unrelated navigation" not in packet["official_event_calendar"][0]["date_lines"]
+
+
+def test_digest_can_select_an_important_update_after_the_first_six_sources():
+    articles = [{**ARTICLE, "url": f"https://example.org/report-{index}",
+                 "text": f"KC coaching update number {index} explains a new preparation change."}
+                for index in range(10)]
+    response = {"items": [{"text": "KC 教练说明了新的备战调整。", "why_relevant": "与当前比赛备战有关。",
+                           "relevance": "useful_background", "event_key": "kc-preparation-change",
+                           "source_ids": ["S10"], "evidence_quote": articles[-1]["text"]}]}
+    with patch.object(repo, "call_digest_model", return_value=json.dumps(response)) as model:
+        sections, missing = repo.summarize_materials(MATCH, [{"id": "news", "items": articles}])
+    assert len(model.call_args.args[0]["sources"]) == 10
+    assert not missing
+    assert sections[0]["items"][0]["url"] == articles[-1]["url"]
+
+
+@pytest.mark.parametrize("identity", [MATCH, {"scope": "team", "team": "KC", "event": "S16"}])
+def test_large_match_and_team_screening_keeps_successful_batches(identity, tmp_path, monkeypatch):
+    monkeypatch.setenv("XIAOXUE_COLLECTION_DIR", str(tmp_path / "materials"))
+    articles = [{**ARTICLE, "text": (f"KC detailed analysis number {index}. " * 130),
+                 "url": f"https://example.org/long-{index}"} for index in range(2)]
+    calls = []
+    def screen(subject, sections):
+        rows = sections[0]["items"]
+        assert len(rows) <= 2 and all(len(row["text"]) <= 1600 for row in rows)
+        calls.append(rows)
+        if len(calls) == 2:
+            return [], ["one transient model failure"]
+        item = {"event_key": rows[0]["url"] + str(rows[0]["excerpt_start"]),
+                "text": "可读分析" + str(rows[0]["excerpt_start"]) + rows[0]["url"],
+                "evidence_quote": rows[0]["text"][:35] + str(rows[0]["excerpt_start"])}
+        return [{"id": "digest", "items": [item]}], []
+    with patch.object(repo, "_summarize_materials_once", side_effect=screen):
+        first, missing = repo.summarize_materials(identity, [{"id": "news", "items": articles}])
+        assert first[0]["items"] and first[0]["incomplete"] is True and missing
+        first_calls = len(calls)
+        second, missing = repo.summarize_materials(identity, [{"id": "news", "items": articles}])
+    assert len(calls) == first_calls + 1
+    assert not missing and second[0]["incomplete"] is False
 
 
 def test_digest_rejects_unknown_sources_or_unsourced_claims():

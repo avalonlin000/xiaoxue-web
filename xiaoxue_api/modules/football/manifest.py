@@ -1,0 +1,23 @@
+MODULE = {
+    "id": "football",
+    "name": "足球观察台",
+    "version": "0.1.0",
+    "purpose": "读取公开足球赛程和可核实历史事实，提供半破与75分钟后观察清单。",
+    "examples": ["查看足球观察台", "筛选半破和75分钟后观察场次"],
+    "inputs": {"optional": ["play", "keyword", "view", "match_id"]},
+    "effect": "live_search",
+    "reads": ["ESPN公开足球赛程和比赛摘要"],
+    "writes": [],
+    "output_schema": {"type": "object", "fields": ["matches", "coverage", "readiness"]},
+    "source_policy": {
+        "domain_allowlist": ["site.api.espn.com"],
+        "official_api": False,
+        "on_demand_only": True,
+        "long_term_write": False,
+    },
+    "settings": {"timeout_seconds": 8, "default_window_hours": 24},
+    "dependencies": ["network"],
+    "health": {"checks": [], "message": "打开足球观察台时读取公开赛程", "reason_code": "football_source_unavailable"},
+    "tests": ["tests/test_football_module.py"],
+    "order": 118,
+}

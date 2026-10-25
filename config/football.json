@@ -1,0 +1,7 @@
+{
+  "leagues": ["eng.1", "esp.1", "ita.1", "ger.1", "aus.1", "swe.1", "qat.1", "chn.1"],
+  "source": "ESPN",
+  "whitelist": ["Atalanta", "Hammarby", "Paderborn", "Al Sadd", "Adelaide"],
+  "timezone": "Asia/Shanghai",
+  "window_hours": 24
+}

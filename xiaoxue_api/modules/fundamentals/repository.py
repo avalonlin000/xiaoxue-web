@@ -119,6 +119,16 @@ def _stage_tokens() -> dict[str, str]:
     return _STAGE_TOKENS_CACHE
 
 
+def domestic_stage() -> str:
+    """国内阶段 token（第三赛段等），用于按赛区查看国内评分。"""
+    return _stage_tokens().get("ts_default_stage") or "第三赛段"
+
+
+def intl_stage() -> str:
+    """国际赛阶段 token（跨赛区单池；空表示未配置）。"""
+    return _stage_tokens().get("ts_intl_stage") or ""
+
+
 def active_stage() -> str:
     """当前活动 TS 阶段：国际赛一旦有快照即接管，否则读国内阶段（见 lol_data 双阶段设计）。"""
     tokens = _stage_tokens()

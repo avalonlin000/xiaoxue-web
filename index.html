@@ -1449,7 +1449,8 @@ html, body {
 .page-event #col-profile,
 .page-market #col-profile,
 .page-tk #col-profile,
-.page-stage #col-profile { display:none; }
+.page-stage #col-profile,
+.page-football #col-profile { display:none; }
 .page-event #card-fundamentals,
 .page-event #card-trades,
 .page-event #card-tk-library { display:none; }
@@ -1460,6 +1461,12 @@ html, body {
 .page-market #card-current-event,
 .page-market #card-tk,
 .page-market #card-tk-library { display:none; }
+.page-football #card-fundamentals,
+.page-football #card-current-event,
+.page-football #card-trades,
+.page-football #card-stage-review,
+.page-football #card-tk,
+.page-football #card-tk-library { display:none; }
 .page-tk #card-fundamentals,
 .page-tk #card-current-event,
 .page-tk #card-trades,
@@ -1473,6 +1480,30 @@ html, body {
 .page-event #card-stage-review,
 .page-market #card-stage-review,
 .page-tk #card-stage-review { display:none; }
+.page-football #card-football { display:flex; flex:1; flex-direction:column; min-height:0; }
+.page-football #card-football .card-body { overflow-y:auto; }
+.football-toolbar { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:12px; }
+.football-segments { display:flex; gap:5px; overflow-x:auto; }
+.football-segments button,.football-toolbar > button,.football-actions button,.football-detail-head button { min-height:34px; padding:7px 11px; border:1px solid var(--line); border-radius:8px; background:var(--bg-0); color:var(--ink-1); font:700 13px var(--font); cursor:pointer; }
+.football-segments button.active,.football-segments button:hover,.football-actions button:hover,.football-detail-head button:hover { border-color:var(--blue); background:var(--blue-light); color:var(--blue-deep); }
+.football-toolbar input { flex:1 1 180px; min-width:150px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; background:var(--bg-0); color:var(--ink-0); font:inherit; }
+.football-summary { margin-bottom:12px; color:var(--ink-2); font-size:13px; }
+.football-list { display:grid; gap:10px; }
+.football-match-card { padding:14px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1); }
+.football-match-head,.football-detail-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+.football-match-head small,.football-detail-head small { color:var(--ink-3); font-size:11px; font-weight:800; letter-spacing:.05em; }
+.football-match-head h3,.football-detail-head h3 { margin:4px 0 0; color:var(--ink-0); font-size:17px; }
+.football-status { flex:0 0 auto; padding:5px 8px; border-radius:999px; background:var(--bg-0); color:var(--ink-2); font-size:12px; font-weight:800; }
+.football-match-meta,.football-results,.football-actions { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+.football-match-meta span { color:var(--ink-2); font-size:13px; }
+.football-play-result { display:inline-flex; gap:5px; align-items:center; padding:5px 8px; border:1px solid var(--line); border-radius:7px; color:var(--ink-2); font-size:12px; }
+.football-play-result b { color:var(--ink-0); }
+.football-play-result.keep { border-color:var(--green); color:var(--green); }.football-play-result.exclude { border-color:var(--red); color:var(--red); }.football-play-result.pending { color:var(--orange); }
+.football-reasons { margin:10px 0 0; color:var(--ink-1); font-size:13px; line-height:1.6; }
+.football-actions button:last-child { margin-left:auto; }
+.football-detail { margin-top:14px; padding:15px; border:1px solid var(--blue); border-radius:10px; background:var(--blue-light); }
+.football-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:12px; }.football-detail-grid > div,.football-detail-block { padding:11px; border-radius:8px; background:var(--bg-0); }.football-detail-grid p,.football-detail-block p { margin:7px 0 0; color:var(--ink-1); font-size:13px; line-height:1.6; }.football-detail-block { margin-top:9px; }.football-detail-block ul { margin:7px 0 0; padding-left:18px; color:var(--ink-1); font-size:13px; line-height:1.6; }
+.football-empty { padding:22px 12px; border:1px dashed var(--line-strong); border-radius:9px; color:var(--ink-2); line-height:1.6; }
 .page-stage #card-stage-review { display:flex; flex:1; flex-direction:column; min-height:0; }
 .page-stage #card-stage-review .card-body { overflow-y:auto; }
 .research-intro { color:var(--ink-2); margin-bottom:12px; }
@@ -2019,6 +2050,7 @@ html, body {
       <button class="workspace-tab active" id="tab-teams" data-shell-page="teams">队伍资料</button>
       <button class="workspace-tab" id="tab-event" data-shell-page="event">当前赛事</button>
       <button class="workspace-tab" id="tab-stage" data-shell-page="stage">沉淀候选</button>
+      <button class="workspace-tab" id="tab-football" data-shell-page="football">足球</button>
       <button class="workspace-tab" id="tab-tk" data-shell-page="tk">TK资料库</button>
       <button class="workspace-tab" id="tab-project-center" data-shell-page="project">项目中心</button>
     </div>
@@ -2162,6 +2194,15 @@ html, body {
             <div class="event-panel-title" style="margin-top:14px">相关资料</div>
             <div id="event-knowledge-results" class="today-content-grid"></div>
           </div>
+        </div>
+
+        <!-- Stage review card -->
+        <div class="card" id="card-football">
+          <div class="card-head">
+            <span class="badge" style="background:var(--green)">足球</span> 足球观察台
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">半破与75分钟后 · 赛中盘口由你现场核验</span>
+          </div>
+          <div class="card-body" data-football-body><div class="tk-empty">正在读取足球赛程…</div></div>
         </div>
 
         <!-- Stage review card -->

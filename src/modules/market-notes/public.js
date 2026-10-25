@@ -59,6 +59,17 @@ export function createMarketNotesModule(options = {}) {
       view?.setGame(state.game);
       return actions.load();
     },
+    openFootballDraft(draft = {}) {
+      state.game = 'football';
+      view?.setGame('football');
+      view?.applyPrefill({
+        matchName: draft.matchName || '',
+        matchTime: draft.matchTime || '',
+        reason: draft.reason || '',
+      });
+      view?.setMessage('已带入足球交易 TK，补一句判断后保存', 'success');
+      return draft;
+    },
     setRange(range) {
       state.filters.range = ['7d', '30d', 'all'].includes(range) ? range : 'all';
       render();

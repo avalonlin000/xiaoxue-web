@@ -114,68 +114,77 @@ def analyze(identity: dict, sections: list[dict]) -> tuple[list[dict], list[str]
     def inference_scope(method, evidence):
         supported_kinds = {"version": {"version"}, "cycle": {"cycle"}, "trading": {"team_profile", "cycle", "version"}}[method]
         return "supported" if any(row.get("kind") in supported_kinds for row in evidence) else "conditional"
-    try:
-        methods = []
-        for key in sorted(eligible):
-            title, paths = METHODS[key]
-            instruction = "\n\n".join((SKILLS / path).read_text() for path in paths)
-            methods.append({"id": key, "title": title, "version": fingerprint(instruction), "instruction": instruction,
-                            "inference_scope": inference_scope(key, inputs)})
-        public = [{**item, "id": f"P{index}"} for index, item in enumerate(
-            public_inputs(sections), 1)]
-        scope = "conditional" if any(method["inference_scope"] == "conditional" for method in methods) else "supported"
-        packet = {"operation": "match_analysis", "match": identity, "as_of": repository.now(), "methods": methods,
-                  "inputs": inputs, "public_analysis": public, "inference_scope": scope,
+    refs = {row["id"]: row for row in inputs}
+    revision = fingerprint(inputs)
+    public = [{**item, "id": f"P{index}"} for index, item in enumerate(public_inputs(sections), 1)]
+    public_refs = {item["id"] for item in public}
+    items, comparisons, failed_methods = [], [], []
+    version_by_method = {}
+    for key in sorted(eligible):
+        title, paths = METHODS[key]
+        instruction = "\n\n".join((SKILLS / path).read_text() for path in paths)
+        method = {"id": key, "title": title, "version": fingerprint(instruction), "instruction": instruction,
+                  "inference_scope": inference_scope(key, inputs)}
+        version_by_method[key] = method["version"]
+        packet = {"operation": "match_analysis", "match": identity, "as_of": repository.now(), "methods": [method],
+                  "inputs": inputs, "public_analysis": public, "inference_scope": method["inference_scope"],
                   "team_strength_roles": None, "user_adopted_rule": False, "market": None}
-        payload = json.loads(repository.call_digest_model(packet))
-        versions = {m["id"]: m["version"] for m in methods}
-        refs = {row["id"]: row for row in inputs}
-        revision = fingerprint(inputs)
-        items, used = [], set()
-        for index, row in enumerate(payload.get("items", [])[:3], 1):
-            method, ids = row.get("method_id"), row.get("source_ids")
-            if method not in eligible or method in used or not isinstance(ids, list) or not ids or any(not isinstance(ref, str) or ref not in refs for ref in ids):
+        try:
+            payload = json.loads(repository.call_digest_model(packet))
+        except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):
+            failed_methods.append(key)
+            continue
+        local_ids = {}
+        for position, row in enumerate(payload.get("items", [])[:1], 1):
+            ids = row.get("source_ids")
+            if row.get("method_id") != key or not isinstance(ids, list) or not ids:
                 continue
-            if any(not isinstance(row.get(key), str) or not row[key].strip() for key in ("text", "basis", "confirmation", "invalidation")):
+            if any(not isinstance(ref, str) or ref not in refs for ref in ids):
                 continue
-            if method in {"trading", "version"}:
+            if any(not isinstance(row.get(field), str) or not row[field].strip() for field in ("text", "basis", "confirmation", "invalidation")):
+                continue
+            if key in {"trading", "version"}:
                 windows = row["confirmation"] + row["invalidation"]
                 for team in (identity["team_a"], identity["team_b"]):
                     windows = windows.replace(team, "")
                 number = r"(?:\d+(?:\.\d+)?|[一二三四五六七八九十百千万]+)"
                 if re.search(number + r"\s*(?:分钟|秒|%|％|成胜率|块经济)" + r"|(?:经济|人头|击杀|赔率|胜率|仓位)[^，。；]{0,8}\d", windows):
                     continue
-            if method == "cycle" and not any(refs[ref].get("kind") == "cycle" for ref in ids):
+            if key == "cycle" and not any(refs[ref].get("kind") == "cycle" for ref in ids):
                 continue
-            if method == "version" and not any(refs[ref].get("kind") in {"version", "author_analysis", "official_background"} for ref in ids):
+            if key == "version" and not any(refs[ref].get("kind") in {"version", "author_analysis", "official_background"} for ref in ids):
                 continue
             official_roster = any(refs[ref].get("source_category") == "official_background" and refs[ref].get("roster_status") == "officially_confirmed" for ref in ids)
             if not official_roster and _asserts_confirmed_roster(row["text"] + "\n" + row["basis"]):
                 continue
-            item_scope = inference_scope(method, [refs[ref] for ref in ids])
-            used.add(method)
-            items.append({"id": f"M{index}", "title": METHODS[method][0] + ("（条件推导）" if item_scope == "conditional" else ""), "method_id": method,
-                          "method_version": versions[method], "input_revision": revision, "as_of": packet["as_of"],
+            item_scope = inference_scope(key, [refs[ref] for ref in ids])
+            item_id = f"M{len(items) + 1}"
+            local_ids[f"M{position}"] = item_id
+            items.append({"id": item_id, "title": METHODS[key][0] + ("（条件推导）" if item_scope == "conditional" else ""), "method_id": key,
+                          "method_version": version_by_method[key], "input_revision": revision, "as_of": packet["as_of"],
                           "inference_scope": item_scope,
                           "text": f"{row['text'][:700]}\n依据：{row['basis'][:500]}\n确认：{row['confirmation'][:400]}\n失效：{row['invalidation'][:400]}",
                           "verification": "system_inference", "source": "按现有方法推导，未确认采用", "source_ids": ids,
                           "evidence": readable_evidence([refs[ref] for ref in ids]),
                           "input_evidence": [refs[ref] for ref in ids]})
-        if not items:
-            return [], ["本次个人方法推导未取得有依据的结果，已保留其他内容"]
-        outputs = [{"id": "analysis", "title": "按我的方法看本场", "items": items}]
-        comparisons = []
-        personal_refs = {item["id"] for item in items}
-        public_refs = {item["id"] for item in public}
-        for row in payload.get("comparison", [])[:3]:
-            if row.get("public_id") in public_refs and row.get("analysis_id") in personal_refs and row.get("relation") in {"agree", "disagree", "conditional"} and isinstance(row.get("text"), str) and row["text"].strip():
-                comparisons.append({"text": row["text"][:700], "verification": "system_inference", "source": "公开观点与个人方法对照", "source_ids": [row["public_id"], row["analysis_id"]]})
-        if comparisons:
-            outputs.append({"id": "comparison", "title": "两边怎么看", "items": comparisons})
-        return outputs, []
-    except (OSError, ValueError, TypeError, AttributeError, subprocess.TimeoutExpired):
-        return [], ["本次个人方法分析未完成，其他已筛内容仍可阅读"]
-
+        personal_refs = set(local_ids.values())
+        for row in payload.get("comparison", [])[:2]:
+            mapped = local_ids.get(str(row.get("analysis_id") or ""))
+            if row.get("public_id") in public_refs and mapped in personal_refs and row.get("relation") in {"agree", "disagree", "conditional"} and isinstance(row.get("text"), str) and row["text"].strip():
+                comparisons.append({"text": row["text"][:700], "verification": "system_inference", "source": "公开观点与个人方法对照",
+                                    "source_ids": [row["public_id"], mapped]})
+    if not items:
+        if failed_methods:
+            names = "、".join(METHODS[key][0] for key in failed_methods)
+            return [], [f"本次{names}调用未完成，下一次有限恢复会继续"]
+        return [], ["本次个人方法推导未取得有依据的结果，已保留其他内容"]
+    outputs = [{"id": "analysis", "title": "按我的方法看本场", "items": items}]
+    if comparisons:
+        outputs.append({"id": "comparison", "title": "两边怎么看", "items": comparisons})
+    notice = []
+    if failed_methods:
+        notice.append("部分方法本次未完成：" + "、".join(METHODS[key][0] for key in failed_methods))
+    return outputs, notice
 
 def _asserts_confirmed_roster(text: str) -> bool:
     """Reject affirmative roster confirmation, retaining unknown/conditional prose."""

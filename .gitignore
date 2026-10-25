@@ -23,6 +23,7 @@ data/*.sqlite3
 data/*.db
 data/.backups/
 data/current_event_materials/
+data/football/
 
 # Generated ClawBench media artifacts
 .clawbench/

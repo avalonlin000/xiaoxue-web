@@ -13,7 +13,7 @@ import { actions as marketNotesActions } from './modules/market-notes/public.js'
 
 const appContext = createAppContext();
 const primaryPages = new Set(['teams', 'event', 'stage', 'tk', 'project']);
-const pages = new Set([...primaryPages, 'market']);
+const pages = new Set([...primaryPages, 'market', 'football']);
 let page = 'event';
 let projectView = 'book';
 
@@ -85,6 +85,12 @@ async function init() {
       getUpcomingSchedule: fetchUpcomingSchedule,
       getMatchContext: fetchMatchContext,
       onTkDraft: draft => tkLibraryActions.openDraft(draft),
+    },
+    football: {
+      onTkDraft: draft => {
+        showPage('market');
+        marketNotesActions.openFootballDraft(draft);
+      },
     },
     tkLibrary: {
       bindHandlers: true,
