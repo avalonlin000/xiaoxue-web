@@ -1457,46 +1457,6 @@ async def xiaoxue_get_champion_context(champion: str, version: str = "") -> str:
 
 
 @mcp.tool(
-    name="xiaoxue_get_score_result",
-    annotations={"title": "查询 ScoreGG 已完赛赛果", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_get_score_result(
-    team_a: str,
-    team_b: str,
-    event: str = "",
-    match_date: str = "",
-    match_time: str = "",
-    match_format: str = "",
-) -> str:
-    """查询一场已导入的 ScoreGG 赛果；纯只读，不触碰交易推演。"""
-
-    return _json(await _api_request("GET", "/scoregg/result", params=_match_params(
-        team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format,
-    )))
-
-
-@mcp.tool(
-    name="xiaoxue_find_score_results",
-    annotations={"title": "收集 ScoreGG 已完赛赛果", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_find_score_results(team: str = "", date_from: str = "", date_to: str = "", limit: int = 20) -> str:
-    """按可选队伍与日期窗口收集已导入赛果；适合“昨天/近几天赛果”等泛查询。"""
-    params: dict[str, Any] = {"limit": _bounded_limit(limit)}
-    if team.strip():
-        params["team"] = _clean_team(team)
-    if date_from.strip():
-        params["date_from"] = date_from.strip()
-    if date_to.strip():
-        params["date_to"] = date_to.strip()
-    data = await _api_request("GET", "/scoregg/results", params=params)
-    return _json(_read_result(
-        data, capability="current_event", version="1.0.0", summary="已收集 ScoreGG 已完赛赛果", source="/scoregg/results",
-    ))
-
-
-@mcp.tool(
     name="xiaoxue_get_match_run_review",
     annotations={"title": "读取单场赛后复盘底稿", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     structured_output=False,
