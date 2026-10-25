@@ -4,7 +4,7 @@ import re
 import time
 
 from ..profile.public import get_wiki_team
-from xiaoxue_api.modules.tk_knowledge.public import count_team_entries
+from xiaoxue_api.modules.knowledge.tk.public import count_team_entries
 
 from . import repository
 

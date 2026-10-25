@@ -142,7 +142,7 @@ def test_upcoming_dashboard_uses_the_same_exact_time_window_as_batch_preparation
 def test_public_evidence_enables_conditional_analysis_without_promoting_old_version():
     sections = [{"id": "digest", "selection_status": "screened", "items": [article()]}]
     response = {"items": [{"method_id": "version", "text": "作者指出边线压力，需核实本场条件。", "basis": "原文分析", "confirmation": "本场出现相同边线条件", "invalidation": "对手处理不同", "source_ids": ["I1"]}]}
-    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value={}), patch.object(repo, "call_digest_model", return_value=json.dumps(response)) as model:
+    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch.object(repo, "call_digest_model", return_value=json.dumps(response)) as model:
         outputs, missing = analysis.analyze(MATCH, sections)
     assert not missing and outputs
     assert model.call_args.args[0]["inputs"][0]["kind"] == "author_analysis"
@@ -327,7 +327,7 @@ def test_pending_digest_and_current_sources_do_not_enter_historical_replay():
 def test_match_cannot_upgrade_media_roster_to_confirmed_starters():
     sections = [{"id": "digest", "selection_status": "screened", "items": [article("媒体预测AAA首发。")]}]
     response = {"items": [{"method_id": "version", "text": "AAA首发已确认。", "basis": "媒体预测名单", "confirmation": "双方进入比赛", "invalidation": "人员变更", "source_ids": ["I1"]}]}
-    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value={}), patch.object(repo, "call_digest_model", return_value=json.dumps(response)):
+    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch.object(repo, "call_digest_model", return_value=json.dumps(response)):
         outputs, missing = analysis.analyze(MATCH, sections)
     assert not outputs and missing
 
@@ -353,7 +353,7 @@ def test_date_entry_uses_canonical_schedule_league_not_display_event_name():
 
 def test_shared_dependency_tracks_source_meaning_not_generated_analysis_revision():
     result = {"revision": "r1", "sections": [{"id": "digest", "selection_status": "screened", "items": [article()]}]}
-    with patch("xiaoxue_api.modules.team.public.get_current_profile", return_value={}), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.tk_knowledge.public.browse", return_value={}), patch("xiaoxue_api.modules.tk_knowledge.public.list_match_trading_tk", return_value={}), patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch.object(service, "list_score_match_results", return_value={}), patch.object(collection, "get_scope_materials", return_value={"result": result}):
+    with patch("xiaoxue_api.modules.team.public.get_current_profile", return_value={}), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.browse", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.list_match_trading_tk", return_value={}), patch("xiaoxue_api.modules.team.public.get_match_context", return_value={}), patch.object(service, "list_score_match_results", return_value={}), patch.object(collection, "get_scope_materials", return_value={"result": result}):
         first = REAL_MANIFEST(MATCH)
         result["revision"] = "system-analysis-only-new-revision"
         result["sections"].append({"id": "analysis", "items": [{"text": "系统新解释"}]})

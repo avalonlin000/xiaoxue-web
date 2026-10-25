@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "knowledge",
+    "name": "认识",
+    "version": "1.0.0",
+    "purpose": "搜索、保存和找回长期认识（普通 TK、交易 TK、队伍交易 TK），并读取统一的当前版本理解。",
+    "examples": ["搜 BLG 的纪律性 TK", "写进 TK：这场先不碰", "现在这个版本怎么玩"],
+    "inputs": {"optional": ["query", "team", "filename", "content"]},
+    "effect": "write",
+    "reads": ["TK 正源文件", "交易 TK 词条", "shared_version_analysis"],
+    "writes": ["TK 正源文件", "交易 TK 词条"],
+    "output_schema": {"type": "object"},
+    "source_policy": {"long_term_write": True},
+    "settings": {},
+    "dependencies": ["tk_dir", "database"],
+    "health": {"checks": ["tk_dir", "database"], "reason_code": "knowledge_unavailable"},
+    "tests": ["tests/test_tk_library.py", "tests/test_version_understanding_api.py"],
+    "order": 60,
+}

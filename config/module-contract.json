@@ -192,7 +192,7 @@
       "consumers": ["TK 资料库", "当前赛事", "日报", "画像维护", "交易判断"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["tk_knowledge"],
+        "backend_capabilities": ["knowledge"],
         "frontend_loaders": ["tk-library"],
         "legacy_names": ["market_notes", "trade_records", "队伍交易备注"]
       }
@@ -348,7 +348,7 @@
       "consumers": ["日报页", "阶段整理页", "当前赛事", "对话"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["daily_content", "team", "tk_knowledge", "current_event"],
+        "backend_capabilities": ["daily_content", "team", "knowledge", "current_event"],
         "frontend_loaders": ["stage-review", "current-event"],
         "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
       }

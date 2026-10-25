@@ -9,8 +9,8 @@ from zoneinfo import ZoneInfo
 
 import xiaoxue_api.modules.team.public as profile_public
 import xiaoxue_api.modules.team.public as team_public
-import xiaoxue_api.modules.tk_knowledge.public as tk_public
-import xiaoxue_api.modules.version_understanding.public as version_public
+import xiaoxue_api.modules.knowledge.tk.public as tk_public
+import xiaoxue_api.modules.knowledge.version.public as version_public
 
 from . import analysis_repository as analysis
 from . import collection_repository as materials_repository

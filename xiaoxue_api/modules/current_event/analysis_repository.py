@@ -26,7 +26,7 @@ def fingerprint(value) -> str:
 
 
 def collect_library(identity: dict) -> tuple[list[dict], list[str]]:
-    from xiaoxue_api.modules.tk_knowledge.public import browse, get_entry
+    from xiaoxue_api.modules.knowledge.tk.public import browse, get_entry
     rows, seen = [], set()
     for team in (identity["team_a"], identity["team_b"]):
         kept = 0
@@ -91,7 +91,7 @@ def collect_inputs(identity: dict, sections: list[dict]) -> list[dict]:
     try:
         # The old brief collector still reads July stage rows and retired skill
         # mirrors. Use the existing current-object public source, never those.
-        from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
+        from xiaoxue_api.modules.knowledge.version.public import get_global_version_understanding
         payload = get_global_version_understanding()
         item = (payload.get("data") or {}).get("item") or {}
         if payload.get("status") == "ok" and item.get("content"):

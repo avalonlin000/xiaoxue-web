@@ -10,7 +10,7 @@ import os
 import sys
 
 sys.path.insert(0, "/home/ubuntu/xiaoxue-web")
-from xiaoxue_api.modules.tk_knowledge import repository  # noqa: E402
+from xiaoxue_api.modules.knowledge.tk import repository  # noqa: E402
 
 CREATED = "2026-10-03"
 SOURCE = "瓦规律库·2026上海冠军赛核验版整理"

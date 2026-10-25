@@ -9,8 +9,8 @@ from pathlib import Path
 
 from xiaoxue_api.modules.team.public import get_match_context
 from xiaoxue_api.modules.team.public import get_profile_bundle, list_schedules
-from xiaoxue_api.modules.tk_knowledge.public import list_match_trading_tk, list_team_trading_notes
-from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
+from xiaoxue_api.modules.knowledge.tk.public import list_match_trading_tk, list_team_trading_notes
+from xiaoxue_api.modules.knowledge.version.public import get_global_version_understanding
 from xiaoxue_api.modules.gol_gg.public import series_facts as gol_series_facts
 
 from xiaoxue_api.modules.current_event import repository

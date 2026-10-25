@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from xiaoxue_api.modules.tk_knowledge import repository, service
+from xiaoxue_api.modules.knowledge.tk import repository, service
 
 
 class UnifiedTKTests(unittest.TestCase):

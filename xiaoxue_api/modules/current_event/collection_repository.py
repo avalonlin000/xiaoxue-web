@@ -419,8 +419,8 @@ def dependency_manifest(identity: dict) -> dict:
     """Public, local reads only. Changes are scoped to the inputs actually used."""
     from xiaoxue_api.modules.team.public import get_current_profile
     from xiaoxue_api.modules.team.public import get_profile_bundle
-    from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
-    from xiaoxue_api.modules.tk_knowledge.public import browse, get_entry, list_match_trading_tk
+    from xiaoxue_api.modules.knowledge.version.public import get_global_version_understanding
+    from xiaoxue_api.modules.knowledge.tk.public import browse, get_entry, list_match_trading_tk
     from .analysis_repository import METHODS, SKILLS
     from .evidence import PUBLIC_EVIDENCE_VERSION
     from .service import get_current_event
@@ -1320,7 +1320,7 @@ def _summarize_materials_once(identity: dict, sections: list[dict]) -> tuple[lis
 def collect_internal(identity: dict) -> tuple[list[dict], list[str]]:
     from xiaoxue_api.modules.team.public import get_match_context
     from xiaoxue_api.modules.team.public import get_profile_bundle
-    from xiaoxue_api.modules.tk_knowledge.public import list_match_trading_tk
+    from xiaoxue_api.modules.knowledge.tk.public import list_match_trading_tk
     from xiaoxue_api.modules.team.public import get_current_profile
 
     from .evidence import prepared_sections
@@ -1388,7 +1388,7 @@ def collect_scope_internal(identity: dict) -> tuple[list[dict], list[str]]:
     """Read formal content, never promote old content to verified event facts."""
     from xiaoxue_api.modules.team.public import get_current_profile
     from xiaoxue_api.modules.team.public import get_profile_bundle
-    from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
+    from xiaoxue_api.modules.knowledge.version.public import get_global_version_understanding
 
     sections, limitations = [], []
     try:

@@ -140,7 +140,7 @@ def database_fallback_profile(team: str) -> dict | None:
     d3 = bundle["three_dimensional"]
     players = bundle["players"]
     try:
-        from xiaoxue_api.modules.tk_knowledge.public import count_team_entries
+        from xiaoxue_api.modules.knowledge.tk.public import count_team_entries
         tk_count = count_team_entries(row["short_name"])
     except (ImportError, OSError):
         tk_count = 0

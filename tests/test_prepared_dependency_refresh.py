@@ -236,7 +236,7 @@ def test_failed_revalidation_keeps_original_timestamp_and_short_negative_cache(s
 
 def test_dependency_manifest_ignores_other_team_and_capture_only_change(store):
     profiles = {"KC": {"profile": {"win_path": "边线"}, "updated_at": "2026-10-18"}, "GEN": {"profile": {"win_path": "资源团"}}}
-    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value={"event": "S16"}), patch("xiaoxue_api.modules.team.public.get_current_profile", side_effect=lambda team: profiles[team]), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.tk_knowledge.public.browse", return_value={}), patch("xiaoxue_api.modules.tk_knowledge.public.list_match_trading_tk", return_value={}):
+    with patch("xiaoxue_api.modules.current_event.service.get_current_event", return_value={"event": "S16"}), patch("xiaoxue_api.modules.team.public.get_current_profile", side_effect=lambda team: profiles[team]), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}), patch("xiaoxue_api.modules.knowledge.version.public.get_global_version_understanding", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.browse", return_value={}), patch("xiaoxue_api.modules.knowledge.tk.public.list_match_trading_tk", return_value={}):
         before = real_dependency_manifest({"scope": "team", "event": "S16", "team": "KC"})
         profiles["GEN"]["profile"]["win_path"] = "其他队变化"
         profiles["KC"]["updated_at"] = "2026-10-20"

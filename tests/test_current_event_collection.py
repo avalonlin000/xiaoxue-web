@@ -251,7 +251,7 @@ def test_content_revision_does_not_change_only_because_capture_time_changes(stor
 
 
 def test_internal_adapter_uses_real_public_contracts():
-    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={"team_a": {"team": "KC", "ts": 20}, "team_b": {"team": "MVK", "ts": 19}}), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={"team": {"region": "LEC"}, "players": [{"name": "Player", "role": "中单"}], "three_dimensional": {"notes": "旧笔记不可冒充画像", "updated_at": "2026-10-18"}}), patch("xiaoxue_api.modules.team.public.get_current_profile", return_value={"found": True, "profile": {"positioning": "中期资源团"}, "updated_at": "2026-10-18"}), patch("xiaoxue_api.modules.tk_knowledge.public.list_match_trading_tk", return_value={"items": [{"statement": "先看版本", "status": "confirmed"}]}) as tk:
+    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={"team_a": {"team": "KC", "ts": 20}, "team_b": {"team": "MVK", "ts": 19}}), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={"team": {"region": "LEC"}, "players": [{"name": "Player", "role": "中单"}], "three_dimensional": {"notes": "旧笔记不可冒充画像", "updated_at": "2026-10-18"}}), patch("xiaoxue_api.modules.team.public.get_current_profile", return_value={"found": True, "profile": {"positioning": "中期资源团"}, "updated_at": "2026-10-18"}), patch("xiaoxue_api.modules.knowledge.tk.public.list_match_trading_tk", return_value={"items": [{"statement": "先看版本", "status": "confirmed"}]}) as tk:
         sections, limitations = repo.collect_internal(MATCH)
     tk.assert_called_once_with(region="LEC", teams=["KC", "MVK"], players=["Player"], limit=12)
     text = json.dumps(sections, ensure_ascii=False)

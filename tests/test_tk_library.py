@@ -31,7 +31,7 @@ def write_tk(root: Path, filename: str, created: str, body: str, *, team: str = 
 
 class TkLibraryTests(unittest.TestCase):
     def test_mempalace_search_and_reindex_default_to_current_tk_not_archive(self) -> None:
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         response = mock.Mock()
         response.raise_for_status.return_value = None
@@ -57,7 +57,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_library_sorts_newest_first_and_paginates_without_losing_total(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -77,7 +77,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_library_filters_by_month_keyword_and_team(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -96,7 +96,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_entry_returns_the_complete_body_instead_of_an_800_character_slice(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -113,7 +113,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_library_keeps_short_but_meaningful_tk_entries(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -128,7 +128,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_library_hides_pointer_files_and_strips_technical_blocks_from_readable_tk(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -149,7 +149,7 @@ class TkLibraryTests(unittest.TestCase):
         self.assertEqual(hidden_search["total"], 0)
 
     def test_personal_write_strips_technical_fragments_before_persistence(self) -> None:
-        from xiaoxue_api.modules.tk_knowledge import repository, service
+        from xiaoxue_api.modules.knowledge.tk import repository, service
 
         with tempfile.TemporaryDirectory() as directory, mock.patch.object(repository, "TK_DIR", directory), mock.patch.object(repository, "request_reindex", return_value=True):
             created = service.create({"content": "【结论】保留正常判断。\n```json\n{\"debug\": true}\n```\n/tmp/ignore-me"})
@@ -162,7 +162,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_personal_remember_writes_raw_words_without_metadata_or_overwrite(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository, service
+        from xiaoxue_api.modules.knowledge.tk import repository, service
 
         teams = [
             {"short_name": "BLG", "name": "Bilibili Gaming", "team_id": "blg"},
@@ -187,7 +187,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_entry_rejects_unsafe_or_non_markdown_filenames(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             with mock.patch.object(repository, "TK_DIR", directory):
@@ -199,7 +199,7 @@ class TkLibraryTests(unittest.TestCase):
     def test_delete_removes_the_selected_tk_and_the_entry_cannot_be_read_back(self) -> None:
         import main
         from fastapi.testclient import TestClient
-        from xiaoxue_api.modules.tk_knowledge import repository
+        from xiaoxue_api.modules.knowledge.tk import repository
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

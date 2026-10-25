@@ -314,7 +314,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(payload["modules"]["daily_content"]["status"], "disabled")
         self.assertIn("主动暂停", payload["modules"]["daily_content"]["message"])
         self.assertEqual(payload["modules"]["team"]["status"], "healthy")
-        self.assertEqual(payload["modules"]["tk_knowledge"]["status"], "healthy")
+        self.assertEqual(payload["modules"]["knowledge"]["status"], "healthy")
 
 
 class LineupWorkflowTests(unittest.TestCase):
