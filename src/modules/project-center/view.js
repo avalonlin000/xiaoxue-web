@@ -144,7 +144,7 @@ function architectureHtml() {
   return `<section class="pc-architecture" aria-label="交易信息系统结构图">
     <div class="pc-section-heading"><div><span class="pc-kicker">系统结构图</span><h2>人和小雪共同维护的一条主线</h2><p>这张图来自项目统一骨架，不是 TK 关系图；新增对象只接入对象适配层，不改公共主线。</p></div><button class="pc-text-action" data-pc-action="view" data-view="objects">查看交易对象目录 →</button></div>
     <div class="pc-flow">${steps.map(([title, detail], index) => `<div class="pc-flow-step"><div class="pc-flow-node pc-flow-${index}"><b>${title}</b><span>${detail}</span></div>${index < steps.length - 1 ? '<span class="pc-flow-arrow" aria-hidden="true">↓</span>' : ''}</div>`).join('')}</div>
-    <div class="pc-architecture-notes"><article><b>唯一载体</b><p>普通 TK 和交易 TK 都是长期内容，但交易 TK 不等于自动交易指令。</p></article><article><b>不自动升级</b><p>当前判断、盘口记录、结果和外部资料不会自动变成长期 TK。</p></article><article><b>可插拔对象</b><p>LOL、CS、足球等只需补主体、事件、信息源、结果源和方法。</p></article></div>
+    <div class="pc-architecture-notes"><article><b>唯一载体</b><p>普通 TK 和交易 TK 都是长期内容，但交易 TK 不等于自动交易指令。</p></article><article><b>不自动升级</b><p>当前判断、临场记录、结果和外部资料不会自动变成长期 TK。</p></article><article><b>可插拔对象</b><p>LOL、CS、足球等只需补主体、事件、信息源、结果源和方法。</p></article></div>
   </section>`;
 }
 

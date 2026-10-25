@@ -502,7 +502,7 @@ def _daily_summary() -> dict[str, Any]:
         report = {key: source_report.get(key) for key in ("publication_status", "url", "snapshot_at")}
     except Exception:
         state = "unavailable"
-    labels = {"ready": ("今天内容已就绪", "可以从日报开始"), "content_missing": ("今天内容还没齐", "需要等内容准备好或直接和小雪聊"), "no_matches": ("今天没有安排比赛", "可以查看已有资料或沉淀候选"), "unavailable": ("日报状态暂时读不到", "不影响其他入口继续使用")}
+    labels = {"ready": ("今天内容已就绪", "可以从日报开始"), "content_missing": ("今天内容还没齐", "需要等内容准备好或直接和小雪聊"), "no_matches": ("今天没有安排比赛", "可以查看已有资料或 TK 资料库"), "unavailable": ("日报状态暂时读不到", "不影响其他入口继续使用")}
     label, reason = labels.get(state, ("日报状态待确认", "当前没有足够信息判断今天内容"))
     return {"status": state, "label": label, "reason": reason, "report": report, "source": "今日内容状态", "observed_at": _now(), "stale": state == "unavailable"}
 

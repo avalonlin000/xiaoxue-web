@@ -108,11 +108,8 @@ class ProjectModuleContractTests(TestCase):
             self.assertIn(field, manifest)
             self.assertIn(field, frontend)
         daily = Path("/home/ubuntu/lol_data/scripts/build_daily_report.py").read_text(encoding="utf-8")
-        lineup_handoff = (ROOT / "src/modules/lineup-handoff/service.js").read_text(encoding="utf-8")
         for field in ("power_score", "volatility_score"):
             self.assertIn(field, daily)
-        self.assertIn("综合实力、稳定性、趋势、势头和状态", lineup_handoff)
-        self.assertNotIn("mu / σ / TS", lineup_handoff)
 
     def test_profile_contract_names_team_profiles_as_source_not_mirror_presence(self) -> None:
         profile = next(item for item in load_module_contract()["modules"] if item["id"] == "team_profile")

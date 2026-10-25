@@ -83,12 +83,12 @@ def _match_brief_payload(desk: dict, archives: list[dict]) -> dict:
             "market_records": "交易 TK 中 category=market 的兼容只读投影（唯一正源）",
             "team_archives": "交易信息档案库；只保存明确留存的原始资料、整理、个人笔记和复盘",
         },
-        "boundary": "只读并列现有单场事实、TK、盘口记录和长期档案；不自动建档、不写交易、不生成交易结论，也不更新 TK、画像或三维。",
+        "boundary": "只读并列现有单场事实、TK、临场记录和长期档案；不自动建档、不写交易、不生成交易结论，也不更新 TK、画像或三维。",
     }
 
 
 def _matching_market_records(team_a: str, team_b: str) -> list[dict]:
-    """盘口记录已于 2026-10-25 退役；交易 TK 是唯一正源。"""
+    """盘口判断已于 2026-10-25 退役；交易 TK 是唯一正源。"""
     return []
 
 

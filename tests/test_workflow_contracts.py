@@ -373,7 +373,7 @@ class MarketReviewWorkflowTests(unittest.TestCase):
                 "wrong_points": "低估前期换线",
                 "missing_evidence": "缺首发确认",
                 "calibration": "下次首发未确认时降权",
-                "destinations": ["market_notes", "team_trading_note"],
+                "destinations": ["team_trading_note"],
             },
             load_repo_config(),
         )

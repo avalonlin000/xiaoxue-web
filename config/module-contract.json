@@ -166,7 +166,7 @@
           "ordinary": "knowledge_tk",
           "trading": "trading_tk",
           "legacy_trade_label": "仅兼容读取，不视为正式交易 TK",
-          "promotion": "普通 TK、当前判断、盘口记录和赛果均不自动升级为交易 TK"
+          "promotion": "普通 TK、当前判断、临场记录和赛果均不自动升级为交易 TK"
         }
       },
       "read_capability": {
@@ -194,7 +194,7 @@
       "compatibility": {
         "backend_capabilities": ["knowledge"],
         "frontend_loaders": ["tk-library"],
-        "legacy_names": ["market_notes", "trade_records", "队伍交易备注"]
+        "legacy_names": ["trade_records", "队伍交易备注"]
       }
     },
     {

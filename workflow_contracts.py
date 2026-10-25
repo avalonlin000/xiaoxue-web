@@ -97,7 +97,7 @@ def build_market_note_review(
         f"判断错误点：{str(payload.get('wrong_points') or '待补').strip()}",
         f"缺失证据：{str(payload.get('missing_evidence') or '待补').strip()}",
         f"校准结论：{str(payload.get('calibration') or '待确认').strip()}",
-        f"建议沉淀：{', '.join(destinations) if destinations else '仅 market_notes'}",
+        f"建议沉淀：{', '.join(destinations) if destinations else '仅交易 TK'}",
         f"<!-- {end} -->",
     ]
     text = "\n".join([f"结果：{result}", original, "\n".join(managed)]).strip()

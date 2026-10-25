@@ -86,7 +86,7 @@
     ]
   },
   "market_review_workflow": {
-    "destinations": ["market_notes", "team_trading_note", "tk", "team_profile", "team_3d"],
+    "destinations": ["team_trading_note", "tk", "team_profile", "team_3d"],
     "knowledge_write_allowed": false,
     "managed_start": "XIAOXUE_REVIEW_START",
     "managed_end": "XIAOXUE_REVIEW_END"

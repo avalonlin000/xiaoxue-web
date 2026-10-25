@@ -1029,13 +1029,6 @@ html, body {
 .match-change-form select, .match-change-form input, .match-change-form textarea { min-width:0; padding:7px 8px; border:1px solid var(--line); border-radius:8px; background:var(--bg-0); color:var(--ink-1); font:12px/1.5 var(--sans); }
 .match-trade-entry-form { grid-template-columns:160px minmax(260px,1fr) auto; align-items:start; }
 .match-trade-entry-form textarea { min-height:72px; resize:vertical; }
-.stage-review-list { display:grid; gap:10px; }
-.stage-review-group { display:grid; gap:7px; padding:10px; border:1px solid var(--line); border-radius:10px; background:var(--bg-1); }
-.stage-review-group h3 { margin:0; color:var(--ink-0); font-size:13px; }
-.stage-candidate { display:grid; grid-template-columns:minmax(120px,.7fr) minmax(220px,1.8fr) auto; gap:8px; align-items:start; padding:9px; border-radius:8px; background:var(--bg-0); }
-.stage-candidate b { color:var(--pink-deep); font-size:12px; }
-.stage-candidate span { color:var(--ink-2); font-size:12px; line-height:1.5; }
-.stage-candidate em { display:block; color:var(--ink-3); font-size:10px; font-style:normal; margin-top:3px; }
 .event-list {
   display: flex;
   flex-direction: column;
@@ -1449,7 +1442,6 @@ html, body {
 .page-event #col-profile,
 .page-market #col-profile,
 .page-tk #col-profile,
-.page-stage #col-profile,
 .page-football #col-profile { display:none; }
 .page-event #card-fundamentals,
 .page-event #card-trades,
@@ -1464,22 +1456,12 @@ html, body {
 .page-football #card-fundamentals,
 .page-football #card-current-event,
 .page-football #card-trades,
-.page-football #card-stage-review,
 .page-football #card-tk,
 .page-football #card-tk-library { display:none; }
 .page-tk #card-fundamentals,
 .page-tk #card-current-event,
 .page-tk #card-trades,
 .page-tk #card-tk { display:none; }
-.page-stage #card-fundamentals,
-.page-stage #card-current-event,
-.page-stage #card-trades,
-.page-stage #card-tk,
-.page-stage #card-tk-library { display:none; }
-.page-teams #card-stage-review,
-.page-event #card-stage-review,
-.page-market #card-stage-review,
-.page-tk #card-stage-review { display:none; }
 .page-football #card-football { display:flex; flex:1; flex-direction:column; min-height:0; }
 .page-football #card-football .card-body { overflow-y:auto; }
 .football-toolbar { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:12px; }
@@ -1504,8 +1486,6 @@ html, body {
 .football-detail { margin-top:14px; padding:15px; border:1px solid var(--blue); border-radius:10px; background:var(--blue-light); }
 .football-detail-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:12px; }.football-detail-grid > div,.football-detail-block { padding:11px; border-radius:8px; background:var(--bg-0); }.football-detail-grid p,.football-detail-block p { margin:7px 0 0; color:var(--ink-1); font-size:13px; line-height:1.6; }.football-detail-block { margin-top:9px; }.football-detail-block ul { margin:7px 0 0; padding-left:18px; color:var(--ink-1); font-size:13px; line-height:1.6; }
 .football-empty { padding:22px 12px; border:1px dashed var(--line-strong); border-radius:9px; color:var(--ink-2); line-height:1.6; }
-.page-stage #card-stage-review { display:flex; flex:1; flex-direction:column; min-height:0; }
-.page-stage #card-stage-review .card-body { overflow-y:auto; }
 .research-intro { color:var(--ink-2); margin-bottom:12px; }
 .research-form,.research-columns { display:grid; gap:10px; }
 .research-form { grid-template-columns:1fr 1fr 1.4fr auto; }
@@ -2191,27 +2171,6 @@ html, body {
             </div>
             <div class="event-panel-title" style="margin-top:14px">相关资料</div>
             <div id="event-knowledge-results" class="today-content-grid"></div>
-          </div>
-        </div>
-
-        <!-- Stage review card -->
-        <div class="card" id="card-stage-review">
-          <div class="card-head">
-            <span class="badge" style="background:var(--orange)">STAGE</span> 沉淀候选
-            <span style="font-size:12px;color:var(--ink-3);font-weight:400">只把赛后反复出现、值得长期保留的内容放进来</span>
-            <span style="flex:1"></span>
-            <button class="compare-close" data-stage-action="refresh">刷新</button>
-          </div>
-          <div class="card-body">
-            <div class="trade-workspace-note">
-              单场偶然留在单场复盘；只有真正可复用的结论才进入这里。确认前不改长期资料。
-              <div class="trade-actions" style="margin-top:8px">
-                <button class="btn-tk-new" data-stage-action="copy-prompt">复制给小雪</button>
-                <span class="trade-msg" id="stage-review-message"></span>
-              </div>
-            </div>
-            <div id="stage-review-summary" class="tk-library-freshness">正在读取待整理内容…</div>
-            <div id="stage-review-list" class="stage-review-list"><div class="tk-empty">读取中…</div></div>
           </div>
         </div>
 
