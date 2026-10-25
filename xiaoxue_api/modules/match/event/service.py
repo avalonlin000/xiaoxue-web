@@ -313,46 +313,6 @@ def save_match_trade_entry(values: dict) -> dict:
     return _match_run_payload(repository.get_match_run_by_identity(identity))
 
 
-def create_knowledge_candidate(values: dict) -> dict:
-    identity = _resolve_run_identity(values)
-    row = _require_match_run(identity)
-    target_type = _limited_text(values.get("target_type"), "长期更新对象", 30).lower()
-    if target_type not in KNOWLEDGE_TARGETS:
-        raise ValueError("长期更新对象只支持队伍、选手、版本或交易方法")
-    target_name = _limited_text(values.get("target_name"), "对象名称", 80)
-    if target_type == "team" and target_name.upper() not in {identity["team_a"], identity["team_b"]}:
-        raise ValueError("队伍候选必须属于当前比赛双方")
-    if not target_name:
-        target_name = "当前版本" if target_type == "version" else "个人交易方法"
-    candidate = repository.create_knowledge_candidate(row["id"], {
-        "target_type": target_type,
-        "target_name": target_name,
-        "topic": _required_limited_text(values.get("topic"), "更新主题", 120),
-        "observation": _required_limited_text(values.get("observation"), "新观察", 1000),
-        "reason": _required_limited_text(values.get("reason"), "为什么值得整理", 500),
-    })
-    return {"ok": True, "candidate": _knowledge_candidate_payload(candidate, identity)}
-
-
-def list_knowledge_candidates(status: str = "pending", limit: int = 100) -> dict:
-    clean_status = _limited_text(status or "pending", "候选状态", 20).lower()
-    if clean_status not in KNOWLEDGE_CANDIDATE_STATUSES:
-        raise ValueError("候选状态不支持")
-    bounded = max(1, min(int(limit or 100), 200))
-    rows = repository.list_knowledge_candidates(clean_status, bounded)
-    return {"status": clean_status, "candidates": [_knowledge_candidate_payload(row) for row in rows]}
-
-
-def update_knowledge_candidate_status(candidate_id: int, status: str) -> dict:
-    clean_status = _limited_text(status, "候选状态", 20).lower()
-    if clean_status not in KNOWLEDGE_CANDIDATE_STATUSES:
-        raise ValueError("候选状态不支持")
-    row = repository.update_knowledge_candidate_status(int(candidate_id), clean_status)
-    if not row:
-        raise LookupError("沉淀候选不存在")
-    return {"ok": True, "candidate": _knowledge_candidate_payload(row)}
-
-
 def update_match_run_fact(values: dict) -> dict:
     identity = _resolve_run_identity(values)
     row = _require_match_run(identity)

@@ -522,7 +522,6 @@ async def _api_request(
 
         "/current-event/match-workspace",
         "/current-event/match-workspace/changes",
-        "/stage-review/candidates",
         "/trading-tk",
         "/tk/search",
         "/team-trading-notes",
@@ -537,7 +536,6 @@ async def _api_request(
         r"/current-event/match-run/facts/\d+",
         r"/current-event/collection/[a-f0-9]{24}",
         r"/current-event/collection/[a-f0-9]{24}/resume",
-        r"/stage-review/candidates/\d+",
         r"/trading-tk/[^/]+\.md",
     )
     # Read-only discovery is intentionally open within Xiaoxue's local product
@@ -571,7 +569,6 @@ async def _api_request(
     if method == "PUT" and re.fullmatch(r"/team-3d/[^/]+", endpoint):
         write_operations.add((method, endpoint))
     if method == "PATCH" and (
-        re.fullmatch(r"/stage-review/candidates/\d+", endpoint)
         or re.fullmatch(r"/trading-tk/[^/]+\.md", endpoint)
     ):
         write_operations.add((method, endpoint))
@@ -1640,65 +1637,6 @@ async def xiaoxue_search_trading_tk(
         "region": (region or "").strip(), "subject": (subject or "").strip(),
         "version_context": (version_context or "").strip(), "limit": _bounded_limit(limit, maximum=100),
     }))
-
-
-@mcp.tool(
-    name="xiaoxue_add_stage_candidate",
-    annotations={"title": "把新认识放入阶段整理", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_add_stage_candidate(
-    user_command: str,
-    team_a: str,
-    team_b: str,
-    target_type: Literal["team", "player", "version", "trading_method"],
-    target_name: str,
-    topic: str,
-    observation: str,
-    reason: str,
-    event: str = "",
-    match_date: str = "",
-    match_time: str = "",
-    match_format: str = "",
-) -> str:
-    """仅在本场产生具体新认识时加入阶段整理；不直接修改队伍、选手、版本或交易方法。"""
-
-    _clean_text(user_command, "用户原始指令")
-    payload = {
-        **_match_payload(team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format),
-        "target_type": target_type,
-        "target_name": (target_name or "").strip(),
-        "topic": _clean_text(topic, "更新主题"),
-        "observation": _clean_text(observation, "新观察"),
-        "reason": _clean_text(reason, "为什么值得整理"),
-    }
-    return _json(await _api_request("POST", "/current-event/match-run/candidates", payload=payload))
-
-
-@mcp.tool(
-    name="xiaoxue_list_stage_candidates",
-    annotations={"title": "读取阶段整理候选", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_list_stage_candidates(status: Literal["pending", "ignored", "applied"] = "pending", limit: int = 100) -> str:
-    """阶段知识整理开始时读取按队伍、选手、版本和交易方法归属的候选。"""
-
-    return _json(await _api_request("GET", "/stage-review/candidates", params={
-        "status": status,
-        "limit": _bounded_limit(limit, maximum=200),
-    }))
-
-
-@mcp.tool(
-    name="xiaoxue_update_stage_candidate",
-    annotations={"title": "更新阶段整理候选状态", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
-    structured_output=False,
-)
-async def xiaoxue_update_stage_candidate(user_command: str, candidate_id: int, status: Literal["ignored", "applied"]) -> str:
-    """用户决定本轮不处理，或长期正源已确认写回并读回后，更新候选状态。"""
-
-    _clean_text(user_command, "用户原始指令")
-    return _json(await _api_request("PATCH", f"/stage-review/candidates/{int(candidate_id)}", payload={"status": status}))
 
 
 @mcp.tool(

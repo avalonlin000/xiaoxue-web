@@ -11,7 +11,7 @@ import {
 import { actions as tkLibraryActions } from './modules/tk-library/public.js';
 
 const appContext = createAppContext();
-const primaryPages = new Set(['teams', 'event', 'stage', 'tk', 'project']);
+const primaryPages = new Set(['teams', 'event', 'tk', 'project']);
 const pages = new Set([...primaryPages, 'football']);
 let page = 'event';
 let projectView = 'book';

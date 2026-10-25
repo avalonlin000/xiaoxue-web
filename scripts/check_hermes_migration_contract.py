@@ -32,8 +32,6 @@ REQUIRED_API_PATHS = {
     "/api/current-event/match-run/pause",
     "/api/current-event/match-run/entry",
     "/api/current-event/match-run/candidates",
-    "/api/stage-review/candidates",
-    "/api/stage-review/candidates/{candidate_id}",
     "/api/trading-tk",
     "/api/trading-tk/{filename}",
     "/api/research/subjects",
@@ -58,9 +56,6 @@ REQUIRED_MCP_TOOLS = {
     "xiaoxue_get_score_evidence",
     "xiaoxue_debug_reveal_match_result",
     "xiaoxue_get_match_run_review",
-    "xiaoxue_add_stage_candidate",
-    "xiaoxue_list_stage_candidates",
-    "xiaoxue_update_stage_candidate",
 
     "xiaoxue_search_trading_tk",
 

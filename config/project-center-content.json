@@ -573,36 +573,6 @@
             "source": "单场记录、市场观察与赛果对照",
             "verification": "从同一场读回原记录和后续复盘结果"
           }
-        },
-        {
-          "id": "stage-review-candidates",
-          "name": "阶段复盘与沉淀候选",
-          "purpose": "把多场之后真正可能复用的结论先列成候选，再决定是否更新版本、画像或长期 TK。",
-          "when_to_use": "一个赛段、系列赛或一组比赛结束后，想整理哪些认识值得长期保留时。",
-          "current_capability": "沉淀候选有查看入口，但候选是否齐全、整理是否完成和正式更新成功必须分别核对；日报与知识维护存在需处理部分时，不承诺阶段整理全链可用。",
-          "entry": {
-            "type": "web",
-            "page": "stage",
-            "label": "查看沉淀候选",
-            "chat_prompt": "把这阶段值得长期保留的结论先列候选，区分已证实、冲突和资料不足"
-          },
-          "ability_ids": [
-            "daily_knowledge",
-            "tk",
-            "team_profile"
-          ],
-          "related_modules": [
-            "队伍画像维护",
-            "版本理解",
-            "TK 整理"
-          ],
-          "boundaries": "候选不等于已经写入长期知识；长期更新必须按对象、范围和确认边界处理。",
-          "next_step": "先看候选和证据；只点名需要更新的一项。",
-          "basket_module_id": "daily_knowledge",
-          "engineering_details": {
-            "source": "阶段候选、长期画像、版本与 TK 正源",
-            "verification": "确认候选、证据、冲突与正式写入状态分开显示"
-          }
         }
       ]
     },

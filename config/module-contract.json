@@ -315,12 +315,12 @@
       },
       "source_of_truth": {
         "label": "日报产物、共享版本理解、队伍画像和 TK 各自正源",
-        "api": "/api/daily-content、/api/stage-review/candidates",
+        "api": "/api/daily-content",
         "state": ["shared_version_analysis", "team_profiles", "TK 正源"]
       },
       "read_capability": {
         "id": "daily_knowledge.read",
-        "entry": "/api/daily-content、/api/stage-review/candidates",
+        "entry": "/api/daily-content",
         "empty": "日报未生成或整理材料不足时明确状态，不把入口存在当成产物存在。"
       },
       "bounded_write_capability": {
@@ -349,7 +349,7 @@
       "status": "partial",
       "compatibility": {
         "backend_capabilities": ["daily_content", "team", "knowledge", "match"],
-        "frontend_loaders": ["stage-review", "current-event"],
+        "frontend_loaders": ["current-event"],
         "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
       }
     },

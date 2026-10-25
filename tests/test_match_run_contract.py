@@ -345,31 +345,5 @@ class MatchRunContractTests(unittest.TestCase):
         self.assertEqual(paused["activity_status"], "paused")
         self.assertNotEqual(paused.get("phase"), "complete")
 
-    def test_long_term_candidate_targets_an_entity_or_method_not_the_match(self):
-        with patch.object(current_event_service, "_collect_run_facts", return_value=[]):
-            current_event_service.start_match_run({**IDENTITY, "mode": "live"})
-
-        result = current_event_service.create_knowledge_candidate({
-            **IDENTITY,
-            "target_type": "team",
-            "target_name": "HLE",
-            "topic": "版本适应",
-            "observation": "换人后中野主动性连续兑现",
-            "reason": "可能改变对 HLE 当前版本适配的认识",
-        })
-        pending = current_event_service.list_knowledge_candidates("pending", 20)
-
-        self.assertEqual(result["candidate"]["target_type"], "team")
-        self.assertEqual(pending["candidates"][0]["target_name"], "HLE")
-        with self.assertRaisesRegex(ValueError, "长期更新对象"):
-            current_event_service.create_knowledge_candidate({
-                **IDENTITY,
-                "target_type": "match",
-                "target_name": "HLE vs DK",
-                "topic": "比赛",
-                "observation": "这场打完了",
-                "reason": "保存比赛笔记",
-            })
-
 if __name__ == "__main__":
     unittest.main()

@@ -405,48 +405,6 @@ def upsert_match_run_entry(run_id: int, section: str, content: str):
         return conn.execute("SELECT * FROM match_run_entries WHERE run_id=? AND section=?", (run_id, section)).fetchone()
 
 
-def create_knowledge_candidate(run_id: int, values: dict):
-    ensure_match_run_tables()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with db() as conn:
-        cursor = conn.execute("""
-            INSERT INTO knowledge_update_candidates (
-                run_id, target_type, target_name, topic, observation, reason, status, created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, 'pending', ?, ?)
-        """, (
-            run_id, values["target_type"], values["target_name"], values["topic"],
-            values["observation"], values["reason"], now, now,
-        ))
-        conn.execute("UPDATE match_runs SET updated_at=? WHERE id=?", (now, run_id))
-        return conn.execute("SELECT * FROM knowledge_update_candidates WHERE id=?", (cursor.lastrowid,)).fetchone()
-
-
-def list_knowledge_candidates(status: str, limit: int = 100):
-    with db() as conn:
-        if not _table_exists(conn, "knowledge_update_candidates") or not _table_exists(conn, "match_runs"):
-            return []
-        return conn.execute("""
-            SELECT candidate.*, run.game, run.team_a, run.team_b, run.event, run.match_date, run.match_time, run.match_format
-            FROM knowledge_update_candidates AS candidate
-            JOIN match_runs AS run ON run.id=candidate.run_id
-            WHERE candidate.status=?
-            ORDER BY candidate.updated_at DESC, candidate.id DESC LIMIT ?
-        """, (status, limit)).fetchall()
-
-
-def update_knowledge_candidate_status(candidate_id: int, status: str):
-    ensure_match_run_tables()
-    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    with db() as conn:
-        conn.execute("UPDATE knowledge_update_candidates SET status=?, updated_at=? WHERE id=?", (status, now, candidate_id))
-        return conn.execute("""
-            SELECT candidate.*, run.game, run.team_a, run.team_b, run.event, run.match_date, run.match_time, run.match_format
-            FROM knowledge_update_candidates AS candidate
-            JOIN match_runs AS run ON run.id=candidate.run_id
-            WHERE candidate.id=?
-        """, (candidate_id,)).fetchone()
-
-
 def list_match_run_facts(run_id: int):
     with db() as conn:
         if not _table_exists(conn, "match_run_facts"):

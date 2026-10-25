@@ -35,9 +35,6 @@ from xiaoxue_api.modules.match.event.service import (
     restore_trade_plan_item,
     reorder_trade_plan_item,
     get_trade_plan_review,
-    create_knowledge_candidate,
-    list_knowledge_candidates,
-    update_knowledge_candidate_status,
 )
 
 
@@ -406,34 +403,6 @@ def pause_current_event_match_run(data: MatchIdentityIn) -> dict:
 def save_current_event_match_trade_entry(data: MatchTradeEntryIn) -> dict:
     try:
         return save_match_trade_entry(data.model_dump())
-    except LookupError as exc:
-        raise HTTPException(404, str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@router.post("/current-event/match-run/candidates")
-def create_current_event_knowledge_candidate(data: KnowledgeCandidateIn) -> dict:
-    try:
-        return create_knowledge_candidate(data.model_dump())
-    except LookupError as exc:
-        raise HTTPException(404, str(exc)) from exc
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@router.get("/stage-review/candidates")
-def stage_review_candidates(status: str = Query("pending"), limit: int = Query(100)) -> dict:
-    try:
-        return list_knowledge_candidates(status, limit)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@router.patch("/stage-review/candidates/{candidate_id}")
-def update_stage_review_candidate(candidate_id: int, data: KnowledgeCandidateStatusIn) -> dict:
-    try:
-        return update_knowledge_candidate_status(candidate_id, data.status)
     except LookupError as exc:
         raise HTTPException(404, str(exc)) from exc
     except ValueError as exc:

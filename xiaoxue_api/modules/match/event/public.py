@@ -32,9 +32,6 @@ from xiaoxue_api.modules.match.event.service import (
     restore_trade_plan_item,
     reorder_trade_plan_item,
     get_trade_plan_review,
-    create_knowledge_candidate,
-    list_knowledge_candidates,
-    update_knowledge_candidate_status,
 )
 from .collection import (
     get_prepared_materials, get_collection_task, prepare_materials,
@@ -51,7 +48,6 @@ __all__ = [
     "save_virtual_judgment", "unlock_match_run_result", "get_score_match_evidence", "get_gol_series_evidence", "get_score_match_result", "get_match_run_review",
     "get_active_match_run", "list_recent_match_runs", "pause_match_run", "save_match_trade_entry",
     "create_trade_plan_item", "update_trade_plan_item", "delete_trade_plan_item", "restore_trade_plan_item", "reorder_trade_plan_item", "get_trade_plan_review",
-    "create_knowledge_candidate", "list_knowledge_candidates", "update_knowledge_candidate_status",
     "get_prepared_materials", "get_collection_task", "prepare_materials", "resume_collection",
     "resume_pending_collections", "list_prepared_materials", "prepare_date", "prepare_upcoming", "run_collection",
 ]
