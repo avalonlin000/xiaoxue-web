@@ -53,7 +53,7 @@ REQUIRED_MCP_TOOLS = {
     "xiaoxue_pause_match_trade",
     "xiaoxue_save_match_trade_entry",
     "xiaoxue_update_match_run_fact",
-    "xiaoxue_get_score_evidence",
+    "xiaoxue_get_score",
     "xiaoxue_debug_reveal_match_result",
     "xiaoxue_get_match_run_review",
 

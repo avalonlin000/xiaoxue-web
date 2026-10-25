@@ -415,7 +415,7 @@ An outdated rumor.
 
     async def test_score_evidence_is_named_and_read_only(self) -> None:
         with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value={"view": "pre", "score_match": {}})) as request:
-            payload = json.loads(await adapter.xiaoxue_get_score_evidence("HLE", "DK", match_date="2026-07-30"))
+            payload = json.loads(await adapter.xiaoxue_get_score("evidence", "HLE", "DK", match_date="2026-07-30"))
 
         self.assertEqual(payload["view"], "pre")
         request.assert_awaited_once_with(
@@ -478,16 +478,6 @@ An outdated rumor.
             "POST", "/tk/remember",
             payload={"text": "写进 TK：最近换人的队伍都在赢或者发挥好", "tags": []},
         )
-
-    async def test_stage_candidate_targets_team_instead_of_creating_a_match_note(self) -> None:
-        with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value={"ok": True})) as request:
-            await adapter.xiaoxue_add_stage_candidate(
-                "HLE 换人后的主动性值得后面整理", "HLE", "DK", "team", "HLE", "换人影响",
-                "换人后中野主动性连续兑现", "可能改变 HLE 当前版本适配判断",
-            )
-
-        self.assertEqual(request.await_args.kwargs["payload"]["target_type"], "team")
-        self.assertEqual(request.await_args.kwargs["payload"]["target_name"], "HLE")
 
     async def test_tk_search_uses_the_formal_search_endpoint(self) -> None:
         with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value={"results": []})) as request:

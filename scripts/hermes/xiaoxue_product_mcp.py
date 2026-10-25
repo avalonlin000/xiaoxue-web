@@ -554,7 +554,6 @@ async def _api_request(
         ("POST", "/current-event/match-run/start"),
         ("POST", "/current-event/match-run/pause"),
         ("PUT", "/current-event/match-run/entry"),
-        ("POST", "/current-event/match-run/candidates"),
         ("POST", "/current-event/match-run/advance"),
         ("PUT", "/current-event/match-run/judgment"),
         ("POST", "/trading-tk"),
@@ -568,9 +567,7 @@ async def _api_request(
         write_operations.add((method, endpoint))
     if method == "PUT" and re.fullmatch(r"/team-3d/[^/]+", endpoint):
         write_operations.add((method, endpoint))
-    if method == "PATCH" and (
-        or re.fullmatch(r"/trading-tk/[^/]+\.md", endpoint)
-    ):
+    if method == "PATCH" and re.fullmatch(r"/trading-tk/[^/]+\.md", endpoint):
         write_operations.add((method, endpoint))
     # Ordinary POST/PUT/PATCH operations are available to the product adapter;
     # irreversible operations were rejected above, before any network request.
@@ -1131,69 +1128,43 @@ async def xiaoxue_prepare_match(
 
 
 @mcp.tool(
-    name="xiaoxue_get_gol_series_facts",
-    annotations={"title": "查 Gol.gg 系列赛逐局事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
+    name="xiaoxue_get_gol_facts",
+    annotations={"title": "查 Gol.gg 公开事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
     structured_output=False,
 )
-async def xiaoxue_get_gol_series_facts(
-    team_a: str, team_b: str, game_id: int, event: str = "", match_date: str = "today", match_time: str = "", match_format: str = "",
+async def xiaoxue_get_gol_facts(
+    kind: Literal["series", "tournament", "bp", "entities", "team", "player"],
+    tournament: str = "",
+    team_a: str = "",
+    team_b: str = "",
+    game_id: int = 0,
+    team_id: int = 0,
+    player_id: int = 0,
+    query: str = "",
+    limit: int = 20,
+    event: str = "",
+    match_date: str = "today",
+    match_time: str = "",
+    match_format: str = "",
 ) -> str:
-    """读取用户明确指定的 Gol.gg 对局页及同系列赛逐局 BP/时长/资源事实；不写入长期资料或覆盖 ScoreGG。"""
-    return _json(await _api_request("GET", "/current-event/gol-series-evidence", params={
-        **_match_params(team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format),
-        "game_id": _positive_id(game_id, "Gol.gg 对局编号"),
-    }))
+    """按需读取 Gol.gg 公开事实，只读、不写长期资料：series=单场逐局事实（需 team_a/team_b/game_id）、tournament=赛事页赛制与时长、bp=赛事英雄BP、entities=定位队伍或选手编号、team=队伍赛事事实、player=选手赛事事实。"""
 
-
-@mcp.tool(
-    name="xiaoxue_get_gol_tournament_facts",
-    annotations={"title": "查 Gol.gg 赛事事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-    structured_output=False,
-)
-async def xiaoxue_get_gol_tournament_facts(tournament: str) -> str:
-    """读取指定 Gol.gg 赛事页的赛制、局数、平均时长与可定位对局；不做跨赛事结论。"""
-    return _json(await _api_request("GET", "/gol/tournament", params={"tournament": _clean_text(tournament, "赛事")}))
-
-
-@mcp.tool(
-    name="xiaoxue_find_gol_entities",
-    annotations={"title": "定位 Gol.gg 赛事对象", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-    structured_output=False,
-)
-async def xiaoxue_find_gol_entities(tournament: str, kind: str = "all", query: str = "", limit: int = 20) -> str:
-    """在指定赛事页定位 Gol.gg 队伍或选手编号；没有唯一命中时返回候选，不猜测。"""
-    return _json(await _api_request("GET", "/gol/entities", params={"tournament": _clean_text(tournament, "赛事"), "kind": _clean_text(kind, "对象类型"), "query": (query or "").strip(), "limit": _bounded_limit(limit, maximum=50)}))
-
-
-@mcp.tool(
-    name="xiaoxue_get_gol_team_facts",
-    annotations={"title": "查 Gol.gg 队伍赛事事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-    structured_output=False,
-)
-async def xiaoxue_get_gol_team_facts(team_id: int, tournament: str) -> str:
-    """读取指定 Gol.gg 队伍在赛事内的基础事实；不自动写入队伍画像。"""
-    return _json(await _api_request("GET", "/gol/team", params={"team_id": _positive_id(team_id, "Gol.gg 队伍编号"), "tournament": _clean_text(tournament, "赛事")}))
-
-
-@mcp.tool(
-    name="xiaoxue_get_gol_tournament_bp",
-    annotations={"title": "查 Gol.gg 赛事 BP 事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-    structured_output=False,
-)
-async def xiaoxue_get_gol_tournament_bp(tournament: str) -> str:
-    """读取指定赛事页面的英雄禁用与分位置选用次数；只返回事实，不自动下优先级结论。"""
-    return _json(await _api_request("POST", "/gol/query", payload={"kind": "bp", "tournament": _clean_text(tournament, "赛事")}))
-
-
-@mcp.tool(
-    name="xiaoxue_get_gol_player_facts",
-    annotations={"title": "查 Gol.gg 选手赛事事实", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": True},
-    structured_output=False,
-)
-async def xiaoxue_get_gol_player_facts(player_id: int, tournament: str) -> str:
-    """读取指定 Gol.gg 选手在赛事内的基础事实；不自动写入选手画像。"""
-    return _json(await _api_request("GET", "/gol/player", params={"player_id": _positive_id(player_id, "Gol.gg 选手编号"), "tournament": _clean_text(tournament, "赛事")}))
-
+    if kind == "series":
+        return _json(await _api_request("GET", "/current-event/gol-series-evidence", params={
+            **_match_params(team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format),
+            "game_id": _positive_id(game_id, "Gol.gg 对局编号"),
+        }))
+    if kind == "tournament":
+        return _json(await _api_request("GET", "/gol/tournament", params={"tournament": _clean_text(tournament, "赛事")}))
+    if kind == "bp":
+        return _json(await _api_request("POST", "/gol/query", payload={"kind": "bp", "tournament": _clean_text(tournament, "赛事")}))
+    if kind == "entities":
+        return _json(await _api_request("GET", "/gol/entities", params={"tournament": _clean_text(tournament, "赛事"), "kind": _clean_text(query or "all", "对象类型"), "query": (query or "").strip(), "limit": _bounded_limit(limit, maximum=50)}))
+    if kind == "team":
+        return _json(await _api_request("GET", "/gol/team", params={"team_id": _positive_id(team_id, "Gol.gg 队伍编号"), "tournament": _clean_text(tournament, "赛事")}))
+    if kind == "player":
+        return _json(await _api_request("GET", "/gol/player", params={"player_id": _positive_id(player_id, "Gol.gg 选手编号"), "tournament": _clean_text(tournament, "赛事")}))
+    raise ValueError(f"未知的 Gol.gg 事实类型：{kind}")
 
 
 def _match_params(
@@ -1444,24 +1415,41 @@ async def xiaoxue_save_virtual_judgment(
 
 
 @mcp.tool(
-    name="xiaoxue_get_score_evidence",
-    annotations={"title": "读取 ScoreGG 比赛证据", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    name="xiaoxue_get_score",
+    annotations={"title": "读取 ScoreGG 赛果与证据", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     structured_output=False,
 )
-async def xiaoxue_get_score_evidence(
-    team_a: str,
-    team_b: str,
+async def xiaoxue_get_score(
+    kind: Literal["evidence", "result", "results"],
+    team_a: str = "",
+    team_b: str = "",
     event: str = "",
     match_date: str = "",
     match_time: str = "",
     match_format: str = "",
     view: str = "pre",
+    team: str = "",
+    date_from: str = "",
+    date_to: str = "",
+    limit: int = 20,
 ) -> str:
-    """读取本地 ScoreGG 导入证据；完全独立于交易推演和状态机。"""
+    """只读 ScoreGG 已导入内容：evidence=单场证据（需双方）、result=单场赛果、results=按队伍/日期收集已完赛赛果。不触碰交易推演。"""
 
-    params = _match_params(team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format)
-    params["view"] = _clean_text(view, "查看阶段")
-    return _json(await _api_request("GET", "/current-event/score-evidence", params=params))
+    if kind in {"evidence", "result"}:
+        params = _match_params(team_a, team_b, event=event, match_date=match_date, match_time=match_time, match_format=match_format)
+        if kind == "evidence":
+            params["view"] = _clean_text(view, "查看阶段")
+            return _json(await _api_request("GET", "/current-event/score-evidence", params=params))
+        return _json(await _api_request("GET", "/scoregg/result", params=params))
+    params: dict[str, Any] = {"limit": _bounded_limit(limit)}
+    if team.strip():
+        params["team"] = _clean_team(team)
+    if date_from.strip():
+        params["date_from"] = date_from.strip()
+    if date_to.strip():
+        params["date_to"] = date_to.strip()
+    data = await _api_request("GET", "/scoregg/results", params=params)
+    return _json(_read_result(data, capability="current_event", version="1.0.0", summary="已收集 ScoreGG 已完赛赛果", source="/scoregg/results"))
 
 
 @mcp.tool(
