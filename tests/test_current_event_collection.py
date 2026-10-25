@@ -251,7 +251,7 @@ def test_content_revision_does_not_change_only_because_capture_time_changes(stor
 
 
 def test_internal_adapter_uses_real_public_contracts():
-    with patch("xiaoxue_api.modules.fundamentals.public.get_match_context", return_value={"team_a": {"team": "KC", "ts": 20}, "team_b": {"team": "MVK", "ts": 19}}), patch("xiaoxue_api.modules.team_data.public.get_profile_bundle", return_value={"team": {"region": "LEC"}, "players": [{"name": "Player", "role": "中单"}], "three_dimensional": {"notes": "旧笔记不可冒充画像", "updated_at": "2026-10-18"}}), patch("xiaoxue_api.modules.profiles.public.get_current_profile", return_value={"found": True, "profile": {"positioning": "中期资源团"}, "updated_at": "2026-10-18"}), patch("xiaoxue_api.modules.tk_knowledge.public.list_match_trading_tk", return_value={"items": [{"statement": "先看版本", "status": "confirmed"}]}) as tk:
+    with patch("xiaoxue_api.modules.team.public.get_match_context", return_value={"team_a": {"team": "KC", "ts": 20}, "team_b": {"team": "MVK", "ts": 19}}), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={"team": {"region": "LEC"}, "players": [{"name": "Player", "role": "中单"}], "three_dimensional": {"notes": "旧笔记不可冒充画像", "updated_at": "2026-10-18"}}), patch("xiaoxue_api.modules.team.public.get_current_profile", return_value={"found": True, "profile": {"positioning": "中期资源团"}, "updated_at": "2026-10-18"}), patch("xiaoxue_api.modules.tk_knowledge.public.list_match_trading_tk", return_value={"items": [{"statement": "先看版本", "status": "confirmed"}]}) as tk:
         sections, limitations = repo.collect_internal(MATCH)
     tk.assert_called_once_with(region="LEC", teams=["KC", "MVK"], players=["Player"], limit=12)
     text = json.dumps(sections, ensure_ascii=False)
@@ -263,7 +263,7 @@ def test_internal_adapter_uses_real_public_contracts():
 
 def test_current_profile_reads_existing_canonical_fields_without_migration(tmp_path, monkeypatch):
     from xiaoxue_api.core import database
-    from xiaoxue_api.modules.profiles.public import get_current_profile
+    from xiaoxue_api.modules.team.public import get_current_profile
     path = tmp_path / "profiles.sqlite3"
     with sqlite3.connect(path) as db:
         db.execute("CREATE TABLE team_profiles(team_name TEXT, positioning TEXT, win_path TEXT, lose_path TEXT, key_points TEXT, bp_tendency TEXT, updated_at TEXT)")

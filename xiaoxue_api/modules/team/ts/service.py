@@ -3,7 +3,7 @@ from __future__ import annotations
 import re
 import time
 
-from xiaoxue_api.modules.profiles.public import get_wiki_team
+from ..profile.public import get_wiki_team
 from xiaoxue_api.modules.tk_knowledge.public import count_team_entries
 
 from . import repository

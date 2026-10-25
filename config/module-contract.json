@@ -77,7 +77,7 @@
       "consumers": ["队伍资料页", "日报", "阵容分析", "交易判断"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["fundamentals"],
+        "backend_capabilities": ["team"],
         "frontend_loaders": ["teams"],
         "legacy_names": ["队伍基本面", "TS 表", "三维 TS"]
       }
@@ -139,7 +139,7 @@
       "consumers": ["队伍资料页", "当前赛事", "阵容分析", "日报", "队伍专项 Skill"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["profiles", "team_data", "business_mutations"],
+        "backend_capabilities": ["team", "business_mutations"],
         "frontend_loaders": ["teams", "current-event"],
         "legacy_names": ["三维", "队伍资料总览", "*-team-profile Skill", "team_3d_data"]
       }
@@ -348,7 +348,7 @@
       "consumers": ["日报页", "阶段整理页", "当前赛事", "对话"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["daily_content", "profiles", "tk_knowledge", "current_event"],
+        "backend_capabilities": ["daily_content", "team", "tk_knowledge", "current_event"],
         "frontend_loaders": ["stage-review", "current-event"],
         "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
       }

@@ -16,7 +16,7 @@ from zoneinfo import ZoneInfo
 from . import collection_repository as repository
 from . import preparation
 from .service import get_current_event, normalize_match_identity
-from xiaoxue_api.modules.team_data.public import list_schedules
+from xiaoxue_api.modules.team.public import list_schedules
 
 
 _executor = ThreadPoolExecutor(max_workers=2, thread_name_prefix="match-materials")

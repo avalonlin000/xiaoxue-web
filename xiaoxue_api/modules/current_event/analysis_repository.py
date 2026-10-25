@@ -56,7 +56,7 @@ def collect_library(identity: dict) -> tuple[list[dict], list[str]]:
 
 def collect_inputs(identity: dict, sections: list[dict]) -> list[dict]:
     from .service import list_score_match_results
-    from xiaoxue_api.modules.fundamentals.public import get_match_context, can_compare_team_ratings
+    from xiaoxue_api.modules.team.public import get_match_context, can_compare_team_ratings
     # Present-day knowledge must not become historical pre-match evidence.
     if date.fromisoformat(identity["match_date"]) < datetime.now(ZoneInfo("Asia/Shanghai")).date():
         return []

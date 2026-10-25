@@ -102,7 +102,7 @@ class ProjectModuleContractTests(TestCase):
             list(ts["field_mapping"]["display"]),
             ["power_score", "volatility_score", "trend", "momentum", "status"],
         )
-        manifest = (ROOT / "xiaoxue_api/modules/fundamentals/manifest.py").read_text(encoding="utf-8")
+        manifest = (ROOT / "xiaoxue_api/modules/team/manifest.py").read_text(encoding="utf-8")
         frontend = (ROOT / "src/modules/teams/view.js").read_text(encoding="utf-8")
         for field in ts["field_mapping"]["display"]:
             self.assertIn(field, manifest)
@@ -117,8 +117,8 @@ class ProjectModuleContractTests(TestCase):
     def test_profile_contract_names_team_profiles_as_source_not_mirror_presence(self) -> None:
         profile = next(item for item in load_module_contract()["modules"] if item["id"] == "team_profile")
         self.assertIn("统一五项队伍画像", profile["source_of_truth"]["label"])
-        service = (ROOT / "xiaoxue_api/modules/profiles/service.py").read_text(encoding="utf-8")
-        manifest = (ROOT / "xiaoxue_api/modules/profiles/manifest.py").read_text(encoding="utf-8")
+        service = (ROOT / "xiaoxue_api/modules/team/profile/service.py").read_text(encoding="utf-8")
+        manifest = (ROOT / "xiaoxue_api/modules/team/manifest.py").read_text(encoding="utf-8")
         self.assertIn("canonical", service)
         self.assertIn('source\": \"team_profile\"', service)
         self.assertIn('"mode": "team_profiles_primary"', manifest)

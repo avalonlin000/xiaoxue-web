@@ -180,6 +180,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertTrue(response.json()["ready"])
 
     def test_health_reports_data_readiness_manifest(self) -> None:
+        import main  # noqa: F401  确保应用已装配，health 才能读到模块状态
         from xiaoxue_api.modules.platform.public import health
 
         payload = health()
@@ -188,6 +189,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertIn("ok", payload["checks"]["data_readiness"])
 
     def test_health_does_not_treat_check_only_manifest_as_production_ready(self) -> None:
+        import main  # noqa: F401  确保应用已装配，health 才能读到模块状态
         from xiaoxue_api.modules.platform.public import health
         from datetime import datetime
 
@@ -216,6 +218,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(payload["checks"]["data_readiness"]["status"], "diagnostic_only")
 
     def test_health_rejects_malformed_readiness_stages_without_crashing(self) -> None:
+        import main  # noqa: F401  确保应用已装配，health 才能读到模块状态
         from xiaoxue_api.modules.platform.public import health
         from datetime import datetime
 
@@ -296,6 +299,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(payload["status"], "healthy")
 
     def test_health_reports_user_paused_daily_as_disabled_not_broken(self) -> None:
+        import main  # noqa: F401  确保应用已装配，health 才能读到模块状态
         from xiaoxue_api.modules.platform.public import health
 
         with tempfile.TemporaryDirectory() as directory, mock.patch.dict(
@@ -309,7 +313,7 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(payload["status"], "healthy")
         self.assertEqual(payload["modules"]["daily_content"]["status"], "disabled")
         self.assertIn("主动暂停", payload["modules"]["daily_content"]["message"])
-        self.assertEqual(payload["modules"]["team_data"]["status"], "healthy")
+        self.assertEqual(payload["modules"]["team"]["status"], "healthy")
         self.assertEqual(payload["modules"]["tk_knowledge"]["status"], "healthy")
 
 

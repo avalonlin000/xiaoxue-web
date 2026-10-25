@@ -124,7 +124,7 @@ def update_team_profile(team: str, values: dict) -> dict:
 def _invalidate_teams_cache() -> None:
     """队伍画像/3D 更新后失效 fundamentals 列表缓存（延迟 import 防循环）。"""
     try:
-        from xiaoxue_api.modules.fundamentals.public import invalidate_teams_cache
+        from xiaoxue_api.modules.team.public import invalidate_teams_cache
     except ImportError:
         return
     invalidate_teams_cache()

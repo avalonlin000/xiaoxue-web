@@ -71,7 +71,7 @@ def test_no_source_evidence_never_calls_the_analysis_model():
 
 def test_unverified_profile_is_background_not_supported_current_team_fact():
     from xiaoxue_api.modules.current_event import analysis_repository as analysis
-    from xiaoxue_api.modules.fundamentals import public as fundamentals
+    from xiaoxue_api.modules.team.ts import public as fundamentals
     from xiaoxue_api.modules.version_understanding import public as version
     sections = [{"id": "team_AAA", "items": [{"source": "已有队伍画像", "text": "旧国内赛赢法", "updated_at": "2026-01-01"}]}]
     with patch.object(fundamentals, "get_match_context", return_value={}), patch.object(version, "get_global_version_understanding", return_value={}):
@@ -100,7 +100,7 @@ def test_library_pages_past_trading_notes_before_limiting_analysis():
 
 def test_cycle_collection_requires_a_nonempty_status():
     from xiaoxue_api.modules.current_event import analysis_repository as analysis
-    from xiaoxue_api.modules.fundamentals import public as fundamentals
+    from xiaoxue_api.modules.team.ts import public as fundamentals
     from xiaoxue_api.modules.version_understanding import public as version
     from xiaoxue_api.modules.current_event import service
     side = {"region": "LPL", "power_score": 10, "volatility_score": 2, "trend": "up", "momentum": 1}

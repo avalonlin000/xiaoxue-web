@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 from xiaoxue_api.core import database
 from xiaoxue_api.modules.current_event import service as current_event_service
-from xiaoxue_api.modules.fundamentals import service as fundamentals_service
+from xiaoxue_api.modules.team.ts import service as fundamentals_service
 
 
 def team_row(team: str, *, mu: float, sigma: float, seed_mu: float | None = None, seed_sigma: float | None = None):

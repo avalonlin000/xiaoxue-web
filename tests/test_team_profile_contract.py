@@ -1,8 +1,8 @@
 import sqlite3
 from unittest.mock import patch
 
-from xiaoxue_api.modules.profiles.service import team_profile_markdown
-from xiaoxue_api.modules.team_data import repository, service
+from xiaoxue_api.modules.team.profile.service import team_profile_markdown
+from xiaoxue_api.modules.team.facts import repository, service
 
 
 def _db():

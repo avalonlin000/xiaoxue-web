@@ -93,7 +93,7 @@ def _product_mcp_discovery() -> dict[str, Any]:
 
 def _snapshot_readback(contract: dict[str, Any]) -> dict[str, Any]:
     source = contract["source"]
-    from xiaoxue_api.modules.fundamentals.repository import active_stage
+    from xiaoxue_api.modules.team.ts.repository import active_stage
 
     stage = active_stage()
     with sqlite3.connect(source["database"]) as conn:

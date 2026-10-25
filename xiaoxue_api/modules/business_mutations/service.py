@@ -5,8 +5,8 @@ import hashlib
 import re
 
 from xiaoxue_api.core.database import connect
-from xiaoxue_api.modules.profiles.public import get_full_profile, wiki_team_path
-from xiaoxue_api.modules.team_data.public import TeamNotFound, get_team_id, get_team_profile, update_team_profile
+from xiaoxue_api.modules.team.public import get_full_profile, wiki_team_path
+from xiaoxue_api.modules.team.public import TeamNotFound, get_team_id, get_team_profile, update_team_profile
 
 
 class MutationRejected(ValueError):

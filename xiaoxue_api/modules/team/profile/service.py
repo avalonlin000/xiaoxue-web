@@ -4,7 +4,7 @@ import datetime
 import os
 import re
 
-from xiaoxue_api.modules.team_data.public import get_profile_bundle
+from ..facts.public import get_profile_bundle
 
 from . import repository
 
@@ -152,7 +152,7 @@ def database_fallback_profile(team: str) -> dict | None:
     ]
     # 只出展示层（综合实力/稳定性/趋势/势头/状态），不下发 mu/sigma/ts 原始值。
     try:
-        from xiaoxue_api.modules.fundamentals.public import get_stage_display_map
+        from xiaoxue_api.modules.team.public import get_stage_display_map
         display = get_stage_display_map().get(str(row["short_name"]).upper(), {})
     except Exception:
         display = {}

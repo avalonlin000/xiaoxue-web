@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.fundamentals import repository
+from xiaoxue_api.modules.team.ts import repository
 
 
 class ActiveStageTests(unittest.TestCase):

@@ -417,8 +417,8 @@ def source_refresh_minutes(identity: dict) -> int:
 
 def dependency_manifest(identity: dict) -> dict:
     """Public, local reads only. Changes are scoped to the inputs actually used."""
-    from xiaoxue_api.modules.profiles.public import get_current_profile
-    from xiaoxue_api.modules.team_data.public import get_profile_bundle
+    from xiaoxue_api.modules.team.public import get_current_profile
+    from xiaoxue_api.modules.team.public import get_profile_bundle
     from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
     from xiaoxue_api.modules.tk_knowledge.public import browse, get_entry, list_match_trading_tk
     from .analysis_repository import METHODS, SKILLS
@@ -466,7 +466,7 @@ def dependency_manifest(identity: dict) -> dict:
             {**section, "items": [{key: value for key, value in row.items() if key != "prepared_revision"} for row in section.get("items", [])]}
             for section in prepared_sections(identity)
         ]
-        from xiaoxue_api.modules.fundamentals.public import get_match_context
+        from xiaoxue_api.modules.team.public import get_match_context
         from .service import list_score_match_results
         internal["cycle"] = safely(lambda: get_match_context(identity["team_a"], identity["team_b"], event=identity.get("event", "")))
         internal["recent"] = {team: safely(lambda: list_score_match_results(team=team, date_to=identity["match_date"], limit=2)) for team in teams}
@@ -1318,10 +1318,10 @@ def _summarize_materials_once(identity: dict, sections: list[dict]) -> tuple[lis
 
 
 def collect_internal(identity: dict) -> tuple[list[dict], list[str]]:
-    from xiaoxue_api.modules.fundamentals.public import get_match_context
-    from xiaoxue_api.modules.team_data.public import get_profile_bundle
+    from xiaoxue_api.modules.team.public import get_match_context
+    from xiaoxue_api.modules.team.public import get_profile_bundle
     from xiaoxue_api.modules.tk_knowledge.public import list_match_trading_tk
-    from xiaoxue_api.modules.profiles.public import get_current_profile
+    from xiaoxue_api.modules.team.public import get_current_profile
 
     from .evidence import prepared_sections
     from .lolesports_facts import facts
@@ -1386,8 +1386,8 @@ def collect_library(identity: dict) -> tuple[list[dict], list[str]]:
 
 def collect_scope_internal(identity: dict) -> tuple[list[dict], list[str]]:
     """Read formal content, never promote old content to verified event facts."""
-    from xiaoxue_api.modules.profiles.public import get_current_profile
-    from xiaoxue_api.modules.team_data.public import get_profile_bundle
+    from xiaoxue_api.modules.team.public import get_current_profile
+    from xiaoxue_api.modules.team.public import get_profile_bundle
     from xiaoxue_api.modules.version_understanding.public import get_global_version_understanding
 
     sections, limitations = [], []

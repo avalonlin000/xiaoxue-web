@@ -2,7 +2,7 @@ import sqlite3
 from unittest.mock import patch
 
 from xiaoxue_api.modules.business_mutations import service as mutation_service
-from xiaoxue_api.modules.team_data import repository as team_repository
+from xiaoxue_api.modules.team.facts import repository as team_repository
 
 
 def _roster_db():

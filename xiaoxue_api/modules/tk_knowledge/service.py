@@ -8,7 +8,7 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
-from xiaoxue_api.modules.team_data.public import get_team_3d, list_teams
+from xiaoxue_api.modules.team.public import get_team_3d, list_teams
 
 from .models import TradingNoteIn
 from . import repository
@@ -554,7 +554,7 @@ def delete(filename: str) -> dict:
 def _invalidate_teams_cache() -> None:
     """TK 写入/删除后失效 fundamentals 列表缓存（延迟 import 防循环）。"""
     try:
-        from xiaoxue_api.modules.fundamentals.public import invalidate_teams_cache
+        from xiaoxue_api.modules.team.public import invalidate_teams_cache
     except ImportError:
         return
     invalidate_teams_cache()

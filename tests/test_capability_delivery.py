@@ -8,7 +8,7 @@ from scripts.verify_capability_delivery import _agent_tool_readback, _api_projec
 from xiaoxue_api.core.module_loader import discover_module_names
 from xiaoxue_api.core.module_registry import normalize_manifest
 from xiaoxue_api.core.product_modules import load_module_contract
-from xiaoxue_api.modules.fundamentals.manifest import MODULE
+from xiaoxue_api.modules.team.manifest import MODULE
 
 
 class _JsonResponse(io.BytesIO):
@@ -20,7 +20,7 @@ class _JsonResponse(io.BytesIO):
 
 
 def test_fundamentals_delivery_contract_is_complete_and_preserves_agent_autonomy():
-    manifest = normalize_manifest(MODULE, module_name="fundamentals")
+    manifest = normalize_manifest(MODULE, module_name="team")
     delivery = manifest["delivery"]
     assert delivery["source"]["snapshot"] == "ts_stage_snapshots"
     assert delivery["agent_entry"]["tool"] == "xiaoxue_get_team"

@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, "/home/ubuntu/xiaoxue-web")
-from xiaoxue_api.modules.fundamentals.repository import active_stage as _active_stage  # noqa: E402
+from xiaoxue_api.modules.team.ts.repository import active_stage as _active_stage  # noqa: E402
 
 
 BASE = "http://127.0.0.1:8880"

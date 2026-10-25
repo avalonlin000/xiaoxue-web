@@ -80,7 +80,7 @@ def test_scope_frozen_read_has_no_future_content_or_mutation(store):
 def test_internal_scope_does_not_claim_legacy_version_or_profile_is_current(store):
     profile = {"found": True, "updated_at": "2026-07-01", "profile": {"win_path": "旧版本运营取胜"}}
     version = {"status": "ok", "data": {"item": {"id": 229, "created_at": "2026-07-01", "content": "旧版本理解"}}}
-    with patch("xiaoxue_api.modules.profiles.public.get_current_profile", return_value=profile), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value=version), patch("xiaoxue_api.modules.team_data.public.get_profile_bundle", return_value={}):
+    with patch("xiaoxue_api.modules.team.public.get_current_profile", return_value=profile), patch("xiaoxue_api.modules.version_understanding.public.get_global_version_understanding", return_value=version), patch("xiaoxue_api.modules.team.public.get_profile_bundle", return_value={}):
         sections, limitations = repository.collect_scope_internal({"scope": "team", "event": "S16", "team": "KC"})
     items = [item for section in sections for item in section["items"]]
     assert all(item["applicability"] == "unverified" and item["recognition"] == "unknown" for item in items)
