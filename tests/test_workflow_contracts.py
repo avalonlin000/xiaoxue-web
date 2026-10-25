@@ -179,24 +179,6 @@ class MainWorkflowIntegrationTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ready"])
 
-    def test_retired_market_review_writes_return_gone(self) -> None:
-        import main
-        from fastapi.testclient import TestClient
-
-        with TestClient(main.app) as client:
-            preview = client.post(
-                "/api/market-notes/retired/review-preview",
-                json={"result": "赢", "correct_points": "不应再写盘口表"},
-            )
-            committed = client.put(
-                "/api/market-notes/retired/review",
-                json={"result": "赢", "confirmed": True},
-            )
-
-        self.assertEqual(preview.status_code, 410)
-        self.assertEqual(committed.status_code, 410)
-        self.assertIn("交易 TK", preview.json()["detail"])
-
     def test_health_reports_data_readiness_manifest(self) -> None:
         from xiaoxue_api.modules.platform.public import health
 

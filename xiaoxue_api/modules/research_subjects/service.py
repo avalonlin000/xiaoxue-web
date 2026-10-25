@@ -7,7 +7,6 @@ from pathlib import Path
 
 from xiaoxue_api.research_core import repository, service as core
 from xiaoxue_api.modules.current_event.public import get_match_desk
-from xiaoxue_api.modules.market_notes.public import list_notes as list_market_notes
 
 
 DEFAULT_DB_PATH = "/home/ubuntu/xiaoxue-web/data/research_core.sqlite3"
@@ -89,17 +88,9 @@ def _match_brief_payload(desk: dict, archives: list[dict]) -> dict:
 
 
 def _matching_market_records(team_a: str, team_b: str) -> list[dict]:
-    """Read only the existing market-notes source and return records naming both sides."""
-    try:
-        records = list_market_notes("lol", 100).get("records") or []
-    except (LookupError, OSError, RuntimeError, ValueError, sqlite3.Error):
-        return []
-    first, second = team_a.casefold(), team_b.casefold()
-    return [
-        record for record in records
-        if first in (record.get("match_name") or "").casefold()
-        and second in (record.get("match_name") or "").casefold()
-    ]
+    """盘口记录已于 2026-10-25 退役；交易 TK 是唯一正源。"""
+    return []
+
 
 
 def _lol_domain(value: object) -> str:

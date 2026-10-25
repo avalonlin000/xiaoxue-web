@@ -192,7 +192,7 @@
       "consumers": ["TK 资料库", "当前赛事", "日报", "画像维护", "交易判断"],
       "status": "available",
       "compatibility": {
-        "backend_capabilities": ["tk_knowledge", "market_notes"],
+        "backend_capabilities": ["tk_knowledge"],
         "frontend_loaders": ["tk-library"],
         "legacy_names": ["market_notes", "trade_records", "队伍交易备注"]
       }

@@ -78,45 +78,6 @@ def check_health() -> None:
     print(f"module-health {data.get('status')} ({len(modules) - len(broken) - len(disabled)} healthy)")
 
 
-def check_market_notes_readonly() -> None:
-    listed = request("/api/market-notes?game=lol&limit=1")
-    assert_true(isinstance(listed.get("records"), list), "market notes response has no records list")
-    print("market-notes readonly ok")
-
-
-def check_market_notes_write() -> None:
-    marker = f"acceptance-{int(time.time())}"
-    created = request(
-        "/api/market-notes",
-        method="POST",
-        body={
-            "game": "lol",
-            "match_name": marker,
-            "direction": "",
-            "total_lean": "放弃",
-            "score_note": "",
-            "reason": "验收脚本：只验证手写草稿保存/读取/删除，不生成方向。",
-            "confidence": "中",
-            "review": "acceptance cleanup",
-            "linked_team": "EDG",
-        },
-    )
-    record = created.get("record") or {}
-    note_id = record.get("id")
-    assert_true(created.get("ok") is True and note_id, f"market note create failed: {created}")
-
-    listed = request("/api/market-notes?game=lol&limit=80")
-    records = listed.get("records", [])
-    assert_true(any(r.get("id") == note_id and r.get("match_name") == marker for r in records), "created note not listed")
-
-    deleted = request(f"/api/market-notes/{note_id}", method="DELETE")
-    assert_true(deleted.get("ok") is True, f"market note delete failed: {deleted}")
-
-    listed_after = request("/api/market-notes?game=lol&limit=80")
-    assert_true(all(r.get("id") != note_id for r in listed_after.get("records", [])), "deleted note still listed")
-    print("market-notes ok")
-
-
 def check_profile_fallback(team: str = "EDG") -> None:
     data = request(f"/api/profile-full/{team}")
     assert_true(data.get("found") is True, f"profile not found for {team}: {data}")
@@ -141,26 +102,17 @@ def main() -> int:
     global BASE
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default=BASE)
-    parser.add_argument(
-        "--write-market-notes",
-        action="store_true",
-        help="explicitly allow a temporary create/read/delete check against the configured server",
-    )
     args = parser.parse_args()
     BASE = args.base.rstrip("/")
 
     checks = [
         ("项目模块合同", check_project_modules),
         ("模块状态", check_health),
-        ("临场记录", check_market_notes_readonly),
         ("TS 展示", check_ts_display),
         ("队伍画像", lambda: check_profile_fallback("BLG")),
         ("TK 读取", check_tk_read),
         ("版本理解", check_version_understanding),
     ]
-    if args.write_market_notes:
-        checks.append(("临场记录写入", check_market_notes_write))
-
     failures = []
     for name, check in checks:
         try:

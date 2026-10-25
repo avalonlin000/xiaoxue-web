@@ -5,20 +5,6 @@ import main
 
 
 class PublicRouteContractTests(unittest.TestCase):
-    def test_market_notes_is_read_only_tk_projection(self):
-        from fastapi.testclient import TestClient
-
-        client = TestClient(main.app)
-        spec = client.get("/openapi.json").json()
-        self.assertEqual(sorted(spec["paths"]["/api/market-notes"]), ["get"])
-        listed = client.get("/api/market-notes?game=lol&limit=1")
-        self.assertEqual(listed.status_code, 200)
-        self.assertEqual(listed.headers.get("deprecation"), "true")
-        self.assertIn("/api/trading-tk", listed.headers.get("link", ""))
-        self.assertEqual(listed.json().get("source"), "trading_tk")
-        rejected = client.post("/api/market-notes", json={"match_name": "retirement-contract-test"})
-        self.assertEqual(rejected.status_code, 410)
-
     def test_health_shows_research_archive_as_retired_module(self):
         response = main.app.routes
         self.assertTrue(response)
@@ -71,7 +57,6 @@ class PublicRouteContractTests(unittest.TestCase):
             ("PUT", "/api/current-event/match-workspace"),
             ("POST", "/api/current-event/trade-plan/manual"),
             ("POST", "/api/current-event/match-workspace/changes"),
-            ("GET", "/api/market-notes"),
             ("POST", "/api/lineup-workflow/prepare"),
             ("POST", "/api/research/subjects"),
             ("GET", "/api/research/subjects"),

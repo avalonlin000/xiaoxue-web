@@ -28,7 +28,6 @@ REQUIRED_API_PATHS = {
     "/api/tk/entry/{filename}",
     "/api/team-trading-notes",
     "/api/team-trading-notes/{team}",
-    "/api/market-notes",
     "/api/current-event/match-run/active",
     "/api/current-event/match-run/pause",
     "/api/current-event/match-run/entry",
@@ -80,7 +79,6 @@ REQUIRED_MCP_TOOLS = {
     "xiaoxue_record_research_note",
     "xiaoxue_search_tk",
     "xiaoxue_get_tk_entry",
-    "xiaoxue_list_market_notes",
 
 }
 RETIRED_RUNTIME_MARKERS = (

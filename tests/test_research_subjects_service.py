@@ -48,16 +48,11 @@ class ResearchSubjectsServiceTests(unittest.TestCase):
             "match": {"game": "lol", "team_a": "BLG", "team_b": "T1", "event": "MSI", "match_date": "2026-08-04", "match_time": "18:00", "match_format": "BO3"},
             "team_a": {"starters": []}, "team_b": {"starters": []}, "trading_notes": {},
         }
-        with mock.patch.object(service, "get_match_desk", return_value=desk), mock.patch.object(
-            service, "list_market_notes", return_value={"records": [
-                {"match_name": "BLG vs T1", "direction": "只读旧记录"},
-                {"match_name": "BLG vs GEN", "direction": "不相关"},
-            ]}
-        ):
+        with mock.patch.object(service, "get_match_desk", return_value=desk):
             brief = service.get_match_research_brief({"team_a": "BLG", "team_b": "T1"})
 
         self.assertEqual(brief["match_facts"], desk)
-        self.assertEqual([item["match_name"] for item in brief["market_records"]], ["BLG vs T1"])
+        self.assertEqual(brief["market_records"], [])
         self.assertEqual(brief["team_archives"], [])
         self.assertFalse(archive_path.exists())
 
