@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""从 lolesports 官方接口同步队伍名单（首发表）。
+"""从 lolesports 官方接口同步队伍名单，并尽量保留已知首发。
 
-默认只做 dry-run，打印每个队的变化；加 --apply 才写库。
-写库方式：旧记录置为 inactive（保留历史），新记录以 source_kind=lolesports 写入。
+- 已有首发的队伍：名单里仍在的旧首发继续算首发；空出的位置用新名单按位置补一个。
+- 没有首发的队伍：按位置各取第一个作为首发。
+- 默认 dry-run；--apply 才写库。旧记录置 inactive 保留历史，新记录带 lolesports 来源。
 """
 
 from __future__ import annotations
@@ -36,60 +37,83 @@ def choose_main(candidates: list[dict], db_name: str) -> dict | None:
     if not rows:
         return None
     exact = [t for t in rows if (t.get("name") or "").casefold() == (db_name or "").casefold()]
-    if exact:
-        return exact[0]
-    return max(rows, key=lambda t: len(t.get("players") or []))
+    return exact[0] if exact else max(rows, key=lambda t: len(t.get("players") or []))
 
 
-def players_of(team: dict) -> list[dict]:
-    out, seen_pos = [], set()
+def roster_players(team: dict) -> list[dict]:
+    out = []
     for p in team.get("players") or []:
+        name = (p.get("summonerName") or "").strip()
+        if not name:
+            continue
         role = (p.get("role") or "").lower()
         cn, pos = POS.get(role, (role or "选手", (role or "").upper()))
-        starter = 1 if pos and pos not in seen_pos else 0
-        seen_pos.add(pos)
-        out.append({"name": (p.get("summonerName") or "").strip(), "role": cn, "position": pos, "starter": starter})
-    return [p for p in out if p["name"]]
+        out.append({"name": name, "role": cn, "position": pos})
+    return out
+
+
+def mark_starters(players: list[dict], old_starters: list[dict]) -> list[dict]:
+    by_ci = {p["name"].casefold(): p for p in players}
+    covered: set[str] = set()
+    for old in old_starters:
+        hit = by_ci.get(str(old["player_name"]).casefold())
+        if hit and hit["position"] not in covered:
+            hit["starter"] = 1
+            covered.add(hit["position"])
+    valid = {value[1] for value in POS.values()}
+    for p in players:
+        if p.get("starter"):
+            continue
+        if len(covered) < 5 and p["position"] in valid and p["position"] not in covered:
+            p["starter"] = 1
+            covered.add(p["position"])
+        else:
+            p["starter"] = 0
+    return players
 
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--apply", action="store_true", help="真正写库")
+    ap.add_argument("--apply", action="store_true")
     args = ap.parse_args()
 
     cfg = json.loads(CONFIG.read_text(encoding="utf-8"))
     s16 = cfg.get("confirmed_teams") or []
-    teams_api = fetch_teams()
+    api_teams = fetch_teams()
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     now = datetime.now().isoformat(timespec="seconds")
-
     changed = 0
+
     for code in s16:
         row = conn.execute("select team_id, name from teams where short_name=?", (code,)).fetchone()
         if not row:
             print(f"{code:5} 数据库没有这支队伍，跳过")
             continue
-        cands = [t for t in teams_api if (t.get("code") or "").upper() == code.upper()]
+        cands = [t for t in api_teams if (t.get("code") or "").upper() == code.upper()]
         main_team = choose_main(cands, row["name"])
         if not main_team:
             print(f"{code:5} 官方接口没有可用名单")
             continue
-        new = players_of(main_team)
+        players = roster_players(main_team)
         old = [dict(r) for r in conn.execute(
-            "select player_name, role, position, is_starter from rosters where team_id=? and status='active'", (row["team_id"],))]
+            "select player_name, position, is_starter from rosters where team_id=? and status='active' and coalesce(leave_date,'')=''",
+            (row["team_id"],))]
+        old_starters = [r for r in old if int(r["is_starter"] or 0) == 1]
+        players = mark_starters(players, old_starters)
+        starters = [p["name"] for p in players if p.get("starter")]
         old_names = {r["player_name"] for r in old}
-        new_names = {p["name"] for p in new}
+        new_names = {p["name"] for p in players}
         old_ci = {n.casefold() for n in old_names}
         new_ci = {n.casefold() for n in new_names}
         added = sorted(n for n in new_names if n.casefold() not in old_ci)
         removed = sorted(n for n in old_names if n.casefold() not in new_ci)
-        if added or removed:
+        if added or removed or len(old_starters) != len(starters):
             changed += 1
-            print(f"{code:5} {row['team_id']:12} 旧 {len(old):2} 人 → 新 {len(new):2} 人 | 新增 {added} | 移除 {removed}")
+            print(f"{code:5} {row['team_id']:14} {len(old):2}→{len(players):2} 人 | 首发 {starters} | 新增 {added} | 移除 {removed}")
         if args.apply:
             conn.execute("update rosters set status='inactive', updated_at=? where team_id=? and status='active'", (now, row["team_id"]))
-            for p in new:
+            for p in players:
                 conn.execute(
                     """insert into rosters (roster_id, team_id, player_id, player_name, role, position, is_starter,
                        join_date, created_at, leave_date, status, transfer_notes, source_kind, source_ref,
