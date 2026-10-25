@@ -1,1 +1,0 @@
-"""Football observation module."""

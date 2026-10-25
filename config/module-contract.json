@@ -492,7 +492,7 @@
       "consumers": ["足球观察台"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["football"],
+        "backend_capabilities": ["external"],
         "frontend_loaders": ["football"],
         "legacy_names": []
       }

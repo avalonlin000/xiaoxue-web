@@ -1,7 +1,7 @@
 import sqlite3
 from unittest.mock import patch
 
-from xiaoxue_api.modules.business_mutations import service as mutation_service
+from xiaoxue_api.modules.platform.mutations import service as mutation_service
 from xiaoxue_api.modules.team.facts import repository as team_repository
 
 

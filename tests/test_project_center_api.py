@@ -24,7 +24,7 @@ class ProjectCenterApiTests(unittest.TestCase):
         self.directory.cleanup()
 
     def test_healthy_backends_do_not_promote_partial_contracts(self):
-        from xiaoxue_api.modules.project_center import service
+        from xiaoxue_api.modules.platform.center import service
 
         self.assertEqual(service._module_runtime(["healthy"], "partial")["status"], "degraded")
         self.assertEqual(service._module_runtime(["healthy"], "available")["status"], "healthy")
@@ -37,7 +37,7 @@ class ProjectCenterApiTests(unittest.TestCase):
         modules = {name: {"status": "healthy"} for item in module_catalog()
                    for name in item["compatibility"]["backend_capabilities"]}
         modules["daily_content"] = {"status": "broken", "reason_code": "readiness_missing"}
-        with patch("xiaoxue_api.modules.project_center.service._safe_health", return_value={"modules": modules}):
+        with patch("xiaoxue_api.modules.platform.center.service._safe_health", return_value={"modules": modules}):
             data = self.client.get("/api/project-center/modules").json()["data"]
         tree = {item["id"]: item for item in data["tree"]}
         self.assertEqual(tree["methods-and-judgment"]["runtime"]["status"], "degraded")

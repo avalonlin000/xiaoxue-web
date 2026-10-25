@@ -1,4 +1,4 @@
-from xiaoxue_api.modules.gol_gg import service
+from xiaoxue_api.modules.external.gol import service
 
 
 def test_query_requires_known_kind():

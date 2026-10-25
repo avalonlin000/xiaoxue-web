@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from xiaoxue_api.modules.football import service
+from xiaoxue_api.modules.external.football import service
 
 
 def test_list_matches_keeps_missing_opening_total_as_pending(monkeypatch):

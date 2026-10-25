@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "external",
+    "name": "外部事实",
+    "version": "1.0.0",
+    "purpose": "按需读取外部公开事实：Gol.gg 逐局赛事数据，以及 ESPN 足球赛程与可核实历史事实。",
+    "examples": ["查这场 Gol.gg 的逐局数据", "看看今天足球有什么", "半破有哪些场"],
+    "inputs": {"optional": ["match", "game_id", "team", "play", "keyword"]},
+    "effect": "live_search",
+    "reads": ["Gol.gg 公开赛事事实", "ESPN 公开足球赛程"],
+    "writes": [],
+    "output_schema": {"type": "object"},
+    "source_policy": {"domain_allowlist": ["gol.gg", "site.api.espn.com"], "on_demand_only": True, "long_term_write": False},
+    "settings": {"timeout_seconds": 8},
+    "dependencies": ["network"],
+    "health": {"checks": [], "message": "按需读取外部来源", "reason_code": "external_source_unavailable"},
+    "tests": ["tests/test_gol_gg_service.py", "tests/test_football_module.py"],
+    "order": 118,
+}

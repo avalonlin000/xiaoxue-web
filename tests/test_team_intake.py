@@ -13,7 +13,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from xiaoxue_api.core import database
-from xiaoxue_api.modules.business_mutations import service as mutations
+from xiaoxue_api.modules.platform.mutations import service as mutations
 from xiaoxue_api.modules.match.scope import service as scope
 
 LEAGUE = "S16全球总决赛"

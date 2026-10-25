@@ -14,7 +14,7 @@ from xiaoxue_api.modules.daily_content import repository, service
 
 class DailyPublicationStateTests(unittest.TestCase):
     def test_project_center_retains_the_actual_readable_daily_receipt(self):
-        from xiaoxue_api.modules.project_center import service as project_service
+        from xiaoxue_api.modules.platform.center import service as project_service
         with mock.patch.object(project_service, "get_daily_content", return_value={"day_state": "ready", "report": {"publication_status": "verified", "url": "https://example.feishu.cn/docx/fixture", "snapshot_at": "2026-10-19T07:00:00+08:00"}}):
             result = project_service._daily_summary()
         self.assertEqual(result["report"]["url"], "https://example.feishu.cn/docx/fixture")

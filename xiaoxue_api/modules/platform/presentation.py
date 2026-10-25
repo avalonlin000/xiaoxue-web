@@ -5,6 +5,8 @@ from . import service
 from xiaoxue_api.core.product_modules import public_module_catalog
 
 
+from .mutations.presentation import router as mutations_router
+from .center.presentation import router as center_router
 router = APIRouter(tags=["platform"])
 
 
@@ -34,3 +36,6 @@ def refresh_data():
 @router.get("/")
 def serve_index():
     return FileResponse(service.index_path())
+
+router.include_router(mutations_router)
+router.include_router(center_router)
