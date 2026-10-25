@@ -2,6 +2,16 @@
 
 > 导航更新：2026-10-21 | 更新人：Codex（本次授权实施与快速收尾）
 
+## 2026-10-25 · 模块归并到 7 个 + 两个概念退役（执行中）
+
+- 后端实现模块 20 → 7：team / match / knowledge / methods / daily_content / platform / external。
+- 删除：analyst、weread_bridge、legacy_trades、market_notes；空目录 business_updates/pre_match/pro_stats。
+- 概念退役：「沉淀候选」「盘口记录」的页面、标签、入口、接口、MCP 工具、能力树节点全部移除；数据保留在 TK。
+- 线上 dist 已重建并与源码对齐（上一版备份 /home/ubuntu/dist-backup-20261025-150810.tar.gz）。
+- 文档：22 篇标记为历史冻结；新增 docs/DECISIONS.md 作为决策正源（三份正源：PROJECT-MAP / progress / DECISIONS）。
+- 验证：/api/health 7 模块 healthy；后端 425 通过 / 5 项为改动前既有失败（事件筛选 3、基本面单场 2）；前端 99 通过；合同校验通过；独立目录构建通过。
+- 未完成（需要决定或另行排期）：MCP 工具 44 个尚未按对象归并；单场页五个动作（今天/读一场/记一句/找回/提事）未动，按钧钧"页面先不动"的要求暂停；首发与价格来源未接。
+
 ## 2026-10-22 Codex：足球观察台产品与工程规格（当前授权）
 
 - Goal：在小雪工作台内形成可直接开发的足球观察台；页面给出半破与75分钟后两种独立赛前筛选结果，比赛开赛后仍可查，钧钧只按需写交易TK。
