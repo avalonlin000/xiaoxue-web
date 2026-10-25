@@ -1,3 +1,5 @@
+> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+
 # 《小雪模块归并 PRD》修改意见
 
 > 评审日期：2026-10-25（Asia/Shanghai）  

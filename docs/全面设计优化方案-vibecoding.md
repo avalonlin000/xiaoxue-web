@@ -1,3 +1,5 @@
+> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+
 # 小雪项目 · 全面设计优化方案（vibecoding 体验重构）
 
 > 作者：小白 | 2026-08-19

@@ -1,3 +1,5 @@
+> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+
 # 足球滚大球赛前筛选 — idea 与要求
 
 > 状态：历史 idea；后续已确认需求以[足球PRD](足球滚大球赛前筛选-PRD.md)和[足球SSD](足球滚大球赛前筛选-SSD.md)为准。

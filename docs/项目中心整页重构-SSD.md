@@ -1,3 +1,5 @@
+> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+
 # 小雪项目中心整页重构 SSD
 
 > 对应 PRD：`docs/项目中心整页重构-PRD.md`

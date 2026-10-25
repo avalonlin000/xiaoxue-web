@@ -1,3 +1,5 @@
+> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+
 # DeepSeek harness 项目交接说明
 
 > 版本：v1.0  
