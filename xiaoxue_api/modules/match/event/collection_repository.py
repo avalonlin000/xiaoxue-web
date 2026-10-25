@@ -596,7 +596,7 @@ def _search_via_hermes(query: str) -> str:
     python = hermes_root / "venv/bin/python"
     if not python.is_file():
         raise RuntimeError("Hermes 搜索后端未就绪")
-    script = "import sys; sys.path.insert(0,sys.argv[1]); from tools.web_tools import web_search_tool; print(web_search_tool(sys.argv[2],limit=3))"
+    script = "import sys; sys.path.insert(0,sys.argv[1]); from tools.web_tools import web_search_tool; print(web_search_tool(sys.argv[2],limit=8))"
     completed = subprocess.run([str(python), "-c", script, str(hermes_root), query],
                                capture_output=True, text=True, timeout=remaining_timeout(20), check=False)
     if completed.returncode or not completed.stdout.strip():
@@ -670,12 +670,19 @@ def _search_via_bilibili(query: str) -> str:
     return json.dumps({"results": rows}, ensure_ascii=False)
 
 
+# 实测有效顺序：Hermes（Tavily 后端，结果最对口）→ Exa → B站 → 必应。
+# 必应中国对英文电竞查询会返回词典和百科页，只留作最后一档。
 SEARCH_PROVIDERS = (
-    ("bilibili", _search_via_bilibili),
-    ("domestic/bing", _search_via_domestic),
     ("hermes/tavily", _search_via_hermes),
     ("agent-reach/exa", _search_via_exa),
+    ("bilibili", _search_via_bilibili),
+    ("domestic/bing", _search_via_domestic),
 )
+
+
+def is_video_lead(lead: dict) -> bool:
+    host = (urlparse(lead.get("url") or "").hostname or "").lower()
+    return any(host == bad or host.endswith("." + bad) for bad in VIDEO_HOSTS)
 
 
 ENCYCLOPEDIA_HOSTS = ("baike.baidu.com", "zhidao.baidu.com", "jingyan.baidu.com", "wenku.baidu.com",
@@ -684,6 +691,9 @@ TRUSTED_HOSTS = ("lolesports.com", "leagueoflegends.com", "liquipedia.net", "lol
                  "op.gg", "invenglobal.com", "sheepesports.com", "dotesports.com", "oneesports.gg",
                  "esports.gg", "thespike.gg", "espn.com", "strafe.com", "bilibili.com", "hupu.com",
                  "weibo.com", "scoregg.com", "wanplus.com", "17173.com")
+# 这些站点的正文取不到：只当线索，永远不能顶掉文字来源。
+VIDEO_HOSTS = ("bilibili.com", "youtube.com", "youtu.be", "weibo.com", "douyin.com",
+               "tiktok.com", "x.com", "twitter.com", "facebook.com", "instagram.com")
 SEARCH_STOPWORDS = {"the", "and", "with", "for", "match", "analysis", "review", "preview", "league",
                     "legends", "site", "http", "https", "com", "www"}
 
@@ -702,9 +712,15 @@ def query_tokens(query: str) -> set[str]:
     return tokens
 
 
-def relevant_leads(query: str, leads: list[dict]) -> list[dict]:
-    """丢弃与查询无关的结果，并按来源可信度排序；不因搜索引擎兜底污染候选。"""
+def relevant_leads(query: str, leads: list[dict], focus: tuple[str, ...] = ()) -> list[dict]:
+    """丢弃与查询无关的结果，并按来源可信度排序；不因搜索引擎兜底污染候选。
+
+    focus 是队名/赛事名：陌生站点必须在标题、摘要或域名里出现其中之一，
+    否则一律当兜底页丢掉——正文预算比线索数量值钱。
+    """
     tokens = query_tokens(query)
+    needles = sorted({str(term).casefold().strip() for term in focus if str(term).strip()})
+    focus_probe = re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(needle) for needle in needles) + r")(?![a-z0-9])") if needles else None
     kept = []
     for lead in leads:
         host = (urlparse(lead.get("url", "")).hostname or "").lower()
@@ -713,19 +729,25 @@ def relevant_leads(query: str, leads: list[dict]) -> list[dict]:
         haystack = f"{lead.get('title', '')} {lead.get('snippet', '')} {host}".casefold()
         if tokens and not any(token in haystack for token in tokens):
             continue
-        lead = {**lead, "host_rank": 0 if any(host == good or host.endswith("." + good) for good in TRUSTED_HOSTS) else 1}
+        trusted = any(host == good or host.endswith("." + good) for good in TRUSTED_HOSTS)
+        if focus_probe is not None and not trusted and not focus_probe.search(haystack):
+            continue
+        video_host = any(host == bad or host.endswith("." + bad) for bad in VIDEO_HOSTS)
+        lead = {**lead, "host_rank": 5 if video_host else (0 if trusted else 1)}
         kept.append(lead)
     kept.sort(key=lambda lead: lead["host_rank"])
     return kept
 
 
-def search(query: str) -> tuple[list[dict], str]:
-    """按 hermes/tavily → exa → 必应 的顺序取结果，任一通道出结果即返回。
+def search(query: str, focus: tuple[str, ...] = ()) -> tuple[list[dict], str]:
+    """按 必应 → hermes/tavily → exa → B站 取结果，拿到能读正文的线索才收工。
 
-    单一通道失败不再让整轮采集失败；全部失败时才报“普通网页搜索未完成”，
-    并在错误里带上各通道的失败原因，便于判断是限流还是网络。
+    视频和社媒线索读不到正文，不能顶掉文字来源；四个通道都只剩视频时，
+    才把视频线索原样退回，让上游如实记下"只找到视频"。
+    单一通道失败不让整轮采集失败，全部失败时才报“普通网页搜索未完成”。
     """
     errors: list[str] = []
+    videos: list[dict] = []
     for name, provider in SEARCH_PROVIDERS:
         try:
             raw = provider(query)
@@ -737,10 +759,18 @@ def search(query: str) -> tuple[list[dict], str]:
         except (ValueError, TypeError) as exc:
             errors.append(f"{name}: parse {type(exc).__name__}")
             continue
-        results = relevant_leads(query, results)
+        results = relevant_leads(query, results, focus)
+        readable = [lead for lead in results if not is_video_lead(lead)]
+        if readable:
+            return readable, ""
         if results:
-            return results, ""
+            if not videos:
+                videos = results
+            errors.append(f"{name}: 仅视频线索")
+            continue
         errors.append(f"{name}: 无相关结果")
+    if videos:
+        return videos, ""
     return [], "普通网页搜索未完成（" + "；".join(errors) + "）"
 
 
@@ -782,6 +812,11 @@ def read_article(url: str) -> str:
         return _read_article(url)
 
 
+_MIRROR_STATE = {"tried": False, "dead": False}
+_EXA_STATE = {"tried": False, "dead": False}
+_BROWSER_STATE = {"missing": False}
+
+
 def _read_article(url: str) -> str:
     check_budget()
     if not _public_dns(url):
@@ -795,18 +830,54 @@ def _read_article(url: str) -> str:
         raise
     except (OSError, ValueError, RuntimeError):
         pass
+    if not _EXA_STATE["dead"]:
+        try:
+            return _read_with_exa(url)
+        except CollectionBudgetExpired:
+            raise
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            if shutil.which("mcporter") is None:
+                _EXA_STATE["dead"] = True
+    if not _MIRROR_STATE["dead"]:
+        try:
+            return _read_with_mirror(url)
+        except CollectionBudgetExpired:
+            raise
+        except (OSError, ValueError, httpx.HTTPError):
+            _MIRROR_STATE["dead"] = True
     try:
-        return _read_with_exa(url)
+        return _read_with_browser(url)
     except CollectionBudgetExpired:
         raise
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        pass
-    try:
-        return _read_with_mirror(url)
-    except CollectionBudgetExpired:
-        raise
-    except (OSError, ValueError, httpx.HTTPError):
+    except (OSError, ValueError, RuntimeError):
         raise ValueError("来源正文未能取得") from None
+
+
+def _read_with_browser(url: str) -> str:
+    """本地无头浏览器兜底：读 JS 渲染或被前两条通道拒绝的页面。"""
+    if _BROWSER_STATE["missing"]:
+        raise ValueError("本地浏览器不可用")
+    try:
+        from playwright.sync_api import sync_playwright
+    except Exception as exc:  # noqa: BLE001 - 缺依赖时按不可用处理
+        _BROWSER_STATE["missing"] = True
+        raise ValueError("本地浏览器不可用") from exc
+    budget_ms = max(4000, min(15000, int(remaining_timeout(15) * 1000)))
+    try:
+        with sync_playwright() as pw:
+            browser = pw.chromium.launch(headless=True, executable_path="/snap/bin/chromium", args=["--no-sandbox"])
+            page = browser.new_page(user_agent="Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/124 Safari/537.36")
+            try:
+                page.goto(url, timeout=budget_ms, wait_until="domcontentloaded")
+                page.wait_for_timeout(1200)
+                text = page.inner_text("body")
+            finally:
+                browser.close()
+    except Exception as exc:  # noqa: BLE001 - 浏览器失败按正文取不到处理
+        raise ValueError("来源正文未能取得") from exc
+    text = (text or "")[:40000]
+    _validate_article_text(text)
+    return text
 
 
 def _read_with_mirror(url: str) -> str:
@@ -946,6 +1017,7 @@ def collect_external(identity: dict) -> tuple[list[dict], list[str]]:
     english_event = next((value for value in aliases if re.search(r"[A-Za-z]{3,}", value)), identity["event"]) if configured else identity["event"]
     english_teams = {team: next((name for name in team_aliases.get(team, []) if re.search(r"[A-Za-z]{3,}", name)), team) for team in teams}
     english_subject = " vs ".join(english_teams.values())
+    focus_terms = tuple(term for term in [*team_terms, *english_teams.values()] if len(str(term).strip()) >= 2)
     queries = [
         f"League of Legends {english_event} {english_subject} {'match analysis review' if is_past else 'match preview analysis'} {date_value[:4]} {exclusions}",
         f"{identity['event']} {subject} 赛前 采访 备战 人员变化 {date_value[:7]}",
@@ -976,7 +1048,7 @@ def collect_external(identity: dict) -> tuple[list[dict], list[str]]:
             limitations.append("本轮检索预算已用完，保留已取得内容")
             break
         try:
-            leads, error = search(query)
+            leads, error = search(query, focus_terms)
         except CollectionBudgetExpired:
             incomplete = True
             break
@@ -1004,7 +1076,8 @@ def collect_external(identity: dict) -> tuple[list[dict], list[str]]:
             limitations.append("发现资讯目录，未将目录摘要当作已读报道")
             continue
         if any(host == domain or host.endswith("." + domain) for domain in ("bilibili.com", "youtube.com", "youtu.be", "facebook.com", "instagram.com", "douyin.com", "tiktok.com")):
-            limitations.append("发现视频或社交线索，但未取得对应正文，不将网页标题当作已读材料")
+            if "发现视频或社交线索，但未取得对应正文，不将网页标题当作已读材料" not in limitations:
+                limitations.append("发现视频或社交线索，但未取得对应正文，不将网页标题当作已读材料")
             continue
         try:
             if body_reads >= MATCH_READ_ATTEMPTS or not consume_source_budget("body", MATCH_READ_ATTEMPTS):
