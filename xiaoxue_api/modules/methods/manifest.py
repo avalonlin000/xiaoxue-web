@@ -1,0 +1,18 @@
+MODULE = {
+    "id": "methods",
+    "name": "方法与英雄资料",
+    "version": "1.0.0",
+    "purpose": "根据明确输入的十英雄提供纯阵容分析，并读取英雄技能、属性、标签和版本的静态资料。",
+    "examples": ["BP 出来了，分析这十个英雄", "查这个版本的英雄属性"],
+    "inputs": {"optional": ["blue_lineup", "red_lineup", "champion", "version"]},
+    "effect": "read",
+    "reads": ["英雄静态资料快照", "阵容分析配置"],
+    "writes": [],
+    "output_schema": {"type": "object"},
+    "source_policy": {"long_term_write": False},
+    "settings": {},
+    "dependencies": ["database", "config"],
+    "health": {"checks": ["database"], "reason_code": "methods_unavailable"},
+    "tests": ["tests/test_champion_static.py"],
+    "order": 120,
+}

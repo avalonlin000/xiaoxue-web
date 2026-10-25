@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from xiaoxue_api.modules.champion_static import service
+from xiaoxue_api.modules.methods.hero_static import service
 
 
 class ChampionStaticTests(unittest.TestCase):

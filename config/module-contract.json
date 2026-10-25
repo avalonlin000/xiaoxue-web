@@ -294,7 +294,7 @@
       "consumers": ["当前赛事", "日报", "阵容分析", "交易系统"],
       "status": "partial",
       "compatibility": {
-        "backend_capabilities": ["lineup", "champion_static", "current_event"],
+        "backend_capabilities": ["methods", "current_event"],
         "frontend_loaders": ["current-event"],
         "legacy_names": ["BP 长报告", "阵容八步法", "版本理解"]
       }

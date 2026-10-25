@@ -10,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from xiaoxue_api.modules.champion_static.service import refresh_champion_cache
+from xiaoxue_api.modules.methods.hero_static.service import refresh_champion_cache
 
 
 def main() -> int:
