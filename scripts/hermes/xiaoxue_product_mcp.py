@@ -660,7 +660,7 @@ async def _product_endpoint_index() -> dict[str, Any]:
     structured_output=False,
 )
 async def xiaoxue_describe_data(resource: str = "") -> str:
-    """先问结构再查数：不传参数返回全部表与接口总览，传表名返回该表字段和样例值，传 endpoints 返回工作台接口目录。"""
+    """先问结构再查数：不传参数返回全部表与接口总览，传表名返回该表字段和样例值，传 endpoints 或 tk 返回接口目录与知识库规模。"""
 
     clean = (resource or "").strip()
     lowered = clean.casefold()
@@ -709,6 +709,29 @@ async def xiaoxue_describe_data(resource: str = "") -> str:
             "groups": index["groups"],
             "writable": writes,
             "hint": "要看某一组接口，传 resource=endpoints/<组名>（如 endpoints/tk）；只读接口用 xiaoxue_query_readonly_api 按路径读取，写入优先用命名工具。",
+        })
+
+    if lowered in {"tk", "知识库", "tk库", "知识"}:
+        async def _tk_total(period: str) -> int | None:
+            data = await _api_request("GET", "/tk/library", params={"period": period, "limit": 1})
+            if isinstance(data, dict) and isinstance(data.get("total"), int):
+                return data["total"]
+            return None
+
+        base = await _api_request("GET", "/tk/library", params={"period": "all", "limit": 1})
+        months = (base.get("available_months") or [])[:12] if isinstance(base, dict) else []
+        total = base.get("total") if isinstance(base, dict) else None
+        latest = base.get("latest_date") if isinstance(base, dict) else ""
+        return _json({
+            "resource": "tk",
+            "total_entries": total,
+            "latest_date": latest,
+            "months": months,
+            "recent": {
+                "7d": await _tk_total("7d"),
+                "30d": await _tk_total("30d"),
+            },
+            "hint": "粗搜用 xiaoxue_search_tk（先看片段），全文用 xiaoxue_get_tk_entry；带交易标签的用 xiaoxue_search_trading_tk。",
         })
 
     tables = _db_schema()
