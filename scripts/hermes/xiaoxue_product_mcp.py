@@ -15,6 +15,7 @@ import asyncio
 import json
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import time
@@ -461,6 +462,353 @@ async def xiaoxue_search_predictions(query: str, limit: int = 8) -> str:
         "counts": {k: len(v) for k, v in sections.items()},
         "notice": "以下为他人预测/前瞻，观点非事实；引用时带来源与时间，不与他人预测平均成共识。",
         **sections,
+    })
+
+
+# ─────────────────────────────────────────────────────────────
+# 数据发现层：让调用方直接问「有什么数据」，而不是手拼 sqlite3 / curl
+# ─────────────────────────────────────────────────────────────
+
+_DB_SCHEMA_TTL_SECONDS = 120.0
+_DB_SCHEMA_CACHE: dict[str, Any] = {"at": 0.0, "tables": {}}
+_DB_HEAVY_COLUMNS = {"embedding", "old_values", "new_values", "evidence_json"}
+_DB_WHERE_OPS = {
+    "": "=", "eq": "=", "ne": "!=", "gt": ">", "gte": ">=", "lt": "<", "lte": "<=",
+    "like": "LIKE", "in": "IN",
+}
+_DB_TIME_COLUMNS = ("updated_at", "changed_at", "completed_at", "created_at", "started_at", "as_of")
+_DB_TABLE_PURPOSES = {
+    "_schema": "库结构版本号与最近更新时间",
+    "changelog": "触发器写入的行级变更流水（表名、操作、旧值、新值）",
+    "knowledge_update_candidates": "知识更新候选（待确认，不进正式知识）",
+    "leagues": "联赛/赛事档（赛季、赛区）",
+    "match_observations": "单场观察条目",
+    "match_run_entries": "单场交易推演的已保存环节正文",
+    "match_run_facts": "单场判断依据条目（含来源、状态、影响面）",
+    "match_run_revisions": "单场依据的修订历史",
+    "match_runs": "单场推演主表（双方、赛事、日期、阶段）",
+    "match_trade_plans": "单场交易计划草稿（自动/手工/冻结）",
+    "match_workspaces": "单场工作台上下文",
+    "matches": "已完赛/进行中的比赛记录（比分、胜者、赛制）",
+    "msi_ts_seed": "MSI 的 TS 种子数据（赔率反推 mu/sigma）",
+    "refresh_log": "数据刷新日志（ScoreGG/TS 等任务的执行结果）",
+    "rosters": "选手与首发名单（按队伍的选手记录）",
+    "schedules": "赛程（日期、BJT 时间、双方、赛区、阶段、来源）",
+    "shared_version_analysis": "版本理解正文（分类、主题、内容、排序）",
+    "team_3d_data": "队伍三维数据（三个维度名与取值）",
+    "team_profiles": "队伍画像五段（定位/怎么赢/怎么输/关键点/BP 倾向）",
+    "teams": "队伍主档（队名、缩写、赛区、联赛、TS 的 mu/sigma）",
+    "trading_rules": "交易规则条目",
+    "ts_cycle_signals": "TS 周期信号（周期类型、阶段、关注度）",
+    "ts_regular_baselines": "TS 常规赛基线（mu/sigma/胜负/速度）",
+    "ts_stage_display": "TS 表展示值（实力、波动、趋势、势头、状态）",
+    "ts_stage_snapshots": "TS 阶段快照（排名、分档、稳定度、结论分）",
+    "ts_update_log": "TS 字段变更流水（哪队哪个字段从多少变到多少）",
+}
+
+
+def _db_ro_connect() -> sqlite3.Connection:
+    """只读连接正式库；WAL 下不阻塞写入，也避免误建空库。"""
+    from db_util import DB_PATH  # 延迟导入：库路径统一走项目配置
+
+    path = os.path.abspath(DB_PATH)
+    if not os.path.exists(path):
+        raise RuntimeError(f"正式库不存在：{path}")
+    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=5.0)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _db_schema() -> dict[str, Any]:
+    now = time.monotonic()
+    cached = _DB_SCHEMA_CACHE.get("tables") or {}
+    if cached and now - float(_DB_SCHEMA_CACHE.get("at") or 0) < _DB_SCHEMA_TTL_SECONDS:
+        return cached
+
+    tables: dict[str, Any] = {}
+    conn = _db_ro_connect()
+    try:
+        names = [
+            r[0]
+            for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        ]
+        for name in names:
+            columns = [dict(r) for r in conn.execute(f'PRAGMA table_info("{name}")')]
+            try:
+                row_count = conn.execute(f'SELECT COUNT(*) FROM "{name}"').fetchone()[0]
+            except sqlite3.Error:
+                row_count = -1
+            time_column = next((c["name"] for c in columns if c["name"] in _DB_TIME_COLUMNS), "")
+            latest = ""
+            if time_column:
+                try:
+                    latest = str(
+                        conn.execute(f'SELECT MAX("{time_column}") FROM "{name}"').fetchone()[0] or ""
+                    )
+                except sqlite3.Error:
+                    latest = ""
+            tables[name] = {
+                "table": name,
+                "purpose": _DB_TABLE_PURPOSES.get(name, ""),
+                "rows": row_count,
+                "time_column": time_column,
+                "latest_update": latest,
+                "columns": columns,
+            }
+    finally:
+        conn.close()
+    _DB_SCHEMA_CACHE["tables"] = tables
+    _DB_SCHEMA_CACHE["at"] = now
+    return tables
+
+
+def _db_sample_values(table: str, column: str, limit: int = 2) -> list[Any]:
+    conn = _db_ro_connect()
+    quoted = '"' + column + '"'
+    query = (
+        "SELECT DISTINCT " + quoted + " AS v FROM " + '"' + table + '"'
+        + " WHERE " + quoted + " IS NOT NULL AND " + quoted + " != '' LIMIT " + str(int(limit))
+    )
+    try:
+        rows = conn.execute(query).fetchall()
+    except sqlite3.Error:
+        return []
+    finally:
+        conn.close()
+    samples: list[Any] = []
+    for row in rows:
+        value = row["v"]
+        if isinstance(value, (bytes, bytearray)):
+            samples.append(f"<blob {len(value)}B>")
+        elif isinstance(value, str):
+            samples.append(value[:80])
+        else:
+            samples.append(value)
+    return samples
+
+
+def _db_column_report(meta: dict[str, Any]) -> list[dict[str, Any]]:
+    report = []
+    for column in meta["columns"]:
+        name = column["name"]
+        item = {
+            "column": name,
+            "type": column.get("type") or "",
+            "pk": bool(column.get("pk")),
+            "notnull": bool(column.get("notnull")),
+        }
+        if name in _DB_HEAVY_COLUMNS:
+            item["note"] = "大字段，默认不返回"
+        else:
+            samples = _db_sample_values(meta["table"], name)
+            if samples:
+                item["samples"] = samples
+        report.append(item)
+    return report
+
+
+async def _product_endpoint_index() -> dict[str, Any]:
+    root = API_BASE_URL.rsplit("/api", 1)[0]
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        response = await client.get(f"{root}/openapi.json")
+        response.raise_for_status()
+        spec = response.json()
+
+    endpoints = []
+    for path, methods in (spec.get("paths") or {}).items():
+        for method, operation in methods.items():
+            if method.lower() not in {"get", "post", "put", "patch", "delete"}:
+                continue
+            summary = str(operation.get("summary") or operation.get("description") or "").strip()
+            summary = summary.split("\n")[0][:80]
+            params = [
+                str(p.get("name"))
+                for p in (operation.get("parameters") or [])
+                if p.get("in") in {"query", "path"}
+            ]
+            endpoints.append({
+                "method": method.upper(),
+                "path": path,
+                "summary": summary,
+                "params": params,
+                "writable": method.lower() != "get",
+            })
+    groups: dict[str, int] = {}
+    for item in endpoints:
+        key = item["path"].strip("/").split("/")[0] or "root"
+        groups[key] = groups.get(key, 0) + 1
+    return {"total": len(endpoints), "groups": groups, "endpoints": endpoints}
+
+
+@mcp.tool(
+    name="xiaoxue_describe_data",
+    annotations={"title": "读取小雪数据结构目录", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    structured_output=False,
+)
+async def xiaoxue_describe_data(resource: str = "") -> str:
+    """先问结构再查数：不传参数返回全部表与接口总览，传表名返回该表字段和样例值，传 endpoints 返回工作台接口目录。"""
+
+    clean = (resource or "").strip()
+    lowered = clean.casefold()
+
+    if lowered in {"", "overview", "tables", "all", "总览", "表"}:
+        tables = _db_schema()
+        listing = [
+            {
+                "table": meta["table"],
+                "purpose": meta["purpose"],
+                "rows": meta["rows"],
+                "latest_update": meta["latest_update"],
+            }
+            for meta in tables.values()
+        ]
+        listing.sort(key=lambda item: -(item["rows"] if isinstance(item["rows"], int) else 0))
+        return _json({
+            "resource": "tables",
+            "table_count": len(listing),
+            "tables": listing,
+            "hint": "要看某张表的字段和样例值，传 resource=<表名>；要看工作台接口，传 resource=endpoints。",
+        })
+
+    if lowered in {"endpoints", "api", "接口"} or lowered.startswith("endpoints/") or lowered.startswith("endpoints:"):
+        index = await _product_endpoint_index()
+        group = ""
+        for sep in ("/", ":", "："):
+            if sep in lowered:
+                group = clean.split(sep, 1)[1].strip().strip("/")
+                break
+        if group:
+            matched = [e for e in index["endpoints"] if e["path"].strip("/").split("/")[0] == group or group in e["path"]]
+            return _json({
+                "resource": f"endpoints/{group}",
+                "total": len(matched),
+                "endpoints": matched,
+            })
+        writes = [
+            {"method": e["method"], "path": e["path"]}
+            for e in index["endpoints"]
+            if e["writable"]
+        ]
+        return _json({
+            "resource": "endpoints",
+            "total": index["total"],
+            "groups": index["groups"],
+            "writable": writes,
+            "hint": "要看某一组接口，传 resource=endpoints/<组名>（如 endpoints/tk）；只读接口用 xiaoxue_query_readonly_api 按路径读取，写入优先用命名工具。",
+        })
+
+    tables = _db_schema()
+    if clean in tables:
+        meta = tables[clean]
+        return _json({
+            "table": meta["table"],
+            "purpose": meta["purpose"],
+            "rows": meta["rows"],
+            "latest_update": meta["latest_update"],
+            "columns": _db_column_report(meta),
+        })
+
+    raise ValueError(f"未知资源：{clean}。留空看总览，或传表名 / endpoints。")
+
+
+def _db_where_clauses(table_columns: set[str], where: dict[str, Any]) -> tuple[list[str], list[Any]]:
+    clauses: list[str] = []
+    params: list[Any] = []
+    for raw_key, value in (where or {}).items():
+        key = str(raw_key)
+        column, _, suffix = key.partition("__")
+        operator = _DB_WHERE_OPS.get(suffix.casefold())
+        if operator is None:
+            raise ValueError(f"不支持的比较方式：{suffix}")
+        if column not in table_columns:
+            raise ValueError(f"字段不存在：{column}")
+        if operator == "IN":
+            if not isinstance(value, (list, tuple)) or not value:
+                raise ValueError(f"{column} 的 in 条件需要非空数组")
+            placeholders = ",".join("?" for _ in value)
+            clauses.append(f'"{column}" IN ({placeholders})')
+            params.extend(list(value))
+            continue
+        if operator == "LIKE":
+            clauses.append(f'"{column}" LIKE ?')
+            params.append(f"%{value}%")
+            continue
+        clauses.append(f'"{column}" {operator} ?')
+        params.append(value)
+    return clauses, params
+
+
+@mcp.tool(
+    name="xiaoxue_query_data",
+    annotations={"title": "按表条件读取小雪数据", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
+    structured_output=False,
+)
+async def xiaoxue_query_data(
+    table: str,
+    columns: list[str] | None = None,
+    where: dict[str, Any] | None = None,
+    order_by: str = "",
+    desc: bool = True,
+    limit: int = 20,
+    offset: int = 0,
+) -> str:
+    """只读读取正式库任意表：先 describe 再查；where 支持等于、__gte/__lte/__gt/__lt/__ne/__like/__in。"""
+
+    tables = _db_schema()
+    name = (table or "").strip()
+    if name not in tables:
+        raise ValueError(f"表不存在：{name}。先用 xiaoxue_describe_data 看可用表。")
+
+    meta = tables[name]
+    all_columns = [c["name"] for c in meta["columns"]]
+    selected = [c for c in (columns or []) if c]
+    for column in selected:
+        if column not in all_columns:
+            raise ValueError(f"{name} 没有字段 {column}")
+    if not selected:
+        selected = [c for c in all_columns if c not in _DB_HEAVY_COLUMNS]
+
+    clauses, params = _db_where_clauses(set(all_columns), where or {})
+    column_sql = ", ".join('"' + column + '"' for column in selected)
+    sql = "SELECT " + column_sql + ' FROM "' + name + '"'
+    if clauses:
+        sql += " WHERE " + " AND ".join(clauses)
+    order_column = (order_by or "").strip()
+    if order_column:
+        if order_column not in all_columns:
+            raise ValueError(f"{name} 没有字段 {order_column}")
+        sql += f' ORDER BY "{order_column}" {"DESC" if desc else "ASC"}'
+    bounded_limit = _bounded_limit(limit, maximum=200)
+    sql += " LIMIT ? OFFSET ?"
+    params.extend([bounded_limit, max(int(offset or 0), 0)])
+
+    conn = _db_ro_connect()
+    try:
+        rows = []
+        for row in conn.execute(sql, params):
+            item = {}
+            for key in row.keys():
+                value = row[key]
+                if isinstance(value, (bytes, bytearray)):
+                    value = f"<blob {len(value)}B>"
+                elif isinstance(value, str) and len(value) > 400:
+                    value = value[:400] + "…(截断)"
+                item[key] = value
+            rows.append(item)
+    except sqlite3.Error as exc:
+        raise RuntimeError(f"读取失败：{exc}") from exc
+    finally:
+        conn.close()
+
+    return _json({
+        "table": name,
+        "purpose": meta["purpose"],
+        "returned": len(rows),
+        "columns": selected,
+        "rows": rows,
+        "truncated": len(rows) >= bounded_limit,
     })
 
 
