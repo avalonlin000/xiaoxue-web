@@ -140,6 +140,18 @@ def _slim_tk_search(data: Any) -> Any:
             content = copy.get("content")
             if isinstance(content, str) and len(content) > TK_SEARCH_SNIPPET_CHARS:
                 copy["content"] = content[:TK_SEARCH_SNIPPET_CHARS] + "…（已截断；全文可用 xiaoxue_get_tk_entry 读取）"
+            filename = copy.get("filename")
+            if filename:
+                for key in ("id", "concept"):
+                    if copy.get(key) == filename:
+                        copy.pop(key, None)
+            concept = copy.get("concept")
+            body = copy.get("content")
+            if isinstance(concept, str) and isinstance(body, str) and concept[:40] and concept[:40] == body[:40]:
+                copy.pop("concept", None)
+            for key in ("source", "source_type", "tags", "strength", "summary", "concept"):
+                if copy.get(key) in ("", None, [], 0):
+                    copy.pop(key, None)
             slimmed.append(copy)
         else:
             slimmed.append(item)
@@ -941,18 +953,58 @@ def _local_api_endpoint(endpoint: str) -> str:
     return clean_endpoint[4:] if clean_endpoint.startswith("/api/") else clean_endpoint
 
 
+def _bounded_api_payload(data: Any, limit_chars: int) -> Any:
+    """逃生口返回体过大时按最长的数组截断，避免一次读取吞掉整段上下文。"""
+    if limit_chars <= 0:
+        return data
+    if len(_json(data)) <= limit_chars:
+        return data
+
+    def trim_sequence(sequence: list[Any]) -> list[Any]:
+        keep = len(sequence)
+        while keep > 1 and len(_json(sequence[:keep])) > limit_chars:
+            keep = max(1, keep // 2)
+        return sequence[:keep]
+
+    if isinstance(data, list):
+        kept = trim_sequence(data)
+        return {
+            "items": kept, "returned": len(kept), "total": len(data), "truncated": True,
+            "hint": "结果过长已截断；用 params 收窄条件或减小 limit 后再读。",
+        }
+    if isinstance(data, dict):
+        candidates = [(key, value) for key, value in data.items() if isinstance(value, list) and value]
+        longest = max(candidates, key=lambda pair: len(pair[1]), default=None)
+        if longest:
+            key, sequence = longest
+            kept = trim_sequence(sequence)
+            out = dict(data)
+            out[key] = kept
+            out["truncated_field"] = key
+            out["truncated_total"] = len(sequence)
+            out["truncated"] = True
+            out["hint"] = "该字段过长已截断；用 params 收窄条件后再读。"
+            return out
+    return {
+        "truncated": True,
+        "hint": "结果过长且无法自动裁剪；请用 params 收窄查询。",
+        "preview": _json(data)[:limit_chars],
+    }
+
+
 @mcp.tool(
     name="xiaoxue_query_readonly_api",
     annotations={"title": "查询小雪只读数据接口", "readOnlyHint": True, "destructiveHint": False, "idempotentHint": True, "openWorldHint": False},
     structured_output=False,
 )
-async def xiaoxue_query_readonly_api(endpoint: str, params: dict[str, Any] | None = None) -> str:
-    """查询本地只读接口；接受 `/health` 和直连形式 `/api/health`。"""
+async def xiaoxue_query_readonly_api(endpoint: str, params: dict[str, Any] | None = None, max_chars: int = 8000) -> str:
+    """查询本地只读接口；接受 `/health` 和直连形式 `/api/health`。返回过长会自动截断，max_chars=0 关闭。"""
     clean_endpoint = _local_api_endpoint(endpoint)
     clean_params = params if isinstance(params, dict) else {}
     data = await _api_request("GET", clean_endpoint, params=clean_params)
+    bounded = _bounded_api_payload(data, int(max_chars or 0))
     return _json(_read_result(
-        data, capability="readonly_api", version="1.0.0", summary="已读取小雪只读数据接口", source=clean_endpoint,
+        bounded, capability="readonly_api", version="1.0.0", summary="已读取小雪只读数据接口", source=clean_endpoint,
     ))
 
 

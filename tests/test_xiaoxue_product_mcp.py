@@ -103,6 +103,21 @@ class JudgmentEntryMCPTests(IsolatedAsyncioTestCase):
 
 
 class XiaoxueProductMCPTests(IsolatedAsyncioTestCase):
+    def test_public_tool_snapshot_is_stable(self) -> None:
+        snapshot_path = Path(__file__).resolve().parent / "fixtures" / "xiaoxue_product_mcp_tools.json"
+        current = {
+            tool.name: sorted(((tool.parameters or {}).get("properties") or {}).keys())
+            for tool in adapter.mcp._tool_manager.list_tools()
+        }
+        if os.environ.get("XIAOXUE_MCP_UPDATE_SNAPSHOT") == "1":
+            snapshot_path.parent.mkdir(parents=True, exist_ok=True)
+            snapshot_path.write_text(json.dumps(current, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        expected = json.loads(snapshot_path.read_text(encoding="utf-8"))
+        self.assertEqual(
+            expected, current,
+            "工具面变了：确认改动后设 XIAOXUE_MCP_UPDATE_SNAPSHOT=1 重跑以更新快照",
+        )
+
     def test_product_tools_never_use_fixed_phrase_permission_gates(self) -> None:
         source = _candidate_path().read_text(encoding="utf-8")
 

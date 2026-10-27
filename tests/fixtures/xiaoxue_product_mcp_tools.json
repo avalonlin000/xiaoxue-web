@@ -1,0 +1,274 @@
+{
+  "xiaoxue_advance_match_run": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "phase",
+    "team_a",
+    "team_b",
+    "user_command"
+  ],
+  "xiaoxue_apply_business_mutation": [
+    "changes",
+    "reason",
+    "target",
+    "target_type",
+    "user_command"
+  ],
+  "xiaoxue_collect_match_materials": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "refresh",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_delete_tk": [
+    "filename"
+  ],
+  "xiaoxue_describe_data": [
+    "resource"
+  ],
+  "xiaoxue_discuss_judgment": [
+    "as_of",
+    "event",
+    "history",
+    "match_date",
+    "match_format",
+    "match_time",
+    "method_id",
+    "offset",
+    "question",
+    "reply_id",
+    "team",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_find_schedules": [
+    "date_from",
+    "date_to",
+    "limit",
+    "team",
+    "upcoming"
+  ],
+  "xiaoxue_get_active_match_trade": [],
+  "xiaoxue_get_champion_context": [
+    "champion",
+    "version"
+  ],
+  "xiaoxue_get_change_basket": [
+    "include_paused",
+    "limit"
+  ],
+  "xiaoxue_get_gol_facts": [
+    "event",
+    "game_id",
+    "kind",
+    "limit",
+    "match_date",
+    "match_format",
+    "match_time",
+    "player_id",
+    "query",
+    "team_a",
+    "team_b",
+    "team_id",
+    "tournament"
+  ],
+  "xiaoxue_get_match_materials": [
+    "event",
+    "expected_revision",
+    "offset",
+    "scope",
+    "section",
+    "task_id",
+    "team"
+  ],
+  "xiaoxue_get_match_run": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_get_match_run_review": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_get_score": [
+    "date_from",
+    "date_to",
+    "event",
+    "kind",
+    "limit",
+    "match_date",
+    "match_format",
+    "match_time",
+    "team",
+    "team_a",
+    "team_b",
+    "view"
+  ],
+  "xiaoxue_get_team": [
+    "team",
+    "trading_note_limit"
+  ],
+  "xiaoxue_get_tk_entry": [
+    "filename"
+  ],
+  "xiaoxue_get_today": [
+    "date",
+    "offset"
+  ],
+  "xiaoxue_get_ts_updates": [
+    "days",
+    "limit",
+    "team"
+  ],
+  "xiaoxue_get_upcoming_preparation": [
+    "offset"
+  ],
+  "xiaoxue_mutate_safe_api": [
+    "endpoint",
+    "method",
+    "payload"
+  ],
+  "xiaoxue_open_judgment": [
+    "as_of",
+    "event",
+    "expected_revision",
+    "match_date",
+    "match_format",
+    "match_time",
+    "method_id",
+    "offset",
+    "team",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_pause_match_trade": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "team_a",
+    "team_b",
+    "user_command"
+  ],
+  "xiaoxue_prepare_match": [
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "team_a",
+    "team_b"
+  ],
+  "xiaoxue_query_data": [
+    "columns",
+    "desc",
+    "limit",
+    "offset",
+    "order_by",
+    "table",
+    "where"
+  ],
+  "xiaoxue_query_readonly_api": [
+    "endpoint",
+    "max_chars",
+    "params"
+  ],
+  "xiaoxue_refresh_results_and_ts": [],
+  "xiaoxue_remember": [
+    "category",
+    "team",
+    "text",
+    "trading"
+  ],
+  "xiaoxue_save_match_trade_entry": [
+    "content",
+    "event",
+    "match_date",
+    "match_format",
+    "match_time",
+    "section",
+    "team_a",
+    "team_b",
+    "user_command"
+  ],
+  "xiaoxue_save_virtual_judgment": [
+    "change_conditions",
+    "direction",
+    "event",
+    "handling",
+    "match_date",
+    "match_format",
+    "match_time",
+    "reasons",
+    "team_a",
+    "team_b",
+    "user_command"
+  ],
+  "xiaoxue_search_external_news": [
+    "include_predictions",
+    "limit",
+    "query",
+    "recency_days"
+  ],
+  "xiaoxue_search_predictions": [
+    "limit",
+    "query"
+  ],
+  "xiaoxue_search_tk": [
+    "limit",
+    "query",
+    "team"
+  ],
+  "xiaoxue_search_trading_tk": [
+    "limit",
+    "query",
+    "region",
+    "scope",
+    "subject",
+    "version_context"
+  ],
+  "xiaoxue_start_match_run": [
+    "event",
+    "focus",
+    "match_date",
+    "match_format",
+    "match_time",
+    "mode",
+    "team_a",
+    "team_b",
+    "user_command"
+  ],
+  "xiaoxue_update_match_run_fact": [
+    "event",
+    "fact_id",
+    "match_date",
+    "match_format",
+    "match_time",
+    "reason",
+    "status",
+    "team_a",
+    "team_b",
+    "user_command",
+    "value"
+  ],
+  "xiaoxue_update_team_profile": [
+    "bp_tendency",
+    "key_points",
+    "lose_path",
+    "positioning",
+    "team",
+    "user_command",
+    "win_path"
+  ]
+}
