@@ -546,6 +546,42 @@ An outdated rumor.
         self.assertTrue(payload["ok"])
         request.assert_awaited_once()
 
+    async def test_remember_with_team_writes_team_scoped_trading_tk(self) -> None:
+        with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value={"ok": True})) as request:
+            await adapter.xiaoxue_remember("T1 前期不爱换线，落后时拖后期", team="T1")
+
+        request.assert_awaited_once_with(
+            "POST",
+            "/trading-tk",
+            payload={
+                "statement": "T1 前期不爱换线，落后时拖后期",
+                "source_command": "xiaoxue_remember(team=T1)",
+                "category": "team",
+                "scope": "team",
+                "subject": "T1",
+            },
+        )
+
+    async def test_describe_data_lists_tables_and_fields_without_shell(self) -> None:
+        overview = json.loads(await adapter.xiaoxue_describe_data())
+        self.assertIn("schedules", {item["table"] for item in overview["tables"]})
+        self.assertTrue(all(item["purpose"] for item in overview["tables"]))
+
+        detail = json.loads(await adapter.xiaoxue_describe_data("schedules"))
+        self.assertIn("team_a", {column["column"] for column in detail["columns"]})
+
+    async def test_query_data_is_bounded_and_rejects_unknown_names(self) -> None:
+        payload = json.loads(await adapter.xiaoxue_query_data("schedules", where={"team_a": "T1"}, limit=2))
+        self.assertLessEqual(payload["returned"], 2)
+        self.assertEqual(payload["truncated"], True)
+
+        with self.assertRaises(ValueError):
+            await adapter.xiaoxue_query_data("不存在的表")
+        with self.assertRaises(ValueError):
+            await adapter.xiaoxue_query_data("teams", where={"不存在的字段": 1})
+        with self.assertRaises(ValueError):
+            await adapter.xiaoxue_query_data("teams", where={"name__regex": "T"})
+
     async def test_explicit_tk_write_is_one_formal_api_call(self) -> None:
         result = {"ok": True, "team": "AL"}
         with mock.patch.object(adapter, "_api_request", new=mock.AsyncMock(return_value=result)) as request:

@@ -880,7 +880,6 @@ async def _api_request(
             raise ValueError("删除接口永不由小雪直接开放")
         _assert_safe_mutation(endpoint, payload)
     write_operations = {
-        ("POST", "/team-trading-notes"),
         ("POST", "/business-mutations/apply"),
         ("PUT", "/current-event/match-workspace"),
         ("POST", "/current-event/match-workspace/changes"),
@@ -963,7 +962,7 @@ async def xiaoxue_query_readonly_api(endpoint: str, params: dict[str, Any] | Non
     structured_output=False,
 )
 async def xiaoxue_mutate_safe_api(method: Literal["POST", "PUT", "PATCH"], endpoint: str, payload: dict[str, Any] | None = None) -> str:
-    """执行普通产品更新；接受 `/path` 和 `/api/path`，高风险动作仍由能力层拒绝。"""
+    """仅在命名工具没有对应通道时使用；队伍交易备注用 xiaoxue_remember(team=...)，不要走这里。"""
     clean_endpoint = _local_api_endpoint(endpoint)
     return _json(await _api_request(method, clean_endpoint, payload=payload if isinstance(payload, dict) else {}))
 
@@ -1873,20 +1872,35 @@ def _first_turn_run_summary(result: dict[str, Any] | list[Any]) -> dict[str, Any
     return summary
 
 
+_TRADING_TK_CATEGORIES = {
+    "version", "regional_style", "team_style", "player_style",
+    "roster", "lineup", "market", "execution", "general", "team",
+}
+
+
 @mcp.tool(
     name="xiaoxue_remember",
     annotations={"title": "写入钧钧明确指定的 TK", "readOnlyHint": False, "destructiveHint": False, "idempotentHint": False, "openWorldHint": False},
     structured_output=False,
 )
-async def xiaoxue_remember(text: str, trading: bool = False) -> str:
-    """仅当钧钧明确提到 TK 或要求写进 TK 时写入；交易 TK 使用独立类型和复查状态。"""
+async def xiaoxue_remember(text: str, trading: bool = False, team: str = "", category: str = "") -> str:
+    """仅当钧钧明确提到 TK 或要求写进 TK 时写入；交易 TK 使用独立类型和复查状态，传 team 就落到该队的队伍交易备注。"""
 
     content = _clean_text(text, "记录内容", min_length=2)
-    if trading:
-        return _json(await _api_request("POST", "/trading-tk", payload={
-            "statement": content, "source_command": "xiaoxue_remember(trading=true)",
-            "category": "general", "scope": "global",
-        }))
+    clean_category = (category or "").strip().lower()
+    if clean_category and clean_category not in _TRADING_TK_CATEGORIES:
+        raise ValueError(f"交易分类不支持：{clean_category}。可用：" + "、".join(sorted(_TRADING_TK_CATEGORIES)))
+    clean_team = _clean_team(team) if (team or "").strip() else ""
+    if trading or clean_team:
+        payload: dict[str, Any] = {
+            "statement": content,
+            "source_command": f"xiaoxue_remember(team={clean_team})" if clean_team else "xiaoxue_remember(trading=true)",
+            "category": clean_category or ("team" if clean_team else "general"),
+            "scope": "team" if clean_team else "global",
+        }
+        if clean_team:
+            payload["subject"] = clean_team
+        return _json(await _api_request("POST", "/trading-tk", payload=payload))
     return _json(await _api_request("POST", "/tk/remember", payload={"text": content, "tags": []}))
 
 
