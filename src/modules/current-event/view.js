@@ -96,7 +96,7 @@ export function createCurrentEventView(root) {
       if (matchDesk) matchDesk.innerHTML = '<div class="tk-empty">选择一场比赛后，在这里查看资料和当前方案。</div>';
     },
     render(payload) {
-      const { context = {}, items = [], matches = [], recentMatches = [], methods: methodCards = [], versionUnderstanding: versionData = null } = payload || {};
+      const { context = {}, matches = [], recentMatches = [], methods: methodCards = [], versionUnderstanding: versionData = null } = payload || {};
       setText(root, '#event-name', context.event || '当前赛事');
       setText(root, '#event-phase', context.phase || '');
       renderFramework(plan, context.stage_framework || context);
@@ -113,8 +113,13 @@ export function createCurrentEventView(root) {
         if (payload.scheduleTruncated) matchList.innerHTML += '<p class="tk-empty">近期赛程较多，当前只显示部分比赛。</p>';
       }
       if (recentList) renderRecentList(recentList, recentMatches);
+      if (payload.items) view.renderKnowledge({ items: payload.items });
+    },
+    renderKnowledge({ items = [], error = false } = {}) {
       if (results) {
-        results.innerHTML = items.length
+        results.innerHTML = error
+          ? '<div class="tk-empty">相关资料暂时无法读取，可稍后重新进入；不影响查看其他赛事内容。</div>'
+          : items.length
           ? items.map((item) => `<article class="today-entry exists"><b>${escapeHtml(item.title)}</b><span class="today-summary">${escapeHtml((item.summary || '').slice(0, 240))}</span><em>${escapeHtml(item.date || '')}</em></article>`).join('')
           : '<div class="tk-empty">暂无相关资料。</div>';
       }
@@ -409,6 +414,9 @@ export function createCurrentEventView(root) {
       };
     },
     error() {
+      if (eventPrepared) eventPrepared.innerHTML = '<p class="tk-empty">已准备的赛事内容暂时无法读取。</p>';
+      if (matchList) matchList.innerHTML = '<div class="tk-empty">近期比赛暂时无法读取。</div>';
+      if (recentList) recentList.innerHTML = '<div class="tk-empty">最近查看暂时无法读取。</div>';
       if (results) results.innerHTML = '<div class="tk-empty" style="color:var(--red)">当前赛事资料暂时不可用。</div>';
       if (methods) methods.innerHTML = '<div class="tk-empty" style="color:var(--red)">判断入口暂时无法读取。</div>';
       if (versionUnderstanding) versionUnderstanding.innerHTML = '<div class="tk-empty" style="color:var(--red)">当前版本理解暂时无法读取。</div>';

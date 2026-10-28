@@ -280,8 +280,10 @@ def test_reader_reuses_existing_extract_backend_when_jina_is_unreachable(monkeyp
     # Exercise the reader itself, while both transport backends remain mocked.
     monkeypatch.setattr(repo, "read_article", real_read_article)
     content = "KC 与 MVK 的官方消息。" * 30
-    response = type("Completed", (), {"returncode": 0, "stdout": json.dumps({"results": [{"url": "https://lolesports.com/news/test", "content": content, "error": ""}]})})()
-    with patch.object(repo, "_public_dns", return_value=True), patch.object(repo.httpx, "stream", side_effect=httpx.ConnectError("offline")), patch.object(repo.subprocess, "run", return_value=response):
+    extracted = {"results": [{"url": "https://lolesports.com/news/test", "content": content, "error": ""}]}
+    with patch.object(repo, "_public_dns", return_value=True), \
+         patch("xiaoxue_api.core.public_reader.extract_public_page", return_value=extracted), \
+         patch.object(repo.httpx, "stream", side_effect=httpx.ConnectError("offline")):
         assert repo.read_article("https://lolesports.com/news/test") == content
 
 
@@ -381,7 +383,9 @@ def test_reader_tries_the_configured_extractor_before_the_mirror(monkeypatch):
     # The mirror is a fallback: a dead mirror must not be paid for on every article.
     monkeypatch.setattr(repo, "read_article", real_read_article)
     content = "GEN 与 IG 在世界赛的公开资料。" * 30
-    response = type("Completed", (), {"returncode": 0, "stdout": json.dumps({"results": [{"url": "https://lolesports.com/news/test", "content": content, "error": ""}]})})()
+    extracted = {"results": [{"url": "https://lolesports.com/news/test", "content": content, "error": ""}]}
     mirror = type("Stream", (), {"__call__": lambda *a, **k: (_ for _ in ()).throw(AssertionError("不应先调用镜像"))})()
-    with patch.object(repo, "_public_dns", return_value=True), patch.object(repo.httpx, "stream", mirror), patch.object(repo.subprocess, "run", return_value=response):
+    with patch.object(repo, "_public_dns", return_value=True), \
+         patch("xiaoxue_api.core.public_reader.extract_public_page", return_value=extracted), \
+         patch.object(repo.httpx, "stream", mirror):
         assert repo.read_article("https://lolesports.com/news/test") == content

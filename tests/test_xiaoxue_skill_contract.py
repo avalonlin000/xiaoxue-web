@@ -118,7 +118,7 @@ class XiaoxueSkillContractTests(unittest.TestCase):
         )
         texts = "\n".join((
             _skill_path().read_text(encoding="utf-8"),
-            (Path(__file__).resolve().parents[1] / "docs/小雪项目总使用说明.md").read_text(encoding="utf-8"),
+            (Path(__file__).resolve().parents[1] / "AGENTS.md").read_text(encoding="utf-8"),
         ))
 
         self.assertEqual(texts.count(contract), 2)
@@ -134,9 +134,11 @@ class XiaoxueSkillContractTests(unittest.TestCase):
         lineup = Path("/home/ubuntu/.agents/skills/esports/lol-lineup-analysis/SKILL.md").read_text(encoding="utf-8")
 
         self.assertIn("纯十英雄阵容：`lol-lineup-analysis`", text)
-        self.assertIn("用户给出蓝红方十英雄", lineup)
-        self.assertIn("只使用蓝红方十英雄、位置和比赛版本", lineup)
-        self.assertIn("需要深入所属项目、核对实现或处理产品入口未覆盖的细节时可以使用", text)
+        self.assertIn("仅真正缺英雄或位置歧义才澄清", lineup)
+        self.assertIn("不引入队伍资料、选手、赛果、TS、TK、盘口", lineup)
+        self.assertIn("未知名称由程序标UNKNOWN，不猜", lineup)
+        self.assertIn("交易人生项目是电竞业务的正源与交付主体", text)
+        self.assertIn("小雪是当前接入助手之一", text)
 
     def test_merged_team_profile_skill_covers_all_teams_without_overview_triggers(self) -> None:
         root = _team_profile_root()

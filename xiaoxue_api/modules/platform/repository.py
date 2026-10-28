@@ -11,8 +11,9 @@ from xiaoxue_api.core.database import DB_PATH, db
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
 WIKI_DIR = os.environ.get("XIAOXUE_WIKI_DIR", "/home/ubuntu/workspace/knowledge/wiki")
 TK_DIR = os.path.join(WIKI_DIR, "小雪电竞", "原始资料", "tk")
-SKILL_DIR_XIAOBAI = os.environ.get("XIAOXUE_SKILL_DIR_XIAOBAI", "/home/ubuntu/.hermes/profiles/xiaobai/skills")
-SKILL_DIR_MAIN = os.environ.get("XIAOXUE_SKILL_DIR_MAIN", "/home/ubuntu/.hermes/skills")
+SKILL_DIR_PUBLIC = "/home/ubuntu/.agents/skills"
+SKILL_DIR_XIAOBAI = os.environ.get("XIAOXUE_SKILL_DIR_XIAOBAI", SKILL_DIR_PUBLIC)
+SKILL_DIR_MAIN = os.environ.get("XIAOXUE_SKILL_DIR_MAIN", SKILL_DIR_PUBLIC)
 
 
 def collect_checks() -> dict:
@@ -30,7 +31,8 @@ def collect_checks() -> dict:
     checks["tk_dir"] = {"ok": os.path.isdir(TK_DIR), "path": TK_DIR}
     checks["skill_dirs"] = {
         "ok": os.path.isdir(SKILL_DIR_XIAOBAI) or os.path.isdir(SKILL_DIR_MAIN),
-        "xiaobai": os.path.isdir(SKILL_DIR_XIAOBAI), "main": os.path.isdir(SKILL_DIR_MAIN),
+        "public": os.path.isdir(SKILL_DIR_PUBLIC),
+        "main": os.path.isdir(SKILL_DIR_MAIN),
     }
     checks["memory_bank"] = {
         "ok": all(os.path.exists(os.path.join(memory_bank, name)) for name in ("README.md", "modules.md", "progress.md")),

@@ -28,7 +28,7 @@ import yaml
 
 HERMES_HOME = Path("/home/ubuntu/.hermes")
 SERVER_NAME = "xiaoxue-product"
-SERVER_COMMAND = "/home/ubuntu/.hermes/venvs/xiaoxue-product-mcp/bin/python"
+SERVER_COMMAND = "/home/ubuntu/xiaoxue-web/.venv-mcp/bin/python"
 SERVER_SCRIPT = "/home/ubuntu/xiaoxue-web/scripts/hermes/xiaoxue_product_mcp.py"
 
 READONLY_TOOLS = [

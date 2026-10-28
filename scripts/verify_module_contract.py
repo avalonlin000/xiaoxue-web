@@ -30,17 +30,21 @@ def main() -> int:
         fail("project-contract.json 未指向唯一模块合同")
 
     guide = ROOT / str(payload.get("model_usage_guide") or "")
-    if not guide.is_file():
-        fail(f"模型项目使用说明不存在：{guide}")
+    canonical = ROOT / "AGENTS.md"
+    if not guide.is_file() or guide.resolve() != canonical.resolve():
+        fail("模型项目使用说明未指向根 AGENTS.md")
+    if project_contract.get("rules_source") != "AGENTS.md":
+        fail("项目约定未指向根 AGENTS.md")
+    rule_refs = project_contract.get("rules") or {}
+    if not rule_refs or any(not str(value).startswith("AGENTS.md#") for value in rule_refs.values()):
+        fail("project-contract.json 仍维护独立规则正文")
+    legacy_guide = ROOT / "docs/小雪项目总使用说明.md"
+    if "[AGENTS.md](../AGENTS.md)" not in legacy_guide.read_text(encoding="utf-8"):
+        fail("旧使用说明未转向根 AGENTS.md")
     skill = Path("/home/ubuntu/.agents/skills/小雪/SKILL.md")
     skill_text = skill.read_text(encoding="utf-8")
-    if guide.name not in skill_text:
-        fail("根 Skill 未接入项目使用说明")
-    product_doc = (ROOT / "docs/交易信息系统-总体设计.md").read_text(encoding="utf-8")
-    engineering_doc = (ROOT / "docs/交易信息系统-工程实现.md").read_text(encoding="utf-8")
-    for text in (product_doc, engineering_doc):
-        if guide.name not in text:
-            fail("正式文档未引用唯一项目使用说明")
+    if guide.name not in skill_text and legacy_guide.name not in skill_text:
+        fail("根 Skill 未接入项目约定或兼容入口")
 
     backend_modules = set(discover_module_names())
     missing_backend = {

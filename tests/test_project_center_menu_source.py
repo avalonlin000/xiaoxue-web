@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[1]
 CONTENT = ROOT / "config" / "project-center-content.json"
 MENU_SCRIPT = ROOT / "scripts" / "xiaoxue_menu.py"
 SKILL = Path("/home/ubuntu/.agents/skills/小雪/SKILL.md")
-GUIDE = ROOT / "docs" / "小雪项目总使用说明.md"
+GUIDE = ROOT / "AGENTS.md"
 
 
 def run_menu(*args: str) -> str:

@@ -1,0 +1,14 @@
+beautifulsoup4==4.15.0
+fastapi==0.133.1
+httpx==0.28.1
+numpy==2.4.6
+openai==2.24.0
+Pillow==11.3.0
+playwright==1.55.0
+pydantic==2.13.4
+pyzbar==0.1.9
+PyYAML==6.0.3
+python-dotenv==1.2.2
+requests==2.33.0
+uvicorn==0.41.0
+yt-dlp==2026.10.26

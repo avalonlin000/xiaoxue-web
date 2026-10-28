@@ -1,7 +1,7 @@
 {
   "schema": "esports-project-contract-v1",
   "project_id": "esports-trading",
-  "display_name": "电竞交易辅助项目",
+  "display_name": "交易人生项目",
   "description": "面向钧钧的电竞事实、知识、判断辅助、记录、复盘与自动化项目；LOL 是当前主业。",
   "capability_namespace": "esports",
   "knowledge_namespace": "小雪电竞",
@@ -43,12 +43,12 @@
         "known_gaps": ["地图、选手状态、赛事资料、盘口和结果源覆盖"]
       },
       "football": {
-        "status": "planned", "display_name": "足球",
-        "current_capability": "目前只登记了待接入对象，可复用资料、普通 TK、交易 TK、判断和复盘的公共组织方式。",
-        "limitations": "还没有正式足球业务入口、可靠资料与结果链；目录里有足球不代表现在就能查比赛、给专业判断或自动跟踪。",
-        "entry": "目前仅在项目中心登记缺口；可向小雪说明希望接入的联赛和问题，尚无专用比赛页面。",
-        "next_step": "先确定联赛和使用场景，补球队、球员、伤停、天气、赔率、专业方法与结果来源，再接入并验收。",
-        "known_gaps": ["球队/球员、伤停、天气、赔率、专业方法和结果源"]
+        "status": "partial", "display_name": "足球",
+        "current_capability": "已有足球观察台和真实赛程接口，可读取公开赛程与可核实历史事实，并给出半破和 75 分钟后两种赛前筛选结果。",
+        "limitations": "来源覆盖、晚段历史与完整端到端验收仍未闭合；接口可能返回 partial，来源失败或资料缺失必须如实显示，不能承诺完整赛程、赔率和专业判断。",
+        "entry": "工作台打开足球观察台（页面 football）；接口为 /api/football/matches；单场资料为 /api/football/matches/{match_id}。",
+        "next_step": "补齐并核验来源覆盖、晚段历史和真实页面使用流程，再决定是否提升为稳定能力。",
+        "known_gaps": ["来源覆盖", "晚段历史", "端到端验收", "可靠赔率与专业判断资料"]
       }
     }
   },
@@ -78,14 +78,15 @@
   "path_templates": {
     "current_event_plan": "/home/ubuntu/workspace/knowledge/wiki/{knowledge_namespace}/20_游戏理解/当前赛事/当前交易预案.md"
   },
+  "rules_source": "AGENTS.md",
   "rules": {
-    "daily_window": "小范围日常业务和自动化由当前业务 Agent 直接处理并读回",
-    "development_window": "大范围结构性改造通常建议由小白统筹，但业务 Agent 保留完整项目能力",
-    "integrity": "同一项目遵循同一套改造规则：保护既有改动、小步修改、保留回退、真实入口验证",
-    "model_read_contract": "给模型读取的工具返回必须精简（≤3000 字符/次），禁止审计外壳、禁止内部全量拉取再过滤、列表返回标题摘要、MCP 统一 structured_output=False；详细见工程实现文档 6.1 模型读取契约",
-    "ui_redesign_not_patch": "UI/布局问题必须整体重设计根治，禁止修修补补反复返工；设计完成需 headless 实测关键交互（无遮挡、无溢出、无空白）",
-    "capability_needs_entry": "能力必须有正规入口（MCP 工具/接口），禁止让 Agent 用 terminal 摸库试错；删除等高风险动作必须有显式工具",
-    "timeout_match": "MCP/代理超时必须 >= 后端最慢操作耗时，禁止 30s 掐断 900s 任务",
-    "no_repeat_work": "同类问题修复后必须把防复发规则写回对应合同（工程文档/contract/skill），禁止同一个坑反复踩"
+    "daily_window": "AGENTS.md#项目定位与产物",
+    "development_window": "AGENTS.md#变更与验证",
+    "integrity": "AGENTS.md#变更与验证",
+    "model_read_contract": "AGENTS.md#变更与验证",
+    "ui_redesign_not_patch": "AGENTS.md#变更与验证",
+    "capability_needs_entry": "AGENTS.md#变更与验证",
+    "timeout_match": "AGENTS.md#变更与验证",
+    "no_repeat_work": "AGENTS.md#变更与验证"
   }
 }

@@ -133,6 +133,38 @@ test('default workspace reads prepared event results even with no scheduled matc
   } finally { globalThis.fetch = original; }
 });
 
+test('a stalled reference search cannot block the current schedule, methods or prepared event content', async () => {
+  const original = globalThis.fetch;
+  let releaseSearch;
+  const stalledSearch = new Promise(resolve => { releaseSearch = resolve; });
+  const response = payload => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => payload });
+  globalThis.fetch = async input => {
+    const url = String(input);
+    if (url.includes('/tk/search?')) return stalledSearch;
+    if (url.includes('/dashboard?')) return response({ context: { event: 'S16' }, matches: [{ match: { team_a: 'AL', team_b: 'BLG' } }] });
+    if (url.includes('/trading-methods')) return response({ methods: [{ id: 'team-understanding' }] });
+    if (url.includes('/scope-materials?')) return response({ result: { revision: 'prepared-event' } });
+    return response({});
+  };
+  const pending = service.loadCurrentEventWorkspace();
+  let timer;
+  try {
+    const workspace = await Promise.race([
+      pending,
+      new Promise(resolve => { timer = setTimeout(() => resolve(null), 100); }),
+    ]);
+    assert.ok(workspace, 'existing event content must be readable while reference search is stalled');
+    assert.equal(workspace.matches[0].match.team_a, 'AL');
+    assert.equal(workspace.methods[0].id, 'team-understanding');
+    assert.equal(workspace.eventMaterials.result.revision, 'prepared-event');
+  } finally {
+    clearTimeout(timer);
+    releaseSearch(response({ results: [] }));
+    await pending;
+    globalThis.fetch = original;
+  }
+});
+
 test('long existing background starts collapsed and is not marked read until explicitly expanded', () => {
   const local = storage(); const tracker = service.createReadingTracker({ storage: local });
   const packet = context();

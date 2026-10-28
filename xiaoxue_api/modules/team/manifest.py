@@ -25,7 +25,7 @@ MODULE = {
         "configuration": {
             "owner": "lol_data/scripts/ts_stage_table.py",
             "keys": ["stage_token", "MU_INIT", "SIGMA_INIT", "SIGMA_MIN", "TIER_BREAKS"],
-            "rule": "活动阶段快照为唯一样本；国内分池、国际赛跨赛区单池；TS=mu-3sigma。",
+            "rule": "活动阶段快照为唯一样本；国内按 LPL/LCK 分池，跨赛区与 INTL 不直接比较；TS=mu-3sigma。",
         },
         "refresh": {
             "entry": "/home/ubuntu/lol_data/scripts/_ts_update.py::run_ts_update",

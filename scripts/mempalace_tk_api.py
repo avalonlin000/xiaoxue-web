@@ -18,24 +18,25 @@ from pathlib import Path
 
 def _mempalace_site_packages() -> str:
     configured = os.getenv("XIAOXUE_MEMPALACE_SITE_PACKAGES", "").strip()
-    if configured:
-        return str(Path(configured).expanduser())
-    candidates = sorted(
-        (Path.home() / ".local/share/uv/tools/mempalace/lib").glob("python*/site-packages"),
-        reverse=True,
-    )
-    return str(candidates[0]) if candidates else ""
+    return str(Path(configured).expanduser()) if configured else ""
 
 
 MEMPALACE_SITE_PACKAGES = _mempalace_site_packages()
 if MEMPALACE_SITE_PACKAGES and MEMPALACE_SITE_PACKAGES not in sys.path:
     sys.path.insert(0, MEMPALACE_SITE_PACKAGES)
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Response
 from pydantic import BaseModel, Field
 
-from mempalace.miner import mine
-from mempalace.searcher import search_memories
+try:
+    from mempalace.miner import mine
+    from mempalace.searcher import search_memories
+    from mempalace.embedding import get_embedding_function
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "MemPalace 必须安装在本项目 .venv-tk，或通过 "
+        "XIAOXUE_MEMPALACE_SITE_PACKAGES 显式指定兼容环境"
+    ) from exc
 
 
 PALACE = str(
@@ -54,6 +55,43 @@ _reindex_error: str | None = None
 LOGGER = logging.getLogger(__name__)
 
 app = FastAPI(title="Xiaoxue TK MemPalace adapter", version="1.0")
+
+
+def _embedding_readiness() -> dict:
+    """Inspect the selected embedding function without starting its lazy download.
+
+    MiniLM's first call downloads to a shared filename without a download lock.
+    Runtime requests must therefore use a fully provisioned cache, never provision
+    it themselves. The model selection remains owned by MemPalace's factory.
+    """
+    try:
+        embedding = get_embedding_function()
+        cache_root = getattr(embedding, "DOWNLOAD_PATH", None)
+        folder = getattr(embedding, "EXTRACTED_FOLDER_NAME", None)
+        if cache_root is None or folder is None:
+            return {"ready": False, "reason": "unsupported_embedding_cache"}
+        model_dir = Path(cache_root) / folder
+        required = (
+            "config.json", "model.onnx", "special_tokens_map.json",
+            "tokenizer_config.json", "tokenizer.json", "vocab.txt",
+        )
+        missing = [name for name in required
+                   if not (model_dir / name).is_file() or (model_dir / name).stat().st_size == 0]
+        return {"ready": not missing, "reason": "model_cache_missing" if missing else "ready",
+                "missing_files": missing}
+    except Exception:
+        LOGGER.exception("Unable to inspect the selected embedding dependency")
+        return {"ready": False, "reason": "embedding_dependency_unavailable"}
+
+
+def _require_embedding_ready() -> None:
+    readiness = _embedding_readiness()
+    if not readiness["ready"]:
+        raise HTTPException(status_code=503, detail={
+            "code": "embedding_not_ready",
+            "message": "TK 语义检索模型缓存未就绪，请先完成项目运行依赖准备。",
+            **readiness,
+        })
 
 
 class SearchRequest(BaseModel):
@@ -103,8 +141,12 @@ def _map_result(item: dict) -> dict:
 
 
 @app.get("/api/health")
-def health() -> dict:
-    return {"status": "ok", "provider": "mempalace", "wing": TK_WING}
+def health(response: Response) -> dict:
+    embedding = _embedding_readiness()
+    if not embedding["ready"]:
+        response.status_code = 503
+    return {"status": "ok" if embedding["ready"] else "degraded",
+            "provider": "mempalace", "wing": TK_WING, "embedding": embedding}
 
 
 @app.get("/api/stats")
@@ -121,6 +163,7 @@ def stats() -> dict:
 
 @app.post("/api/search")
 def search(payload: SearchRequest) -> dict:
+    _require_embedding_ready()
     result = search_memories(
         payload.query,
         PALACE,
@@ -190,6 +233,7 @@ def delete_entry(payload: DeleteRequest) -> dict:
 @app.post("/api/reindex")
 def reindex(payload: ReindexRequest) -> dict:
     del payload
+    _require_embedding_ready()
     global _reindex_error, _reindex_running
     with _reindex_lock:
         if _reindex_running:
@@ -201,6 +245,8 @@ def reindex(payload: ReindexRequest) -> dict:
 
 
 if __name__ == "__main__":
+    import os
     import uvicorn
 
-    uvicorn.run(app, host="127.0.0.1", port=8770)
+    port = int(os.getenv("XIAOXUE_TK_PORT", "8770"))
+    uvicorn.run(app, host="127.0.0.1", port=port)

@@ -21,8 +21,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-# 服务跑在 Hermes 的 venv 里（playwright 装在那边）；换解释器才能测到真实通道。
-SERVICE_PYTHON = Path("/home/ubuntu/.hermes/hermes-agent/venv/bin/python")
+# 服务跑在项目自己的主环境里。
+SERVICE_PYTHON = ROOT / ".venv" / "bin" / "python"
 
 
 def _reexec_into_service_python() -> None:
@@ -52,7 +52,6 @@ FIX = {
     "local-service": "本机 8338 搜索服务不可用：systemctl status websearch-mcpserver",
     "bilibili": "B站搜索不用 key，失败多为接口风控，稍后重试即可",
     "domestic/bing": "确认 /home/ubuntu/.local/bin/dsearch 还在、必应网页结构没变",
-    "hermes/web": "检查 Hermes web.search_backend=searxng 与 SEARXNG_URL=http://127.0.0.1:8338/searxng",
     "agent-reach/exa": "需要 mcporter + EXA_API_KEY；没配就让它空着，不影响主线",
     "mirror": "r.jina.ai 免费镜像经常被打断，断了不影响主线",
     "exa/fetch": "同 agent-reach/exa",
@@ -177,7 +176,6 @@ def main() -> int:
     if args.only in ("all", "search"):
         groups["搜索"] = [
             _run("local/searxng", "搜索", repo._search_via_local, SEARCH_QUERY),
-            _run("hermes/web", "搜索", repo._search_via_hermes, SEARCH_QUERY),
             _run("bilibili", "搜索", repo._search_via_bilibili, SEARCH_QUERY),
             _run("domestic/bing", "搜索", repo._search_via_domestic, SEARCH_QUERY),
             _run("agent-reach/exa", "搜索", repo._search_via_exa, SEARCH_QUERY),

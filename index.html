@@ -259,6 +259,7 @@ html, body {
 }
 
 /* Content columns */
+#content-area { flex-direction:row; overflow:hidden; }
 .col-profile {
   width: 420px;
   flex-shrink: 0;
@@ -1462,6 +1463,7 @@ html, body {
 .page-tk #card-current-event,
 .page-tk #card-trades,
 .page-tk #card-tk { display:none; }
+#content-area:not(.page-football) #card-football { display:none; }
 .page-football #card-football { display:flex; flex:1; flex-direction:column; min-height:0; }
 .page-football #card-football .card-body { overflow-y:auto; }
 .football-toolbar { display:flex; align-items:center; gap:9px; flex-wrap:wrap; margin-bottom:12px; }
@@ -1533,9 +1535,10 @@ html, body {
   padding: 12px 16px;
 }
 .page-teams.team-selected #card-fundamentals .scope-row { margin-bottom: 8px; }
+.page-teams.team-selected #cycle-focus-panel { max-height:120px; overflow-y:auto; }
 .page-teams.team-selected #card-fundamentals .fund-table {
   flex: 1;
-  min-height: 0;
+  min-height: 160px;
   overflow-y: auto;
 }
 .page-teams.team-selected #card-fundamentals .event-actions { margin-top: 8px; }
@@ -1562,6 +1565,16 @@ html, body {
   min-height: 0;
   overflow: hidden;
   padding: 12px 16px 14px;
+}
+@media (max-width:720px) {
+  #content-area.page-teams { flex-direction:column; overflow:visible; }
+  .page-teams.team-selected #col-profile:not(.collapsed) { width:auto; overflow:visible; }
+  .page-teams.team-selected #col-data { overflow:visible; }
+  .page-teams.team-selected #card-fundamentals { flex:none; max-height:none; }
+  .page-teams #card-fundamentals .fund-table { overflow-x:auto; }
+  .page-teams #card-fundamentals .fund-row { min-width:860px; }
+  .page-teams.team-selected #card-tk { min-height:320px; }
+  .page-teams.team-selected #card-tk .card-head { flex-wrap:wrap; }
 }
 .page-tk #card-tk-library { display:flex; flex:1; flex-direction:column; min-height:0; }
 .page-tk #card-tk-library .card-body { display:flex; flex:1; min-height:0; flex-direction:column; overflow:hidden; padding:0; }
@@ -2070,7 +2083,7 @@ html, body {
     <section id="project-center" class="project-center" aria-live="polite"></section>
 
     <!-- Content (hidden until team loaded) -->
-    <div id="content-area" class="page-teams" style="display:none;flex:1;flex-direction:row;gap:calc(var(--s)*2);overflow:hidden">
+    <div id="content-area" class="page-teams" style="display:none;flex:1;gap:calc(var(--s)*2)">
       <!-- Profile column -->
       <div class="col-profile" id="col-profile">
         <button class="profile-toggle" id="profile-toggle" title="折叠/展开画像">◀</button>
@@ -2171,6 +2184,17 @@ html, body {
             </div>
             <div class="event-panel-title" style="margin-top:14px">相关资料</div>
             <div id="event-knowledge-results" class="today-content-grid"></div>
+          </div>
+        </div>
+
+        <!-- Football board -->
+        <div class="card" id="card-football">
+          <div class="card-head">
+            <span class="badge" style="background:var(--green)">足球</span> 足球观察台
+            <span style="font-size:12px;color:var(--ink-3);font-weight:400">赛程、半破与 75 分钟后筛选；资料不足时明确标出</span>
+          </div>
+          <div class="card-body" data-football-body>
+            <div class="football-empty">正在读取足球赛程和可核实资料…</div>
           </div>
         </div>
 

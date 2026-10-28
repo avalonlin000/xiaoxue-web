@@ -1,34 +1,40 @@
-# 小雪工作台项目事实
+# 交易人生项目
 
-本文件只保存小雪工作台的项目事实；Codex 通用开发纪律、Hermes 身份和 Skill 总规则由上层继承。
+本文件是项目层唯一的现行约定。它说明项目是什么、产出什么、依赖哪些入口和必须遵守的边界；实现细节按需查项目地图、配置合同和专业 Skill，不在这里复制长篇流程。
 
-## 真实入口
+## 项目定位与产物
 
-- 本目录是钧钧实际使用的小雪主工作台，不是实验副本。
-- 前端：`index.html`、`src/main.js`；后端：`main.py`；前端使用 Vite/Vanilla JS，后端使用 FastAPI。
-- 稳定入口：`http://127.0.0.1:8880/`；开发入口：`http://127.0.0.1:5173/`。
-- 数据库：`/home/ubuntu/lol_data/英雄联盟数据库.db`。
-- `/home/ubuntu/life-os-frontend-v2/packages/xiaoxue-web/` 不是当前主入口。
-- Hermes 产品入口：`scripts/hermes/xiaoxue_product_mcp.py` 是唯一 `xiaoxue-product` MCP Server；Agent 新功能作为其中命名明确的工具接入，不新增平行 Server。
+这是自用的电竞交易辅助项目，当前以 LOL 为主。项目独立于任何 Bot、模型、聊天平台或开发工具；更换接入助手不会改变项目身份和业务正源。
 
-## 沙箱禁令（2026-10-21 钧钧明确要求）
+- 项目负责业务 API/MCP、资料与研究成果、记录与复盘、业务方法、数据准备和自动化任务，并让产物可由 Hermes 等接入方使用。
+- Hermes 负责平台接入、对话承载、工具发现、调度和消息投递，不维护第二套业务实现。小雪是当前接入助手之一，不是项目本身。
+- 项目需求应落实到项目代码、配置、数据或正式文档，不以修改某个 Bot 的记忆、人格或平台提示词代替。
+- 网页用于浏览、比较、记录和回看；自然语言对话由当前接入助手承载，不把网页误作唯一业务入口。
+- 效率、实用性和使用体验优先：减少重复操作、等待、资料搬运和维护负担，同时保证结果准确、易懂、可找回。
 
-- 本机 Codex 沙箱（bubblewrap / user namespaces）有兼容问题，可能反复卡在授权或执行失败；禁止使用任何带沙箱的执行方式。
-- 执行命令一律走普通路径：不加 `sandbox_permissions: require_escalated`，不申请提权，不触发 approval 弹窗。
-- 默认配置已固定为 `sandbox_mode = "danger-full-access"` + `approval_policy = "never"`；后续任何客户端、插件或 Skill 不得改回沙箱模式。
+## 当前入口与正源
 
-## 项目事实
+- 仓库：`/home/ubuntu/xiaoxue-web/`；前端为 Vite/Vanilla JS，后端为 FastAPI，启动入口 `main.py`。
+- 当前部署在腾讯云服务器；`127.0.0.1` 是服务器内部地址，不是外部访问 URL。既有目录、服务和工具名中的 `xiaoxue-*` 是兼容标识，不代表项目归属于小雪。
+- 稳定服务在服务器内通过 `http://127.0.0.1:8880/` 访问；开发前端为 `http://127.0.0.1:5173/`。本机地址不证明外部网络可达。
+- 用户级服务为 `xiaoxue-workbench-api.service`、`xiaoxue-workbench-vite.service`、`xiaoxue-tk-mempalace.service`；TK 检索服务端口为 `8770`。
+- 产品工具入口：`scripts/hermes/xiaoxue_product_mcp.py`；新增业务工具优先接入现有产品 MCP，不另建平行 Server。
+- 业务数据库为 `/home/ubuntu/lol_data/英雄联盟数据库.db`；长期知识位于 `/home/ubuntu/workspace/knowledge/wiki/小雪电竞/`；项目配置负责定位外置数据。
+- 主服务、TK 检索和产品 MCP 分别使用 `.venv`、`.venv-tk`、`.venv-mcp`；依赖分别见 `requirements/`。
+- 项目能力和缺口以 `config/project-contract.json` 为准；模块接口与字段以 `config/module-contract.json` 为准；外部依赖以 `config/project-dependencies.json` 为准。
+- 实现位置见 `docs/architecture/PROJECT-MAP.md`；当前状态见 `memory-bank/progress.md`，状态记录不替代项目事实。
 
-- 盘口/交易记录正源是交易 TK，正式写入使用 `/api/trading-tk`；`/api/market-notes` 是只读投影；旧 `/api/trades` 与 `legacy_trades` 模块已于 2026-10-25 退役，均不恢复旧表写入。
-- 队伍交易备注跟随队伍 TK，使用 `type=trading_note`；队伍不明确时不落库。
-- BP 后阵容分析由 `lol-lineup-analysis` 提供判断，前端只整理输入、复制提示和复盘沉淀。
-- 固定工作流配置以 `config/workflows.json` 为准；今日内容、队伍别名和市场枚举优先改配置，不回写 `main.py` 常量。
-- 交易 TK 的复查经明确确认后用原入口更新原条目；不因普通讨论自动写入、认可或修改画像、三维。
-- 当前赛事近期准备窗口由 `xiaoxue_api/modules/current_event/config.json` 的 `preparation.upcoming_days` 声明；源码默认 7 天。生产是否已采用该版本以交付证据为准。
-- `dist/` 由正式服务直接提供；未授权发布时，构建使用独立 `--outDir`，不能把默认构建当成无副作用检查。
+## 业务边界
 
-## 边界与验收
+- 不编造数据、来源、赛果或已完成状态；来源冲突时保留来源、时间、差异及其影响。
+- 普通讨论、临时判断、单场观察和赛果不自动变成长久知识或交易结论；明确要求保存时沿对应正源写入并重新读取确认。
+- 用户只问队伍画像、首发或队伍资料时，只展示五项画像和明确请求的队伍事实；不自动读取或附加 TS、TK、盘口，以及 volatility/trend 等内部字段。只有用户明确要求组合时，才读取并展示对应模块。
+- 每项业务能力和生产任务保持单一正源、单一实现；不得因客户端不同复制数据库、知识或业务逻辑。
+- 删除、批量覆盖、数据迁移、生产调度、发布、外部消息及模型、密钥、权限或网络变更，须先取得覆盖该动作的明确授权。
 
-- 缺数据时返回明确空态或“暂不推荐”，不伪造队伍、BP、盘口或赛果。
-- 真实业务数据、数据库迁移、生产 cron、外部消息和系统配置必须先得到钧钧确认。
-- 按影响范围使用 `npm run build`、`python3 -m py_compile main.py`、相关 GET/API smoke 和真实页面路径；写回能力还要重新读取并检查无效输入不污染数据。
+## 变更与验证
+
+- 动手前检查工作树和相关正源，保护已有未提交改动；按影响范围查阅项目地图、模块合同及对应测试。
+- 项目任务实体位于 `scripts/tasks/`，调用唯一业务生产链；Hermes 同名任务只做参数、输出和退出码透明转发，不另写业务逻辑。
+- 验证与改动相称：只读检查可用 `scripts/health_check.py --json`；另运行相关测试、合同检查或隔离构建。涉及写回时从同一正源读回。测试或 health 只证明其覆盖范围，不等同于生产发布或真实用户路径验收。
+- 未获发布授权时，不覆盖正式 `dist/`；构建使用独立输出目录。未经授权不重启生产服务、不改生产任务、不写真实业务数据。

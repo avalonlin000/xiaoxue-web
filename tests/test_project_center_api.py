@@ -44,14 +44,18 @@ class ProjectCenterApiTests(unittest.TestCase):
         daily = tree["daily-and-automation"]
         self.assertEqual(daily["runtime"]["label"], "需要处理")
         self.assertTrue(any("当天数据就绪信息缺失" in item["reason"] for item in daily["runtime_details"]))
-        self.assertIn("状态可读取不等于日报已生成", daily["current_capability"])
+        self.assertIn("知识导入最近回执仍为 partial", daily["current_capability"])
+        self.assertIn("不能写成全部成功", daily["current_capability"])
 
     def test_objects_explain_usable_scope_limits_entry_and_next_step(self):
         objects = self.client.get("/api/project-center/modules").json()["data"]["object_catalog"]["objects"]
         for name, item in objects.items():
             for field in ("current_capability", "limitations", "entry", "next_step", "known_gaps"):
                 self.assertTrue(item[field], f"{name}: {field}")
-        self.assertIn("还没有正式足球业务入口", objects["football"]["limitations"])
+        self.assertEqual(objects["football"]["status"], "partial")
+        self.assertIn("partial", objects["football"]["limitations"])
+        self.assertIn("页面 football", objects["football"]["entry"])
+        self.assertIn("/api/football/matches", objects["football"]["entry"])
         self.assertIn("历史赔率", objects["valorant"]["limitations"])
 
     def test_overview_and_modules_keep_content_runtime_and_progress_separate(self):

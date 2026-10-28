@@ -128,6 +128,28 @@ class DailyPublicationStateTests(unittest.TestCase):
         self.assertEqual(result["report"]["publication_status"], "blocked-by-data-readiness")
         self.assertEqual(result["latest_matches"][0]["match_id"], "fixture-match")
 
+    def test_no_matches_receipt_is_a_complete_empty_outcome(self):
+        self.schedules.return_value = []
+        self.manifest.update({
+            "run_id": "rest-day-fixture",
+            "published": False,
+            "audit_ok": True,
+            "mode": "no_matches",
+            "result": {
+                "outcome": "no_matches",
+                "message": "当日没有已确认的比赛，未生成或发布日报。",
+                "today_match_count": 0,
+            },
+            "destinations": {},
+            "validation_errors": [],
+        })
+        self.write_manifest()
+        result = service.get_daily_content(self.date)
+        self.assertEqual(result["match_count"], 0)
+        self.assertEqual(result["day_state"], "no_matches")
+        self.assertEqual(result["report"]["publication_status"], "no_matches")
+        self.assertFalse(result["report"]["published"])
+
     def test_material_failure_does_not_break_verified_report(self):
         self.materials.side_effect = RuntimeError("private internal detail")
         result = service.get_daily_content(self.date)

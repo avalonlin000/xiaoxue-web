@@ -2,7 +2,7 @@
   "schema": "xiaoxue-module-contract-v1",
   "version": "1.0.0",
   "project": "esports-trading",
-  "model_usage_guide": "docs/小雪项目总使用说明.md",
+  "model_usage_guide": "AGENTS.md",
   "tool_contract": {
     "mcp": "xiaoxue-product",
     "read_schema": "命名读取能力只读正源并返回精简业务字段；不让模型用终端摸库或猜入口。",
@@ -306,11 +306,11 @@
       "ownership": "日常内容与长期知识",
       "user_entry": {
         "natural_examples": ["看今天日报", "把这阶段的 TK 整理一下", "更新 BLG 画像"],
-        "web": "日报与阶段整理页"
+        "web": "项目中心的日报与状态卡"
       },
       "agent_entry": {
         "skill": "xiaoxue + 对应知识 Skill",
-        "tools": ["xiaoxue_get_today", "xiaoxue_list_stage_candidates", "xiaoxue_update_team_profile"],
+        "tools": ["xiaoxue_get_today", "xiaoxue_update_team_profile"],
         "behavior": "按用户目标进入日报、版本、画像或 TK 的独立能力；不把后台流水线伪装成日常固定步骤。"
       },
       "source_of_truth": {
@@ -345,12 +345,12 @@
         "boundary": "报告文件存在不等于发布通过；已发布冻结报告与后续单场最新材料分开，不自动重新发布或启用排程。"
       },
       "extension_kind": "ordinary_content",
-      "consumers": ["日报页", "阶段整理页", "当前赛事", "对话"],
+      "consumers": ["日报", "当前赛事", "对话"],
       "status": "partial",
       "compatibility": {
         "backend_capabilities": ["daily_content", "team", "knowledge", "match"],
         "frontend_loaders": ["current-event"],
-        "legacy_names": ["WHAT", "阶段知识整理", "日报流水线"]
+        "legacy_names": ["WHAT", "阶段知识整理", "阶段整理", "日报流水线"]
       }
     },
     {
@@ -416,8 +416,8 @@
       },
       "source_of_truth": {
         "label": "项目配置和当前赛事配置",
-        "api": "/api/health、当前赛事配置入口",
-        "state": ["config/workflows.json", "current_event/config.json"]
+        "api": "/api/health、/api/current-event",
+        "state": ["config/workflows.json", "xiaoxue_api/modules/match/event/config.json"]
       },
       "read_capability": {
         "id": "attention.read",
@@ -459,16 +459,16 @@
       "agent_entry": {
         "skill": "xiaoxue",
         "tools": [],
-        "behavior": "按需读取公开赛程；未上线前不作为主路径承诺。"
+        "behavior": "按需读取公开赛程和两种筛选结果；来源失败或资料不足时明确返回 partial，不编造缺口。"
       },
       "source_of_truth": {
         "label": "ESPN 公开赛程与比赛摘要",
-        "api": "/api/football/board",
+        "api": "/api/football/matches",
         "state": ["本地文件缓存"]
       },
       "read_capability": {
         "id": "football.read",
-        "entry": "/api/football/board",
+        "entry": "/api/football/matches",
         "empty": "没有可核实赛程时明确空态，不编造对阵。"
       },
       "bounded_write_capability": {
@@ -477,12 +477,12 @@
         "scope": "只读，不写任何正源。"
       },
       "readback_capability": {
-        "entry": "/api/football/board",
+        "entry": "/api/football/matches/{match_id}",
         "checks": ["比赛身份", "两种筛选结果", "资料缺口"]
       },
       "analysis_capability": {
         "id": "football.screen",
-        "entry": "/api/football/board",
+        "entry": "/api/football/matches?play=half_break|late_over",
         "boundary": "只做赛前筛选与资料，不给交易方向。"
       },
       "field_mapping": {

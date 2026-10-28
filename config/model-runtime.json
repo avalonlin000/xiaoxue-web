@@ -1,0 +1,19 @@
+{
+  "schema": "xiaoxue-model-runtime-v1",
+  "provider": "opencode-go",
+  "model": "deepseek-v4.1-flash",
+  "base_url": "https://opencode.ai/zen/go/v1",
+  "api_key_env": "OPENCODE_GO_API_KEY",
+  "credential_env_file": "~/.config/xiaoxue/model.env",
+  "api_mode": "chat_completions",
+  "max_tokens": 16384,
+  "reasoning_effort": "ultra",
+  "reasoning_wire_effort": "max",
+  "extra_body": {},
+  "timeout_seconds": 95,
+  "headers": {
+    "HTTP-Referer": "https://opencode.ai/",
+    "X-Title": "Xiaoxue Project",
+    "User-Agent": "xiaoxue-project/1.0"
+  }
+}

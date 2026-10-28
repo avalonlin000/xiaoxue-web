@@ -1,0 +1,8 @@
+chromadb==1.5.9
+fastapi==0.133.1
+httpx==0.28.1
+mempalace==3.4.0
+PyYAML==6.0.3
+requests==2.34.2
+pytest==8.4.2
+uvicorn==0.41.0

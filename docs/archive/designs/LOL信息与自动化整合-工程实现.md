@@ -24,12 +24,12 @@
 | 内容 | 正式位置 | 当前状态 |
 |---|---|---|
 | LOL 事实数据库 | `/home/ubuntu/lol_data/英雄联盟数据库.db` | 赛程 556 行、比赛 526 行、首发 145 行、队伍画像 22 行、TS 阶段表齐备 |
-| 范围定义 | `xiaoxue_api/modules/current_event/config.json`（`event` / `leagues`） | 现为 `S16 世界赛` / `S16全球总决赛` |
+| 范围定义 | `xiaoxue_api/modules/match/event/config.json`（`event` / `leagues`） | 现为 `S16 世界赛` / `S16全球总决赛` |
 | 范围模块合同 | `config/module-contract.json` → `attention_config` | 状态 partial；只声明入口，没有派生产出 |
 | 库外队伍资料 | `xiaoxue_api/modules/gol_gg/`（按需只读） | `writes: []`、`long_term_write: false`：查得到、留不下 |
 | LOL 价格 | 无 | 库内只有盘口/交易 TK 的记录位，没有采集源；瓦赔率台账与 LOL 无关 |
 | 自动化任务 | `/home/ubuntu/.hermes/cron/jobs.json`（小雪 Profile，13 条） | 12 条是数据维护，只有 07:00 日报面向用户 |
-| 任务脚本 | `/home/ubuntu/.hermes/scripts/xiaoxue_*.py` | 数据就绪、日报、巡检、知识导入、抽查 |
+| 任务脚本 | 正式业务实体：`/home/ubuntu/xiaoxue-web/scripts/tasks/`；`/home/ubuntu/.hermes/scripts/xiaoxue_*.py` 仅为薄 wrapper | 项目拥有数据就绪、日报、巡检、知识导入、抽查等业务实体；Hermes 同名入口只透明转发参数与退出状态 |
 | 业务脚本 | `/home/ubuntu/lol_data/scripts/` | ScoreGG 刷新、TS 更新、日报流水线 |
 | 稳定 Web / API | `http://127.0.0.1:8880/`、`main.py` + `xiaoxue_api/` | 现有模块注册与结果外壳可复用 |
 | 唯一产品 MCP | `scripts/hermes/xiaoxue_product_mcp.py` | 39 个工具；新增读取必须走精简契约（≤3,000 字符） |
@@ -64,7 +64,7 @@ Hermes cron 支持的排程形态：cron 表达式、固定间隔（`every 30m`�
 
 ### 4.1 范围（唯一）
 
-- 继续以 `current_event/config.json` 作为范围内的唯一声明（赛事名 + 联赛列表），不新增第二份配置。
+- 继续以 `xiaoxue_api/modules/match/event/config.json` 作为范围内的唯一声明（赛事名 + 联赛列表），不新增第二份配置。
 - 新增**派生读取**（不落第二份正源）：由范围算出
   1. 范围赛事下的比赛清单（`schedules` 按 `leagues` 过滤）；
   2. 范围里出现的队伍集合（含待定名额产生的 TBD，TBD 不参与队伍缺口计算）；
@@ -216,7 +216,7 @@ Hermes cron 支持的排程形态：cron 表达式、固定间隔（`every 30m`�
 ### S1｜收拢事实 + 接上范围（只读）— 已交付并验证
 
 - 新增只读能力 `lol_scope`：范围派生（赛事、区间、参赛队伍、比赛清单）+ 覆盖面（每场"谁上场/价格/结果"三态与洞清单）。
-- 范围仍只读 `current_event/config.json`，没有新增第二份名单；事实全部读现有数据库，不写库（有测试证明字节不变）。
+- 范围仍只读 `xiaoxue_api/modules/match/event/config.json`，没有新增第二份名单；事实全部读现有数据库，不写库（有测试证明字节不变）。
 - 真实入口验证：`http://127.0.0.1:8880/api/lol-scope/overview`、`/api/lol-scope/coverage`。真实结果：范围 S16 世界赛，窗口 2026-10-16 → 2026-11-04，8 场；范围里 4 支队（C9、KC、FUR、MVKE）中 C9/FUR/MVKE 库内没有，KC 有队无首发无画像；价格来源为空。overview 2931 字符、coverage 3062 字符（符合精简读取契约）。
 - 测试：`tests/test_lol_scope_service.py` 10 项通过；模块注册、架构边界、公开路由、能力交付、项目中心内容覆盖共 24 项回归通过。
 

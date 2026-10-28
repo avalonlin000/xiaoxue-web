@@ -26,9 +26,12 @@ import {
 
 export async function loadCurrentEventKnowledge() {
   const context = await fetchCurrentEvent();
+  return { context, ...await loadCurrentEventReferences(context) };
+}
+
+export async function loadCurrentEventReferences(context = {}) {
   const payload = await fetchEventKnowledge(context.knowledge_query || context.event, 12);
   return {
-    context,
     items: (payload.results || []).map((item) => ({
       title: item.concept || item.id || '赛事资料', summary: item.content || '', date: item.date || '',
     })),
@@ -43,10 +46,7 @@ export async function loadCurrentEventWorkspace(date = 'upcoming') {
     fetchGlobalVersionUnderstanding().catch(() => null),
   ]);
   const context = dashboard.context || await fetchCurrentEvent();
-  const [payload, eventMaterials] = await Promise.all([
-    fetchEventKnowledge(context.knowledge_query || context.event, 8),
-    fetchEventScopeMaterials(context.event || '').catch(() => null),
-  ]);
+  const eventMaterials = await fetchEventScopeMaterials(context.event || '').catch(() => null);
   return {
     context,
     eventMaterials,
@@ -60,9 +60,6 @@ export async function loadCurrentEventWorkspace(date = 'upcoming') {
     date: dashboard.date || date,
     dateTo: dashboard.date_to || dashboard.date || date,
     scheduleTruncated: dashboard.truncated === true,
-    items: (payload.results || []).map((item) => ({
-      title: item.concept || item.id || '赛事资料', summary: item.content || '', date: item.date || '',
-    })),
   };
 }
 

@@ -1,0 +1,18 @@
+{
+  "schema": "xiaoxue-project-dependencies-v1",
+  "shared": {
+    "lol_data": {
+      "root": "/home/ubuntu/lol_data",
+      "python": "/home/ubuntu/xiaoxue-web/.venv/bin/python",
+      "purpose": "LOL 数据、知识导入与自动排程"
+    },
+    "knowledge_wiki": {
+      "root": "/home/ubuntu/workspace/knowledge/wiki",
+      "namespace": "小雪电竞"
+    },
+    "searxng": {
+      "url": "http://127.0.0.1:8338/searxng",
+      "health": "http://127.0.0.1:8338/health"
+    }
+  }
+}

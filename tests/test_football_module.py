@@ -3,6 +3,16 @@ from __future__ import annotations
 from xiaoxue_api.modules.external.football import service
 
 
+def test_match_detail_uses_competition_kickoff_not_season_year(monkeypatch):
+    header = {"season": {"year": 2026}, "competitions": [{
+        "date": "2026-10-25T17:30Z", "competitors": [], "status": {},
+    }]}
+    monkeypatch.setattr(service, "_get_json", lambda url: {"header": header})
+    assert service.get_match("espn:esp.1:401882829")["kickoff"] == "2026-10-25T17:30Z"
+    header["competitions"][0].pop("date")
+    assert service.get_match("espn:esp.1:401882829")["kickoff"] == ""
+
+
 def test_list_matches_keeps_missing_opening_total_as_pending(monkeypatch):
     monkeypatch.setattr(service, "_read_cache", lambda: [])
     monkeypatch.setattr(service, "_write_cache", lambda matches: None)

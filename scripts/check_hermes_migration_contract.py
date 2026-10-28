@@ -26,12 +26,10 @@ REQUIRED_API_PATHS = {
     "/api/teams",
     "/api/tk/search",
     "/api/tk/entry/{filename}",
-    "/api/team-trading-notes",
     "/api/team-trading-notes/{team}",
     "/api/current-event/match-run/active",
     "/api/current-event/match-run/pause",
     "/api/current-event/match-run/entry",
-    "/api/current-event/match-run/candidates",
     "/api/trading-tk",
     "/api/trading-tk/{filename}",
     "/api/research/subjects",
@@ -43,39 +41,11 @@ REQUIRED_API_PATHS = {
     "/api/research/subjects/{subject_id}/reviews",
     "/api/research/match-brief",
 }
-REQUIRED_MCP_TOOLS = {
-    "xiaoxue_get_today",
-    "xiaoxue_find_schedules",
-    "xiaoxue_search_external_news",
-    "xiaoxue_start_match_run",
-    "xiaoxue_get_match_run",
-    "xiaoxue_get_active_match_trade",
-    "xiaoxue_pause_match_trade",
-    "xiaoxue_save_match_trade_entry",
-    "xiaoxue_update_match_run_fact",
-    "xiaoxue_get_score",
-    "xiaoxue_debug_reveal_match_result",
-    "xiaoxue_get_match_run_review",
-
-    "xiaoxue_search_trading_tk",
-
-    "xiaoxue_get_match_workspace",
-    "xiaoxue_save_match_workspace",
-    "xiaoxue_record_match_change",
-    "xiaoxue_get_team",
-    "xiaoxue_get_match_research_brief",
-    "xiaoxue_open_research_subject",
-    "xiaoxue_list_research_subjects",
-    "xiaoxue_get_research_subject",
-    "xiaoxue_record_research_event",
-    "xiaoxue_record_research_digest",
-    "xiaoxue_record_research_review",
-    "xiaoxue_record_research_material",
-    "xiaoxue_record_research_note",
-    "xiaoxue_search_tk",
-    "xiaoxue_get_tk_entry",
-
-}
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_MCP_PYTHON = PROJECT_ROOT / ".venv-mcp" / "bin" / "python"
+PROJECT_MCP_SCRIPT = PROJECT_ROOT / "scripts" / "hermes" / "xiaoxue_product_mcp.py"
+MCP_TOOL_SNAPSHOT = PROJECT_ROOT / "tests" / "fixtures" / "xiaoxue_product_mcp_tools.json"
+PRODUCT_BOUNDARY_PLUGIN = Path("/home/ubuntu/.hermes/plugins/xiaoxue-product-boundary")
 RETIRED_RUNTIME_MARKERS = (
     "localhost:8768",
     "127.0.0.1:8768",
@@ -134,7 +104,6 @@ def _load_package(package: Path | None) -> tuple[dict[str, Path], list[Path]]:
     runtime_docs = staged_runtime_docs or [
         Path("/home/ubuntu/.agents/skills/小雪"),
         Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index"),
-        Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index"),
         Path("/home/ubuntu/.agents/skills/esports/knowledge/lol-knowledge-engine"),
     ]
     return targets, runtime_docs
@@ -149,7 +118,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
 
 def _skill_names() -> set[str]:
     names: set[str] = set()
-    for skill_file in Path("/home/ubuntu/.agents/skills").glob("*/SKILL.md"):
+    for skill_file in Path("/home/ubuntu/.agents/skills").rglob("SKILL.md"):
         text = skill_file.read_text(encoding="utf-8", errors="replace")[:4000]
         match = re.search(r"(?m)^name:\s*[\"']?([^\n\"']+)", text)
         if match:
@@ -160,15 +129,23 @@ def _skill_names() -> set[str]:
 def _check_config(config: dict[str, Any], mcp_target: Path) -> list[str]:
     errors: list[str] = []
     server = (config.get("mcp_servers") or {}).get("xiaoxue-product") or {}
-    expected_command = "/home/ubuntu/.hermes/hermes-agent/venv/bin/python"
+    expected_command = str(PROJECT_MCP_PYTHON)
     expected_script = "/home/ubuntu/xiaoxue-web/scripts/hermes/xiaoxue_product_mcp.py"
     if server.get("command") != expected_command:
-        errors.append("xiaoxue-product MCP 没有使用 Hermes Python")
+        errors.append("xiaoxue-product MCP 没有使用项目 .venv-mcp")
     if expected_script not in (server.get("args") or []):
         errors.append("xiaoxue-product MCP 没有指向小雪正式适配器")
-    included_tools = set(((server.get("tools") or {}).get("include") or []))
-    if included_tools != REQUIRED_MCP_TOOLS:
-        errors.append(f"xiaoxue-product 工具白名单不完整：{sorted(included_tools)}")
+    include_value = (server.get("tools") or {}).get("include")
+    required_tools = set(json.loads(MCP_TOOL_SNAPSHOT.read_text(encoding="utf-8")))
+    # Omitting include is intentional: the server itself owns the public tool
+    # snapshot. If an explicit include list exists, it must match that snapshot
+    # rather than a separately maintained hand-written copy.
+    included_tools = set(include_value or []) if include_value is not None else required_tools
+    if included_tools != required_tools:
+        errors.append(
+            f"xiaoxue-product 工具白名单不一致：缺少 {sorted(required_tools - included_tools)}，"
+            f"多出 {sorted(included_tools - required_tools)}"
+        )
     if not mcp_target.is_file():
         errors.append(f"MCP 候选不存在：{mcp_target}")
 
@@ -177,24 +154,25 @@ def _check_config(config: dict[str, Any], mcp_target: Path) -> list[str]:
         errors.append("飞书没有启用 xiaoxue-product")
     if "no_mcp" in feishu_tools:
         errors.append("飞书仍被 no_mcp 禁止加载产品工具")
-    forbidden_generic = {"terminal", "file"} & feishu_tools
-    if forbidden_generic:
-        errors.append(f"飞书仍暴露可退回旧路径的通用工具：{sorted(forbidden_generic)}")
+    enabled_plugins = set(((config.get("plugins") or {}).get("enabled") or []))
+    boundary_plugin = PRODUCT_BOUNDARY_PLUGIN / "__init__.py"
+    boundary_manifest = PRODUCT_BOUNDARY_PLUGIN / "plugin.yaml"
+    if "xiaoxue-product-boundary" not in enabled_plugins:
+        errors.append("飞书通用能力缺少 xiaoxue-product-boundary 一次性审批边界")
+    if not boundary_manifest.is_file():
+        errors.append(f"产品边界插件清单不存在：{boundary_manifest}")
+    if boundary_plugin.is_file():
+        boundary_source = boundary_plugin.read_text(encoding="utf-8", errors="replace")
+        if 'ctx.register_hook("pre_tool_call"' not in boundary_source:
+            errors.append("产品边界插件没有注册 pre_tool_call 审批钩子")
+        if '"action": "approve"' not in boundary_source:
+            errors.append("产品边界插件没有使用 Hermes 的一次性审批动作")
+    else:
+        errors.append(f"产品边界插件实现不存在：{boundary_plugin}")
 
     tool_search = ((config.get("tools") or {}).get("tool_search") or {})
     if str(tool_search.get("enabled", "")).lower() not in {"off", "false", "0"}:
         errors.append("xiaoxue-product 仍会被延迟工具搜索隐藏")
-
-    platform_hint = str((((config.get("platform_hints") or {}).get("feishu") or {}).get("append") or ""))
-    for marker in (
-        "never use terminal, file, read_file, search_files, or shell",
-        "xiaoxue_get_today",
-        "xiaoxue_search_external_news",
-        "call it exactly once",
-        "without a generic-tool fallback",
-    ):
-        if marker not in platform_hint:
-            errors.append(f"飞书平台路由提示缺少强制约束：{marker}")
 
     channels = ((config.get("channels") or {}).get("feishu") or {})
     display = (((config.get("display") or {}).get("platforms") or {}).get("feishu") or {})
@@ -234,9 +212,16 @@ def _check_runtime_docs(paths: list[Path]) -> list[str]:
 def _check_root_route(root_skill: Path) -> list[str]:
     text = root_skill.read_text(encoding="utf-8")
     errors = []
-    for token in ("lol-competition-basics", "明确提到“TK”", "xiaoxue_remember"):
+    for token in ("lol-competition-basics", "xiaoxue_remember"):
         if token not in text:
             errors.append(f"小雪根入口缺少确定性路由：{token}")
+    tk_norms = (
+        ("普通聊天", "提到 TK", "不自动保存"),
+        ("明确要求", "写进 TK", "才写入"),
+    )
+    for markers in tk_norms:
+        if not all(marker in text for marker in markers):
+            errors.append("小雪根入口的 TK 持久化边界不完整：" + " / ".join(markers))
     return errors
 
 

@@ -1,0 +1,225 @@
+> 历史快照：2026-10-29 已将有效项目约定并入根 `AGENTS.md`，实现位置归入 `docs/PROJECT-MAP.md`。下文的旧入口、数量与流程不再作为当前事实。
+
+# 小雪工作台 — 模块边界声明
+
+> 改任何模块前先读这里，防止改A炸B。
+
+## 前端工作台（xiaoxue-web/）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 小雪电竞交易助理的深度整理台：队伍资料看宏观总览与单队画像/三维/队伍 TK；当前赛事先读赛事与近期比赛，再进入具体对局和持续判断；交易后复查由钧钧沿交易 TK 完成；TK 资料库看全部长期知识。日常时间紧时直接在 HarmonyOS/飞书和小雪对话，前端用于有时间时的横向对比、定性/定量资料整理和确认后留存 |
+| **技术栈** | Vite(5173) + FastAPI(8880) + SQLite |
+| **数据来源** | 只通过 FastAPI `/api/*` 端点获取数据 |
+| **禁止** | 不直接读数据库文件，不调 RAG API，不写飞书文档 |
+| **对外接口** | `/api/teams`, `/api/team-3d/{team}`, `/api/tk/search`, `/api/tk/library`, `/api/trading-tk`, `/api/profile-full/{team}`, `/api/current-event/dashboard`, `/api/current-event/match-desk`, `/api/current-event/match-run*`（`match-workspace` 仅兼容读）, `/api/current-event/score-evidence`, `/api/lineup-workflow/prepare`, `/api/health` |
+| **当前边界** | 一级导航为队伍资料、当前赛事、足球观察台、TK 资料库、项目中心。当前源码默认当前赛事，发布情况查专项 SSD；已有深链保留。网页支持基于已有材料追问，不自主外搜、不永久保存聊天；单场记录仅明确保存时写入。普通 TK 与交易 TK 共用笔记库；BP/阵容仍在小雪对话；原「盘口记录」已退役，历史内容只在交易 TK 正源 |
+
+**文件清单：**
+```
+xiaoxue-web/
+├── main.py                 # 极薄启动入口，只创建应用
+├── xiaoxue_api/app.py      # 后端组合根：装载模块、挂静态资源、汇总状态
+├── xiaoxue_api/core/       # 模块装载、隔离配置、共享数据库连接
+├── xiaoxue_api/modules/    # 后端功能模块；每个模块分 presentation/service/repository/public
+├── index.html              # 工作台布局
+├── src/app/                # 前端启动、模块装载与状态汇总
+├── src/modules/            # 当前赛事、足球、队伍、TK、项目中心独立目录
+├── src/shared/             # 共享 API 与通用模块工具
+└── memory-bank/            # 项目记忆库 ← 新对话先读这里
+```
+
+## 模块隔离与状态
+
+| 状态 | 含义 |
+|------|------|
+| `healthy` | 该模块当前可用，可独立进入和验收 |
+| `broken` | 该模块当前待修，必须显示原因，但不得阻断其他模块 |
+| `disabled` | 非当前主线或旧兼容能力，明确暂停，不计为整站故障 |
+
+- 应用外壳只有自身不可用时才判定整站不可用；非关键模块故障只进入降级状态。
+- 各模块配置分别放在自己的目录，某个配置缺失或损坏只影响本模块。
+- 后端表现层只处理 HTTP，请求交给业务层；业务层只通过仓储层访问文件、数据库和外部服务。
+- 后端跨模块调用只允许导入目标模块的 `public.py`，不得访问对方内部层。
+- 前端每个功能分别拥有 `view.js / service.js / api.js / public.js`；主入口只装载、导航和分发命令。
+- 前端跨模块协作只通过 `public.js` 或语义事件，不读取其他模块页面节点和内部状态。
+- 交易记录沿交易 TK 正源；原 `market_notes` 页面、接口、模块和表已退役，旧交易接口不恢复写入。
+- 近期窗口与时刻解析集中在 `xiaoxue_api/modules/match/event/preparation.py`；公开证据身份、引用与共享复用集中在同目录 `evidence.py`。后者只把明确已筛选的原来源送入新推导，不把系统旧结论反馈为证据。
+- 近期单场准备按当前配置的明确赛事别名定位同一缓存；历史比赛和正式记录主键不迁移。预案存储兼容与条目合成集中在 `xiaoxue_api/modules/match/event/trade_plan.py`；显式保存、冻结及单场记录编排仍沿原 service/repository。
+- 单场记录词汇、栏目／阶段目录及纯展示投影集中在 `xiaoxue_api/modules/match/event/match_records.py`；空记录和已有记录共用目录，展示本身不保存、不改原判断。service／repository 继续承担规范身份、权限、写入与暂停恢复。
+- 单场记录统一走 `match_runs` / `match_run_facts` / `match_run_entries` / `match_run_revisions`：保存可暂停、切换和恢复的临时比赛状态、依据账本、环节记录和修订。`focus` 只是当前位置，不规定下一步。旧 `match_workspaces` / `match_observations` 自 2026-10-05 收拢后不再接受新写入，仅保留兼容。单场体系不写 TK、画像、三维、盘口记录，也不自动改写当前判断。
+- 前端模块分别装载；一个模块加载或挂载失败后继续装载后续模块。
+- 默认验收只读、逐模块继续执行；真实数据写入验收必须显式开启。
+
+## 小雪项目协作与同步
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 说明小雪 runtime 改动如何进入开发维护、验证、Git 留痕和 sync 闭环 |
+| **团队运行手册** | `/home/ubuntu/.hermes/team/TEAM_OPERATING_GUIDE.md` |
+| **默认开发关系** | 小雪负责电竞业务的完整使用与业务操作；小白负责规则改造、工程实现、跨层排障、部署、验收和 Hermes 运维。小雪保留按需查看、讨论和说明业务影响的能力 |
+| **Codex 职责** | 小白按需使用的后台施工或复审工具，不拥有项目主控权 |
+| **小白职责** | 开发维护优先入口：方案、实现、验证、交付、Hermes 运维与 Bot 恢复；完成后日常使用继续回到小雪入口 |
+| **小雪同步矩阵** | PRD/SSD、`xiaoxue-web`、memory-bank、skill、钧钧工作台、sync、GitHub |
+| **禁止** | 不把 Codex 写成项目主控；不把小雪描述为能力或权限不足；不自动交易 |
+
+## 日报管道（daily-report cron）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 每日自动生成LOL电竞日报 → 输出飞书文档 |
+| **数据来源** | SQLite数据库（matches/schedules/team_3d_data）+ RAG API（TK语义搜索）+ DailyContext.web_sources.public_opinion（豆包搜索只采舆论） |
+| **禁止** | 不改数据库表结构，不改前端代码，不碰前端的 FastAPI |
+| **输出** | 飞书云文档（文件夹 FiyGfjl6ml7nIidfvhHc5LIvnod） |
+| **材料包** | `collect_daily_context.py` 输出 `daily_context_YYYY-MM-DD.json`；`collect_online_sources.py` 输出 `online_sources_YYYY-MM-DD.json` 并写入 `web_sources.public_opinion` |
+| **联网配置** | `/home/ubuntu/lol_data/config/daily_online_sources.json` 只管理舆论查询；BP/盘口/战报不得走豆包额度 |
+| **结构契约** | `daily_report_contract.py` 固定 section 顺序、逐场模块、禁入项和来源校验 |
+| **脚本** | `daily_pipeline.py` 是唯一生产入口；`postprocess_daily_report.py`/`inject_pre_match_trading_layer.py` 仅为停用兼容文件，不得进入生产 |
+| **发布前门禁** | 读取 `data_readiness_manifest_YYYY-MM-DD.json`；仅当天 `mode=full / ok=true` 且 ScoreGG、TS 两阶段成功时放行，check-only/畸形清单一律阻断 |
+| **运行态可见性** | `/api/health` 返回 `checks.data_readiness`，可区分 ready、diagnostic_only 与 missing_or_blocked |
+
+## 日报联网资料层（daily-online-sources）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 在日报渲染前采集当天赛前舆论资料 |
+| **主链路** | `scripts/collect_online_sources.py` → `scripts/online_sources_YYYY-MM-DD.json` → `DailyContext.web_sources` → `build_daily_report.py` |
+| **搜索后端** | `byted-web-search`（豆包搜索），仅用于 `public_opinion` |
+| **配置** | `/home/ubuntu/lol_data/config/daily_online_sources.json`，新增/修改查询词优先改配置 |
+| **Skill** | `opinion-sources` 负责舆论材料契约、社区舆论口径与搜索能力（2026-10-01 三合一） |
+| **禁止** | 不让模型在 Markdown 正文里临时联网搜索；不把搜索结果手工 `content.replace()` 进日报；不使用豆包搜索采 BP/盘口/战报 |
+
+## 小雪搜索路由（interactive search routing）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 将小雪的查询意图区分为内部事实、普通外部资料、正式日报舆情和分析判断 |
+| **内部事实** | LOL 数据库 / ScoreGG / Wiki / TK-RAG 优先 |
+| **普通联网** | `scripts/search_web.py` → 本机零 Key 多源搜索（8338 / mcphub + Bing/360 回退）；`dsearch` 兜底；B站/RSS 资料发现；Exa 仅在已有可用额度时补充 |
+| **正式舆情** | `opinion-sources` + 豆包冻结包，只写 `public_opinion` |
+| **判断入口** | BP/阵容/盘口仍走 `lol-lineup-analysis` 和结构化数据，不由搜索器直接给结论 |
+| **执行契约** | `/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index/references/search-routing.md` |
+| **当前边界** | Agent Reach 仅用于交互式查询和知识发现，不自动接入日报 cron，不修改 DailyContext schema |
+
+## 赛前交易判断能力（非独立日报）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 交易 TK 与当前交易预案分别由各自正式入口维护；原盘口记录已退役；不再生成第二份日报或独立发布层 |
+| **主链路** | LOL 日报正式业务实体：`/home/ubuntu/xiaoxue-web/scripts/tasks/xiaoxue_daily_report.py` → `daily_pipeline.py --publish`；Hermes 同名脚本只是通过 `os.execv` 切到项目 `.venv` 的薄 wrapper |
+| **日报关系** | 日报只读取已确认的当前交易预案与交易 TK；不注入 `赛前交易判断层`，不以交易判断文件作为发布门禁 |
+| **数据来源** | 当前赛事预案、交易 TK 与队伍 TK 中 `type=trading_note`；原盘口记录数据已归入交易 TK，不再存在 `market_notes` 活投影或独立正源 |
+| **禁止** | 不建立平行交易规律库或独立 SQLite 表，不恢复 `tk_library`，不接旧 `/api/trades` 统计面板，不用 RAG 搜索作为主判断 |
+| **降级** | 没有命中有效交易 TK 或基础面不足时写“暂不推荐”，不硬编方向 |
+
+## 交易 TK（同一资料库，按一般到特殊归类）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 记录钧钧明确点名写进 TK 的交易规律；版本共性、赛区环境、队伍特点、选手特点都进入同一套 TK |
+| **归属** | 全局 → 赛区 → 队伍 → 选手。版本共性归全局，LPL/LCK 等环境归赛区，换人/打法/阵容习惯归队伍，个人打法归选手；原有队伍交易 TK 不迁移、不丢失 |
+| **结构标签** | 新交易 TK 使用 `scope=global/region/team/player`、`region`、`subject`、`version_context`、`category`、`status=candidate/confirmed/invalid`；原有队伍 `type=trading_note` 继续兼容读取 |
+| **写入入口** | `POST /api/team-trading-notes` / `POST /api/team-trading-notes/from-text` 会先标准化队伍名，失败则拒绝写入 |
+| **读取入口** | `GET /api/team-trading-notes/{team}` 只读解析 TK 文件中的结构化块 |
+| **统一入口** | `POST/GET/PATCH /api/trading-tk` 创建、搜索和复查同一交易 TK；原有队伍 `type=trading_note` 同时以只读兼容项出现在统一列表与单场调用中，不复制原文；阶段整理页直接展示层级、主题和状态 |
+| **单场调用** | 打开一场比赛时，只取该场的全局、所属赛区、双方队伍和当前首发选手交易 TK，再进入阵容；待验证只作提醒，不自动当趋势采用 |
+| **日报使用** | 日报按每场对阵双方精确读取 active 队伍交易 TK，并放在“交易 TK”段落，优先于普通队伍 TK |
+| **日常口语** | “把 LCK 这版本偏运营写进 TK”归赛区；“记到 TK：AL 团战易翻盘”归队伍；旧式“小雪记到 HLE：虐菜大人头”继续写原队伍交易 TK。只说“记住/记一下/帮我记着”不写 TK。 |
+
+## 原盘口记录（2026-10-25 已退役）
+
+| 属性 | 值 |
+|------|-----|
+| **当前状态** | 页面、`/api/market-notes` 接口、`xiaoxue_api/modules/market_notes` 模块、MCP 工具与 SQLite 表均已移除；不得按旧文档恢复 |
+| **正式替代** | 交易 TK：`POST/GET/PATCH /api/trading-tk`；队伍交易笔记：`/api/team-trading-notes` |
+| **历史数据** | 已归入交易 TK，当前生产库不再有 `market_notes` 表 |
+| **验证** | `GET /api/market-notes` 应返回 404；交易 TK 可创建、读取、更新并读回 |
+
+## 数据就绪（scoregg + TS cron）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 顺序执行 ScoreGG 刷新 → TS 更新 → 表计数/新鲜度/TS 覆盖校验 → 原子写入 readiness manifest；缺库、坏库、超时也留失败清单 |
+| **数据来源** | ScoreGG API |
+| **禁止** | 不读RAG，不改前端，不生成飞书文档 |
+| **主入口** | 正式业务实体：`/home/ubuntu/xiaoxue-web/scripts/tasks/xiaoxue_data_readiness.py` → `/home/ubuntu/lol_data/scripts/data_readiness_pipeline.py`；Hermes 同名脚本只是通过 `os.execv` 切到项目 `.venv` 的薄 wrapper |
+| **写入目标** | `/home/ubuntu/lol_data/英雄联盟数据库.db` 与 `scripts/data_readiness_manifest_YYYY-MM-DD.json` |
+
+## B站/公众号知识导入（knowledge-import cron）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 从B站UP主视频+微信公众号文章提取结构化知识入库 |
+| **数据来源** | B站API（字幕）+ 微信读书搜一搜 |
+| **禁止** | 不改数据库表结构，不碰前端 |
+| **写入目标** | Wiki TK 目录 → MemPalace `xiaoxue-tk` 分区（本机 `8770` 增量入口）；旧 RAG `8768` 服务已停用 |
+| **固定计划** | `xiaoxue_knowledge_import.py` 先生成 `knowledge_import_manifest_YYYY-MM-DD.json`；模型只处理 `bilibili_candidates`，不得自行扩大范围 |
+
+## TK搜索（MemPalace 入口）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 语义搜索TK知识库，返回相关条目 |
+| **数据来源** | MemPalace `xiaoxue-tk` wing（714 份 Wiki TK 条目） |
+| **对外接口** | `POST localhost:8770/api/search`；小雪工作台通过 `/api/tk/search` 使用 |
+| **禁止** | 不直接读SQLite |
+| **依赖** | `xiaoxue-tk-mempalace.service`；旧 `knowledge-rag.service` unit、索引、日志和专属环境已删除，仅留离线代码归档 |
+
+## TK资料库（按时间阅读）
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 给钧钧按时间浏览可读 TK 正文，研究队伍、选手、战术、队伍交易 TK 与通用交易 TK |
+| **主接口** | `/api/tk/library`（时间/关键词/队伍筛选与分页）、`/api/tk/entry/{filename}`（完整正文） |
+| **前端位置** | 顶部独立“TK资料库”页面 |
+| **阅读口径** | 正文与结论优先；明确显示 TK 日期；来源、文件名和导入字段不进入阅读界面 |
+| **完整性** | 有实际正文的短条目也保留；只过滤空白或失败导入指针；全文不得截断为 800 字 |
+| **排序** | 按 `created` 日期降序，缺日期时用文件更新时间；每次 30 条，可继续加载更早内容 |
+
+## 旧版本字段迁移兼容
+
+| 属性 | 值 |
+|------|-----|
+| **职责** | 记录旧 `team_3d_data.version_understanding` 字段已完成迁移 |
+| **迁移结果** | 30 条有效内容进入对应队伍 TK；1 条测试内容跳过；原字段清空并保留内部兼容 |
+| **用户可见** | 不再有队伍版本栏目；全局版本统一叫版本理解 |
+| **保留接口** | `/api/version-understanding/{team}` 仅作旧客户端兼容，不接入工作台主路径 |
+
+## 数据库（SQLite）
+
+| 属性 | 值 |
+|------|-----|
+| **位置** | `/home/ubuntu/lol_data/英雄联盟数据库.db` |
+| **核心表** | teams, rosters, schedules, matches, team_3d_data, team_profiles, trading_rules, match_trade_plans, match_runs, match_run_facts, match_run_entries, match_run_revisions；`match_workspaces` / `match_observations` 仅兼容读 |
+| **禁止** | 不在 scripts/ 下创建同名影子文件（会遮蔽真实DB） |
+| **访问方式** | 必须通过 `config.DB_PATH` 或 `db_util.get_db()` |
+
+## 队伍画像（SKILL.md）
+
+| 属性 | 值 |
+|------|-----|
+| **读取顺序** | Wiki 实体画像 → xiaobai/main SKILL.md → 数据库只读兜底画像 |
+| **SKILL位置** | `~/.hermes/skills/{队伍}-team-profile/SKILL.md` 或 xiaobai profile skills |
+| **基础覆盖** | teams/team_3d_data 当前覆盖 31 支；LPL+LCK 基础数据 24 支 |
+| **手工画像** | AL, BLG, JDG, WE, TES, DK, BRO, KT（8支）为旧口径手工覆盖 |
+| **兜底边界** | 没有 Wiki/SKILL 时，只拼接 teams、rosters、team_3d_data、msi_ts_seed；不推断队伍风格，不冒充人工画像 |
+
+## 飞书附件发送
+
+| 属性 | 值 |
+|------|-----|
+| **推荐路径** | Hermes `send_message` 工具正文里使用 `MEDIA:/absolute/path/to/file` |
+| **适用** | 私聊发送二维码、截图、图片、文件附件 |
+| **禁止** | 不把图片/base64/JSON 当正文发给钧钧；不优先折腾 lark-cli 用户 OAuth scope |
+| **参考** | `/home/ubuntu/.hermes/profiles/xiaobai/skills/devops/hermes-team-ops/references/feishu-private-media-send.md` |
+
+---
+
+## 三条硬规矩（每次开发对话开头提醒AI）
+
+1. **一个文件一个职责** — 别把日报生成和数据库导入写在同一个Python文件里
+2. **盘口只存手写草稿** — 不自动交易、不自动生成方向、不展示收益率幻觉
+3. **画像缺口要标来源** — 数据库兜底画像必须说明来源，不能冒充手工 SKILL
+4. **能改配置就不改代码** — 新增数据项用JSON/YAML配置，不写死在代码里
+5. **日报只走单流水线** — 不让模型手工改 Markdown，不运行停用后处理链；模块顺序、来源、缺失和禁入项由 `daily_report_contract.py` 校验
+6. **舆论资料先采集再写作** — 舆论必须先进入 `online_sources_YYYY-MM-DD.json` / `DailyContext.web_sources.public_opinion`，正文只能引用材料包；BP/盘口/战报另接专用来源

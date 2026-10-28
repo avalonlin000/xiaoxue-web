@@ -20,27 +20,27 @@
 - **36f19ad** · 2026-08-15 20:36 · refactor: separate project capability from agent adapters
   - 改动：`AGENTS.md, config/agents/agent-adapter.example.json, config/agents/xiaomei.json, config/agents/xiaoxue.json, tests/test_project_identity.py, xiaoxue_api/core/project_identity.py`
 - **d11f170** · 2026-08-15 20:35 · feat: establish Xiaoxue 3.0 module contracts
-  - 改动：`config/module-contract.json, config/project-contract.json, docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md, docs/小雪项目总使用说明.md, scripts/verify_capability_delivery.py (+9)`
+  - 改动：`config/module-contract.json, config/project-contract.json, docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md, docs/小雪项目总使用说明.md, scripts/verify_capability_delivery.py (+9)`
 - **4c29cfe** · 2026-08-04 17:24 · docs: redefine xiaoxue agent-native architecture
-  - 改动：`AGENTS.md, docs/README.md, docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`AGENTS.md, docs/README.md, docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **ef72467** · 2026-08-04 16:40 · record team profile routing regression
-  - 改动：`docs/交易信息系统-工程实现.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md`
 - **44c9a39** · 2026-08-04 16:36 · narrow team profile skill triggers
-  - 改动：`docs/交易信息系统-工程实现.md, tests/test_xiaoxue_skill_contract.py`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, tests/test_xiaoxue_skill_contract.py`
 - **8218d19** · 2026-08-04 16:26 · clarify cross-module natural intent rule
-  - 改动：`docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-总体设计.md`
 - **e701331** · 2026-08-04 16:25 · fix natural business routing guard
-  - 改动：`docs/交易信息系统-工程实现.md, tests/test_xiaoxue_skill_contract.py`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, tests/test_xiaoxue_skill_contract.py`
 - **3284d89** · 2026-08-04 15:52 · docs: record natural match routing acceptance
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **f12060a** · 2026-08-04 14:34 · docs: unify natural intent and side-effect rules
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **8ada28d** · 2026-08-04 13:56 · docs: require explicit intent for external search
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **85fd856** · 2026-08-04 12:01 · docs: add recommendations to information conflicts
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **3415e13** · 2026-08-04 11:59 · docs: define natural match information flow
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md`
 - **0f99957** · 2026-08-01 22:35 · feat: release composable Xiaoxue trading workflow
   - 改动：`index.html, memory-bank/modules.md, memory-bank/progress.md, scripts/check_hermes_migration_contract.py, scripts/hermes/xiaoxue_product_mcp.py, src/app/module-catalog.js (+31)`
 - **49f4264** · 2026-07-31 03:32 · feat: add Xiaoxue product MCP entry
@@ -91,7 +91,7 @@
 - **ee6e962** · 2026-08-25 03:05 · feat: surface BO5 preparation context
   - 改动：`config/project-center-content.json, index.html, memory-bank/progress.md, src/main.js, src/modules/current-event/view.js, src/modules/tk-library/public.js (+8)`
 - **6f8a002** · 2026-08-22 16:44 · feat: 收口TS周期信号与队伍重点展示
-  - 改动：`config/project-center-content.json, docs/交易信息系统-工程实现.md, index.html, memory-bank/progress.md, src/modules/teams/view.js, xiaoxue_api/modules/fundamentals/repository.py (+1)`
+  - 改动：`config/project-center-content.json, docs/archive/designs/交易信息系统-工程实现.md, index.html, memory-bank/progress.md, src/modules/teams/view.js, xiaoxue_api/modules/fundamentals/repository.py (+1)`
 - **94eda33** · 2026-08-21 01:51 · feat: 文档归档 + champion_static 2.0 + project_center/version_understanding 模块 + current_event 前端重构
   - 改动：`.gitignore, AGENTS.md, config/module-contract.json, config/project-center-content.json, config/project-contract.json, config/trading-methods.json (+56)`
 # 小雪项目 · 开发变更流水（自动生成，勿手编）
@@ -153,7 +153,7 @@
 - 新增同步 commit 数：1（本次写入 1 条）
 
 - **e4c2653** · 2026-09-30 18:12 · feat: fundamentals reads active TS stage (domestic/international switch)
-  - 改动：`docs/交易信息系统-工程实现.md, scripts/acceptance_check.py, scripts/verify_capability_delivery.py, tests/test_fundamentals_active_stage.py, xiaoxue_api/modules/fundamentals/manifest.py, xiaoxue_api/modules/fundamentals/repository.py (+1)`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, scripts/acceptance_check.py, scripts/verify_capability_delivery.py, tests/test_fundamentals_active_stage.py, xiaoxue_api/modules/fundamentals/manifest.py, xiaoxue_api/modules/fundamentals/repository.py (+1)`
 # 小雪项目 · 开发变更流水（自动生成，勿手编）
 
 > 本文件由 `scripts/sync_development_view.py` 自动维护。它把 git 真实改动
@@ -168,7 +168,7 @@
 - 新增同步 commit 数：1（本次写入 1 条）
 
 - **ac8d892** · 2026-10-02 16:44 · feat: 内容收敛收口 + 动态事实带时间 + 德杯/世界赛适配
-  - 改动：`AGENTS.md, config/module-contract.json, config/project-center-content.json, docs/交易信息系统-工程实现.md, docs/小雪项目总使用说明.md, memory-bank/changelog.md (+29)`
+  - 改动：`AGENTS.md, config/module-contract.json, config/project-center-content.json, docs/archive/designs/交易信息系统-工程实现.md, docs/小雪项目总使用说明.md, memory-bank/changelog.md (+29)`
 # 小雪项目 · 开发变更流水（自动生成，勿手编）
 
 > 本文件由 `scripts/sync_development_view.py` 自动维护。它把 git 真实改动
@@ -183,7 +183,7 @@
 - 新增同步 commit 数：1（本次写入 1 条）
 
 - **a555f40** · 2026-10-15 21:32 · feat: complete unified trading information skeleton
-  - 改动：`AGENTS.md, config/module-contract.json, config/project-center-content.json, config/project-contract.json, docs/PROJECT-MAP.md, docs/交易信息系统-工程实现.md (+33)`
+  - 改动：`AGENTS.md, config/module-contract.json, config/project-center-content.json, config/project-contract.json, docs/PROJECT-MAP.md, docs/archive/designs/交易信息系统-工程实现.md (+33)`
 # 小雪项目 · 开发变更流水（自动生成，勿手编）
 
 > 本文件由 `scripts/sync_development_view.py` 自动维护。它把 git 真实改动
@@ -198,7 +198,7 @@
 - 新增同步 commit 数：2（本次写入 2 条）
 
 - **c20f101** · 2026-10-15 23:37 · feat: add project architecture and object directory views
-  - 改动：`docs/交易信息系统-工程实现.md, docs/交易信息系统-总体设计.md, docs/小雪项目总使用说明.md, index.html, memory-bank/progress.md, package-lock.json (+5)`
+  - 改动：`docs/archive/designs/交易信息系统-工程实现.md, docs/archive/designs/交易信息系统-总体设计.md, docs/小雪项目总使用说明.md, index.html, memory-bank/progress.md, package-lock.json (+5)`
 - **bf03a6b** · 2026-10-15 21:41 · docs: sync development history for v2.1.0
   - 改动：`memory-bank/changelog.md, memory-bank/progress.md`
 # 小雪项目 · 开发变更流水（自动生成，勿手编）
@@ -230,13 +230,13 @@
 - 新增同步 commit 数：6（本次写入 6 条）
 
 - **9b6117f** · 2026-10-17 00:37 · feat(lol): 外部事实入库（队伍/价格）+ 覆盖面来源可见 + 变化推送 + 文档更新
-  - 改动：`docs/LOL信息与自动化整合-PRD.md, docs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md, tests/test_team_intake.py, xiaoxue_api/modules/business_mutations/manifest.py, xiaoxue_api/modules/business_mutations/service.py (+2)`
+  - 改动：`docs/archive/designs/LOL信息与自动化整合-PRD.md, docs/archive/designs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md, tests/test_team_intake.py, xiaoxue_api/modules/business_mutations/manifest.py, xiaoxue_api/modules/business_mutations/service.py (+2)`
 - **8a8e864** · 2026-10-16 23:35 · docs(lol): 立项 SSD 落地状态 + 进度记录（S1/S2 交付）
-  - 改动：`docs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md`
+  - 改动：`docs/archive/designs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md`
 - **c1d5db1** · 2026-10-16 23:22 · feat(lol_scope): 新增范围派生与覆盖面只读能力（S1）
-  - 改动：`docs/LOL信息与自动化整合-工程实现.md, docs/PROJECT-MAP.md, tests/test_lol_scope_service.py, xiaoxue_api/modules/lol_scope/__init__.py, xiaoxue_api/modules/lol_scope/manifest.py, xiaoxue_api/modules/lol_scope/presentation.py (+3)`
+  - 改动：`docs/archive/designs/LOL信息与自动化整合-工程实现.md, docs/PROJECT-MAP.md, tests/test_lol_scope_service.py, xiaoxue_api/modules/lol_scope/__init__.py, xiaoxue_api/modules/lol_scope/manifest.py, xiaoxue_api/modules/lol_scope/presentation.py (+3)`
 - **0f73f14** · 2026-10-16 23:09 · docs: 新增 LOL 信息与自动化整合立项 PRD，并在项目地图登记权威等级
-  - 改动：`docs/LOL信息与自动化整合-PRD.md, docs/PROJECT-MAP.md`
+  - 改动：`docs/archive/designs/LOL信息与自动化整合-PRD.md, docs/PROJECT-MAP.md`
 - **4443e3f** · 2026-10-16 17:15 · feat: 小雪菜单与模块说明改为项目中心内容唯一正源
   - 改动：`docs/PROJECT-MAP.md, docs/小雪项目总使用说明.md, index.html, scripts/xiaoxue_menu.py, src/modules/project-center/view.js, tests/project_center_mobile_ux.test.mjs (+1)`
 - **ad397bb** · 2026-10-16 17:15 · fix: 看板 TBD 不再整页 400、盘口页写入改接交易 TK、项目中心状态与内容对齐现状
@@ -255,4 +255,4 @@
 - 新增同步 commit 数：1（本次写入 1 条）
 
 - **92f8dd6** · 2026-10-17 15:52 · docs(automation): 补记受管任务的形态约束与 2026-10-17 事故修复
-  - 改动：`docs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md`
+  - 改动：`docs/archive/designs/LOL信息与自动化整合-工程实现.md, memory-bank/progress.md`

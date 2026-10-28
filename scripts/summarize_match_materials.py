@@ -3,9 +3,9 @@ from __future__ import annotations
 
 import json
 import re
-from pathlib import Path
 import sys
 import time
+from xiaoxue_api.core import model_runtime
 
 
 PROMPT = """你替钧钧阅读并粗筛比赛信息，交付值得知道的内容，不是逐篇翻译、压缩原文或凑字数。不做交易判断。
@@ -95,34 +95,15 @@ def parse_model_json(text: str) -> dict:
 
 def main() -> None:
     packet = json.loads(sys.stdin.read(200000))
-    sys.path.insert(0, str(Path("/home/ubuntu/.hermes/hermes-agent")))
-    from hermes_cli.config import load_config
-    from hermes_cli.runtime_provider import resolve_runtime_provider
-    from providers import get_provider_profile
     from openai import OpenAI
 
-    config = load_config()
-    model = config["model"]["default"]
-    runtime = resolve_runtime_provider(target_model=model)
-    if runtime["api_mode"] != "chat_completions":
-        raise ValueError("当前协议不支持此次中文整理")
-    profile = get_provider_profile(runtime["provider"])
-    effort = config.get("agent", {}).get("reasoning_effort")
-    extra_body, extra_args = profile.build_api_kwargs_extras(
-        reasoning_config={"enabled": effort not in ("none", "off", "disabled"), "effort": effort}, model=model)
-    headers = {**profile.default_headers,
-               **config.get("providers", {}).get(runtime["provider"], {}).get("extra_headers", {}),
-               **runtime.get("extra_headers", {})}
     prompt = select_prompt(packet)
-    kwargs = dict(model=model, messages=[{"role": "system", "content": prompt},
-                  {"role": "user", "content": json.dumps(packet, ensure_ascii=False)}],
-                  max_tokens=config["model"].get("max_tokens", 16384),
-                  response_format={"type": "json_object"}, stream=True, **extra_args)
-    if extra_body:
-        kwargs["extra_body"] = extra_body
+    kwargs = model_runtime.request_options()
+    kwargs.update(messages=[{"role": "system", "content": prompt},
+                            {"role": "user", "content": json.dumps(packet, ensure_ascii=False)}],
+                  response_format={"type": "json_object"})
     parts, started = [], time.monotonic()
-    with OpenAI(api_key=runtime["api_key"], base_url=runtime["base_url"],
-                default_headers=headers, timeout=95, max_retries=0) as client:
+    with OpenAI(**model_runtime.client_options()) as client:
         with client.chat.completions.create(**kwargs) as stream:
             for chunk in stream:
                 if time.monotonic() - started > 90:

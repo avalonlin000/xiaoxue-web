@@ -1,68 +1,17 @@
-> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+# 项目文档索引
 
-# 小雪工作台 — 来源规格归档说明
+| 内容 | 入口 |
+|---|---|
+| 唯一现行项目约定、定位和使用原则 | [AGENTS.md](../AGENTS.md) |
+| Full-Stack Web 轻量分区、代码和任务导航 | [architecture/PROJECT-MAP.md](architecture/PROJECT-MAP.md) |
+| 对象与能力范围 | [project-contract.json](../config/project-contract.json) |
+| 模块接口、字段和消费者 | [module-contract.json](../config/module-contract.json) |
+| 用户模块与功能菜单 | [project-center-content.json](../config/project-center-content.json) |
+| 当前进度、验证和未完成项 | [progress.md](../memory-bank/progress.md) |
+| 未标记冻结的需求资料 | [requirements/](requirements/) |
+| 冻结的历史 PRD、SSD 和规划 | [archive/designs/](archive/designs/) |
+| 历史审计 | [archive/audits/](archive/audits/) |
+| 历史决定及当时证据 | [DECISIONS.md](archive/DECISIONS.md) |
+| 本次收敛前的地图、模块说明、Loop、旧规格和模型交接 | [2026-10-29-guidance](archive/2026-10-29-guidance/) |
 
-> 状态：来源文档 / 历史基线
-> 归档说明时间：2026-06-28
-> 新文档位置：`/home/ubuntu/life-os-frontend-v2/docs/products/xiaoxue-esports-life/`
-
----
-
-## 说明
-
-`SPEC.md` 是小雪主工作台早期功能规格，仍然是重要来源文档。
-
-现在用户侧产品名已明确为：**小雪电竞人生**。
-
-Life OS 不再作为用户侧单一产品名，而是内部工程母项目；用户侧拆分为：
-
-- 小雪电竞人生
-- 结衣知行合一
-
----
-
-## 新文档入口
-
-| 类型 | 新文件 |
-|------|--------|
-| 产品定位 | `docs/products/xiaoxue-esports-life/PRD/00-overview.md` |
-| 功能需求 | `docs/products/xiaoxue-esports-life/PRD/01-features.md` |
-| 路线图 | `docs/products/xiaoxue-esports-life/PRD/02-roadmap.md` |
-| 系统语义 | `docs/products/xiaoxue-esports-life/SSD/00-system-semantics.md` |
-| 技术规格 | `docs/products/xiaoxue-esports-life/SSD/01-technical-spec.md` |
-| 数据接口 | `docs/products/xiaoxue-esports-life/SSD/02-data-and-api.md` |
-| 界面规格 | `docs/products/xiaoxue-esports-life/SSD/03-ui-spec.md` |
-| 数据映射 | `docs/products/xiaoxue-esports-life/SSD/04-schema-mapping.md` |
-| 验收清单 | `docs/products/xiaoxue-esports-life/ACCEPTANCE.md` |
-| 任务清单 | `docs/products/xiaoxue-esports-life/BACKLOG.md` |
-
----
-
-## 后续维护规则
-
-- `SPEC.md` 保留为来源基线，不直接承载新路线图。
-- 新需求、新规格、新验收项写到 `life-os-frontend-v2/docs/products/xiaoxue-esports-life/`。
-- 当前可运行主工作台仍在 `/home/ubuntu/xiaoxue-web/`。
-
----
-
-## MemPalace TK 适配器部署
-
-仓库内的 `deploy/xiaoxue-tk-mempalace.service.example` 是脱敏的 user systemd 模板。部署时复制到 `~/.config/systemd/user/xiaoxue-tk-mempalace.service`，并创建仅保存在服务器上的 `~/.config/xiaoxue/mempalace.env`：
-
-```ini
-XIAOXUE_MEMPALACE_SITE_PACKAGES=/实际的/mempalace/site-packages
-XIAOXUE_MEMPALACE_PALACE=/实际的/palace
-XIAOXUE_TK_SOURCE_DIR=/实际的/小雪TK目录
-XIAOXUE_MEMPALACE_WING=xiaoxue-tk
-```
-
-然后执行：
-
-```bash
-systemctl --user daemon-reload
-systemctl --user enable --now xiaoxue-tk-mempalace.service
-curl -fsS http://127.0.0.1:8770/api/health
-```
-
-路径由环境文件提供；仓库代码不绑定服务器用户名、Python 小版本或知识库绝对路径。
+归档保留需求与交付追溯价值，不构成独立工作规范，不证明当前服务和能力已经可用，也不自动重开历史工程。旧技术导航与使用说明路径只作兼容跳转。技术导航、机器合同、任务证据与历史资料各有用途，不复制为多套规则。

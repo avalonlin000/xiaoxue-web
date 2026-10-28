@@ -1,5 +1,5 @@
 import {
-  buildMatchPrompt, createMatchMaterialsController, matchMaterialsForDesk, loadCurrentEventWorkspace, loadMatchDesk, loadGolSeriesEvidence,
+  buildMatchPrompt, createMatchMaterialsController, matchMaterialsForDesk, loadCurrentEventWorkspace, loadCurrentEventReferences, loadMatchDesk, loadGolSeriesEvidence,
   focusMatchRun, pauseMatchRun, saveMatchTradeEntry, startMatchRun,
   createTradePlanItem, updateTradePlanItem, deleteTradePlanItem, restoreTradePlanItem, reorderTradePlanItem,
   createJudgmentController, judgmentObject,
@@ -19,6 +19,7 @@ export default {
     const state = { matches: [], recentMatches: [], selected: null, desk: null, context: {}, methods: [], eventMaterials: null };
     let active = true;
     let selection = 0;
+    let workspaceRevision = 0;
     let materialsDesk = null;
     let selectedMethod = '';
     let selecting = false;
@@ -100,6 +101,7 @@ export default {
     };
     const refresh = async () => {
       const current = ++selection;
+      const revision = ++workspaceRevision;
       rememberJudgmentDraft();
       materials.stop();
       materialsDesk = null;
@@ -119,6 +121,12 @@ export default {
         state.context = payload.context || {};
         state.methods = payload.methods || [];
         view.render(payload);
+        // Reference search is an independent read: a slow search must not hide
+        // the already prepared schedule, methods and event content.
+        void loadCurrentEventReferences(state.context).then(
+          references => { if (active && revision === workspaceRevision) view.renderKnowledge(references); },
+          () => { if (active && revision === workspaceRevision) view.renderKnowledge({ error: true }); },
+        );
         const eventPacket = readable('event', payload.eventMaterials || {}, { event: state.context.event || '' });
         state.eventMaterials = eventPacket;
         view.renderEventMaterials(eventPacket); watchReading('event', eventPacket);

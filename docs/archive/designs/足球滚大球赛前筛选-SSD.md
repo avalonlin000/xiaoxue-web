@@ -11,7 +11,7 @@
 |---|---|---|
 | 工作台 | `index.html`、`src/main.js`；Vite/Vanilla JS | 原壳增加足球入口，复用样式和导航 |
 | 后端 | `xiaoxue_api/app.py` 组装模块，`main.py` 为入口 | 模块自有服务、资料适配和接口，通过原组装入口注册 |
-| 足球对象 | `config/project-contract.json` 中 `football` 仍为 `planned` | 验收前保持该状态；正式接线时同步合同与项目中心 |
+| 足球对象 | `config/project-contract.json` 中 `football` 当前为 `partial` | 页面和真实接口已接通；来源覆盖、晚段历史与完整验收仍待补齐 |
 | 交易TK | `/api/trading-tk` 是正式写入；旧接口为只读 | 在原正式链中补足球身份与比赛关联，不建第二套记录 |
 | TK输入缺口 | `GeneralTradingTKIn` 和前端 `createMarketNote` 未提供正式足球 `game` 输入 | 先验证存储、检索、投影的分类契约，再扩展保存和读回 |
 | 正式静态资源 | 根 `dist/` 正在被服务 | 验证构建指定独立 outDir；发布是独立动作 |

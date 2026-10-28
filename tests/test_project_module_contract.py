@@ -57,6 +57,15 @@ class ProjectModuleContractTests(TestCase):
         self.assertIn("trading_tk", catalog["shared_lifecycle"])
         self.assertEqual(set(catalog["objects"]), {"lol", "valorant", "cs2", "football"})
         self.assertTrue(catalog["objects"]["football"]["known_gaps"])
+        self.assertEqual(catalog["objects"]["football"]["status"], "partial")
+        self.assertIn("/api/football/matches", catalog["objects"]["football"]["entry"])
+
+    def test_football_contract_points_to_live_routes(self) -> None:
+        football = next(item for item in load_module_contract()["modules"] if item["id"] == "football")
+        self.assertEqual(football["status"], "partial")
+        self.assertEqual(football["source_of_truth"]["api"], "/api/football/matches")
+        self.assertEqual(football["read_capability"]["entry"], "/api/football/matches")
+        self.assertNotIn("football/board", json.dumps(football, ensure_ascii=False))
 
     def test_invalid_catalog_rejects_missing_contract_fields_and_duplicate_ids(self) -> None:
         payload = load_module_contract()
@@ -82,18 +91,29 @@ class ProjectModuleContractTests(TestCase):
         self.assertEqual(referenced, registered)
         self.assertNotIn('source_of_truth:', source)
 
-    def test_formal_docs_and_root_skill_point_to_the_same_model_guide(self) -> None:
-        guide = ROOT / "docs/小雪项目总使用说明.md"
-        guide_text = guide.read_text(encoding="utf-8")
-        self.assertIn("查、记、改、分析和新增", guide_text)
-        self.assertIn("缺数据", guide_text)
-        self.assertIn("结构级", guide_text)
-        product = (ROOT / "docs/交易信息系统-总体设计.md").read_text(encoding="utf-8")
-        engineering = (ROOT / "docs/交易信息系统-工程实现.md").read_text(encoding="utf-8")
+    def test_formal_docs_and_root_skill_reach_the_canonical_project_instructions(self) -> None:
+        guide_text = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("交易人生项目", guide_text)
+        self.assertIn("Hermes", guide_text)
+        self.assertIn("效率、实用性和使用体验优先", guide_text)
+        legacy = (ROOT / "docs/小雪项目总使用说明.md").read_text(encoding="utf-8")
+        self.assertIn("[AGENTS.md](../AGENTS.md)", legacy)
+        self.assertIn("不再维护独立正文", legacy)
+        self.assertNotIn("## 查", legacy)
+        project = json.loads((ROOT / "config/project-contract.json").read_text(encoding="utf-8"))
+        self.assertEqual(project["rules_source"], "AGENTS.md")
+        self.assertTrue(project["rules"])
+        self.assertTrue(all(value.startswith("AGENTS.md#") for value in project["rules"].values()))
+        self.assertTrue(all(f"## {value.partition('#')[2]}" in guide_text for value in project["rules"].values()))
+        self.assertEqual(project["display_name"], "交易人生项目")
+        self.assertEqual(load_module_contract()["model_usage_guide"], "AGENTS.md")
+        project_map = (ROOT / "docs/architecture/PROJECT-MAP.md").read_text(encoding="utf-8")
+        self.assertIn("# 交易人生项目 — 技术导航", project_map)
         skill = Path("/home/ubuntu/.agents/skills/小雪/SKILL.md").read_text(encoding="utf-8")
-        for text in (product, engineering, skill):
-            self.assertIn("小雪项目总使用说明.md", text)
-        self.assertIn("小雪是整个项目的完整业务入口", skill)
+        self.assertIn("交易人生项目是电竞业务的正源与交付主体", skill)
+        self.assertIn("小雪是当前接入助手之一", skill)
+        self.assertNotIn("小雪是整个项目的完整业务入口", skill)
+        self.assertIn("/home/ubuntu/xiaoxue-web/AGENTS.md", skill)
         self.assertIn("普通已有对象的小范围记录、修正、补充可以直接处理并读回", skill)
 
     def test_ts_contract_has_one_display_mapping_used_by_frontend_and_consumers(self) -> None:

@@ -1,4 +1,4 @@
-> 状态：历史文档，2026-10-25 冻结；不再更新。当前事实以 `docs/PROJECT-MAP.md` 与 `memory-bank/progress.md` 为准。
+> 历史交接：2026-10-29 移出活跃文档目录。现行角色边界和项目约定见项目根 `AGENTS.md`；下文的固定模型身份、旧数量和首次接手流程不再生效。
 
 # DeepSeek harness 项目交接说明
 
@@ -186,4 +186,3 @@ node node_modules/vite/bin/vite.js build --outDir /tmp/xiaoxue-web-build-check -
 6. 如果实施，最小安全切片是什么。
 
 完成这份基线报告后，等待用户明确授权，再进入代码施工。
-

@@ -1,6 +1,37 @@
-# 小雪工作台 — 开发进度
+# 个人电竞交易辅助系统 — 任务进度
 
-> 导航更新：2026-10-21 | 更新人：Codex（本次授权实施与快速收尾）
+> 导航更新：2026-10-29 | 本次授权：项目规范合并与按模板整理目录
+
+## 2026-10-29 · 规范与目录收敛
+
+- Goal / Locked decisions：项目是部署在腾讯云的自用电竞交易辅助系统，包含前端、后端、数据库、知识和自动化；网页只是一个入口。体验、效率和实用性优先，沿同一项目正源服务网页与已接入的 Agent。项目规则统一在根 `AGENTS.md`，上位角色规则、专业 Skill 与机器合同各保留原职责。
+- Current stage：规范合并和目录整理已完成；本轮测试与合同检查通过，活跃文档引用已核对。`AGENTS.md` 暂时完整收拢现行项目规则，后续由高级模型继续取舍和优化措辞。本次不实施历史 PRD、不迁移数据库、不发布前端、不重启服务或修改调度。
+- Changed：有效项目约定由 AGENTS、旧地图流程、模块边界、总使用说明和 Loop 收敛到唯一根 `AGENTS.md`。旧地图、模块和使用说明路径只留兼容指针；旧需求卡、Loop、模型交接和 SPEC 原文保留在 `docs/archive/2026-10-29-guidance/`。`project-contract.json` 的通用规则改为章节引用，`module-contract.json` 的模型使用说明直接指向 `AGENTS.md`。
+- Layout：选择用户提供架构模板中的 Full-Stack Web，轻量适配现有 `src/` 前端与 `xiaoxue_api/` 后端；技术导航归 `docs/architecture/`，1 份未标冻结的需求资料归 `docs/requirements/`，17 份已冻结设计原文归 `docs/archive/designs/`，历史审计归 `docs/archive/audits/`。其他脚本、配置、测试、部署与运行路径保留。旧进度中的文档路径仅机械重定位，未改历史结论或能力状态。
+- Verified：`.venv/bin/python -m pytest` 运行项目模块、菜单来源和小雪 Skill 合同共 27 项通过，1 项无关 API 启动测试未运行；`scripts/verify_module_contract.py` 校验 9 个能力域与前后端映射通过，模型使用说明为 `AGENTS.md`。技术地图已改指向 `AGENTS.md` 的现行章节，活跃 Markdown 引用检查未发现仓库内断链。相关测试验证新正文和旧引用的兼容，不依赖历史 PRD 当现行规范。
+- Rollback：保留本次开始时的未提交内容；AGENTS 原文包位于 `/tmp/xiaoxue-agents-consolidation-20261029-njhiIN/before-agents-full.tar.gz`，目录整理包位于 `/tmp/xiaoxue-guidance-consolidation-20261029-gCVq74/`，含 `before.tar.gz`、`project-contract-before.tar.gz`、`before-layout.tar.gz`、`changelog-before.tar.gz`。仅用于本轮文件恢复，不覆盖其他既有改动。
+- Next / Blockers：后续由高级模型审阅 `AGENTS.md` 的规则取舍和措辞；外部访问入口、跨端对话同步和未来自动化不在本次验收范围。本轮未改变业务能力的既有 partial / 未验证状态。
+
+## 2026-10-28 · 项目与 Hermes 解耦（已部署大部分，整体验收未完成）
+
+- 私人系统补验：当前正式前端资产配临时后端/数据库，在390宽浏览器完成课题→方法→实践→反馈→沉淀，刷新及后端重启后均读回1个方法版本。明确使用虚构测试样例、生产API访问0；只补隔离页面证据，不冒充真实私人数据或飞书。见Delivery的jieyi-isolated-page-journey-20261028.json，临时服务已停止。
+- 足球详情续验修复：真实比赛espn:esp.1:401882829详情曾将赛季年份2026作为kickoff；现改为上游competition.date，缺失保持空。新回归先失败后足球4项全通过，项目API重启后正式详情两次读回2026-10-25T17:30Z，health healthy；回退文件见Delivery backups/football-service-before-kickoff-fix.py。卡塔尔ESPN来源400仍保留partial；未改页面、范围、模型或飞书，整体未完成。
+- Goal：按 `life-os-frontend-v2/docs/PROJECT_DECOUPLING_PLAN.md` 完成项目运行环境、业务任务、项目资料与 Hermes 的平台职责分离；保留原页面、URL、导航和飞书入口的使用方式，使电竞和私人系统能够独立运行，并让小白可按正式入口继续维护。
+- Page fix（15:29）：按钧钧要求将飞书验收放最后，先处理独立项目。已修赛事主读取被参考检索超时拖垮、足球卡跨页显示及手机选队布局；原8880入口看到赛事正文、6场比赛和6个判断入口，桌面/390宽读回AL同一446字TK。手机表内横滑可到右侧列，文档宽度仍390。前端101项通过、隔离构建成功、dist已替换，未重启服务；回退包和证据见Delivery的 `a02-read-fix-20261028.json`。
+- Production import（16:47）：项目模型读取显式引用既有私有model.env，环境变量优先、不插值、不注入其他键；lol_data声明并安装openai2.24.0、python-dotenv1.2.2，不改模型/Provider/推理参数/密钥值。09:24生产导入旧回执为partial，经正式 `apply_knowledge_import.py` 补跑后恢复为complete：B站4项中3篇写入、1条音乐视频not_applicable，微信26项中1篇写入、25项去重，两源失败均为0；四篇新TK与回执哈希一致。回执reindex为not_needed，正式8880 `/api/tk/search` 已实际读回新文章和视频，36项导入回归通过。证据为Delivery的 `a05-import-runtime-20261028.json` 和 `a05-production-import-retry-20261028.json`。
+- Navigation followup：16:04原8880的TK资料库和项目中心双端可见，无页面/HTTP错误或文档横溢，补齐此前赛事、队伍、足球以外的两个主导航；探针拦截既有自动准备POST。结衣四页与知识摘要读回仍有效，全文入口缺失是既有设计。证据为 `a02-retained-navigation-20261028.json`。
+- TK recovery：停止旧进程四个并发隐式下载，去掉外部uv工具site-packages借用，直接使用项目.venv-tk，服务PID1162841。15:54的503/degraded及1.3369秒返回12条文件资料只是修复中间态；唯一有界任务已完整下载83,178,821 bytes官方原MiniLM归档，SHA256 `913d7300ceae3b2dbc2c50d1de4baacab4be7b9380491c27fab7418616a16ec3`匹配后原子发布六文件并自然退出，TK未再次重启。最新8770 health为200/ready，正式检索来源含mempalace/wechat/file；赛事页桌面7.434秒、390宽3.701秒显示12条/3511字参考，双端正文哈希一致，主要内容和6个方法按钮可读。无pageerror，唯一requestfailed是探针拦截既有自动准备POST。证据为 `a02-tk-runtime-repair-20261028.json`。
+- Natural automation（15:20观察）：已只读核对14:40、14:50、15:00、15:10四次自然排程输出与15:10项目回执；6场确认比赛，两项受管计划changed:false，未手动触发或改排程。次日赛前/赛后实际执行和下游消费仍待发生。
+- Deployed：小雪主站 API、TK 和产品 MCP 已分别使用 `xiaoxue-web/.venv`、`.venv-tk`、`.venv-mcp`；`lol_data` 使用自身 `.venv`。四个环境都没有加载 Hermes 私有 `sys.path`。14 个项目任务实体已归入 `scripts/tasks/`，Hermes 同名脚本改为 `os.execv` 薄转发；模型配置已移入 `config/model-runtime.json`。页面、原地址和一级导航未替换；两个无引用旧环境只移到交付包归档，未删除。
+- Verified：13:05历史基线为前端99、后端432（另1 skipped）、TK4、产品MCP68、lol_data218（另6 skipped），早前补验项目中心/内容/菜单/健康20和TK adapter4均通过；当时health_check为ok:true/退出码0、迁移合同ok:true、八个用户服务active。15:29前端101项仍有效；16:08新增凭据4项、两个项目解释器各19项导入回归、.venv-tk的TK adapter6项通过。未重跑无关套件，不把旧健康当当前全绿；systemd用ubuntu的XDG_RUNTIME_DIR=/run/user/1000 systemctl --user检查。
+- Historical health/resources：13:05完整API/页面快照和14:09资源复查均为历史采样；后者根分区82%/约6.87GiB可用，内存available约2.01GiB、Swap约2.13GiB，gateway cgroup约398MiB/峰值991MiB。网关当时有elevated memory pressure警告。后续只补TK恢复与页面证据，未重采全套资源，不据旧数字宣称压力已解除或全部health200。
+- Test isolation incident：统一测试最初运行时，API 测试会启动 FastAPI lifespan 并恢复采集队列，测试没有全局隔离，05:50—06:08 期间生产采集目录出现了与测试时段高度吻合的新写入。已新增 `tests/conftest.py`，以 `XIAOXUE_COLLECTION_DIR` 强制所有测试进程进入临时目录，修复后完整测试才重新通过。已记录 9 个关联任务 ID，当前可定位 8 个，另 1 个 `787a6b0cde2ac94e79c2cea7` 未定位；没有删除或回滚。生产 API journal 只见 health 请求，旧测试 worker 子进程缺少完整日志，因此不能声称已完全归因。
+- Acceptance（16:53最终证据收口，状态不升级）：A01 partial；A02/A05/A06/A07/A08/A11/A12和R1/R2/R3/R4 passed-with-limit；A03/A04/A10 passed；A09 unverified。五主导航双端、独立与生产导入、原模型补齐、正式8880检索读回及最后飞书只读复核均有新证据；A03仍只证明隔离副本写读回，结衣无知识全文入口属既有设计限制。overall_complete:false/released:false保持。
+- A09 final read-only refresh（16:52）：网关PID1088277仍active；4个已知chat中默认主chat重启后有8条应用消息、用户消息0，默认次chat/小白/结衣均为0；三个Profile仅保留已知oneshot会话，无新增非CLI业务会话。未发送测试消息、未改配置。查询范围仅限既有已知chat与本地会话库，不代表查遍全部飞书会话；应用消息和CLI不能替代真实业务入站。
+- Jieyi recovery：经钧钧当次明确授权，只把结衣默认模型和 `flash` 别名从已下线 `deepseek-v4-flash` 换成小雪同款 `deepseek-v4.1-flash`，Provider 仍为 `opencode-go`，未改密钥值；精确备份保留。单网关 PID 1088277 已加载新模型并连接 `jieyi:feishu`。网关最终重启后的 fresh CLI 已在 default/xiaobai/jieyi 三 Profile 复验；结衣 `20261028_124943_caee90` 完成 5 条消息/2 次工具调用，实际读取结衣产品知识库 40 条/已处理 40/待处理 0。A07/R2 为受限通过；A09 保留真实飞书业务链待验，按钧钧要求放最后，不阻止独立项目继续验收。
+- Data safety：切换前回退包为 `.../backups/prechange.tgz`，152,671,382 bytes、19,335 entries、SHA-256 `21b0bd...53ef`。安全恢复主体得到 16,933 个普通文件/531,640,654 bytes，随机样本哈希一致；但含 19 个不安全链接且缺少四项历史材料。补充包只含四个当前状态文件，不是完整历史快照；生产恢复未执行。三个仓库既有脏工作树全部保留；没有 reset、checkout、clean、全局格式化或 push。
+- Still unverified：真实飞书inbound→项目资料→工具→回复按要求最后验，有限CLI不能替代。五主导航与结衣四页/知识摘要已有双端证据，但未穷尽全部交互，结衣知识全文入口属既有设计。原MiniLM和赛事语义参考已恢复；当天生产导入及正式8880检索已闭环，远期次日赛前/赛后自然任务与消费仍待发生，旧失败不能由该闭环外推为全部同因。四次自然排程/15:10项目回执已观察；足球coverage仍partial。正式版本理解路由已200，旧version-analysis不是目标；当前磁盘约84%、内存仍紧，资源保留各自采样时间。
+- Delivery：当前证据、事故边界、服务快照和 A01—A12 逐项结论见 `/home/ubuntu/.hermes/team/deliveries/verified-changes/decoupling-20261028/`。状态是 `deployed-partial` / `activated-partial`，`overall_complete:false`，不是 Released。
 
 ## 2026-10-25（第四轮）· 首发来源接通 + 网关重启
 
@@ -30,7 +61,7 @@
 - 删除：analyst、weread_bridge、legacy_trades、market_notes；空目录 business_updates/pre_match/pro_stats。
 - 概念退役：「沉淀候选」「盘口记录」的页面、标签、入口、接口、MCP 工具、能力树节点全部移除；数据保留在 TK。
 - 线上 dist 已重建并与源码对齐（上一版备份 /home/ubuntu/dist-backup-20261025-150810.tar.gz）。
-- 文档：22 篇标记为历史冻结；新增 docs/DECISIONS.md 作为决策正源（三份正源：PROJECT-MAP / progress / DECISIONS）。
+- 文档：22 篇标记为历史冻结；新增 docs/archive/DECISIONS.md 作为决策正源（三份正源：PROJECT-MAP / progress / DECISIONS）。
 - 验证：/api/health 7 模块 healthy；后端 425 通过 / 5 项为改动前既有失败（事件筛选 3、基本面单场 2）；前端 99 通过；合同校验通过；独立目录构建通过。
 - 未完成（需要决定或另行排期）：MCP 工具 44 个尚未按对象归并；单场页五个动作（今天/读一场/记一句/找回/提事）未动，按钧钧"页面先不动"的要求暂停；首发与价格来源未接。
 
@@ -39,7 +70,7 @@
 - Goal：在小雪工作台内形成可直接开发的足球观察台；页面给出半破与75分钟后两种独立赛前筛选结果，比赛开赛后仍可查，钧钧只按需写交易TK。
 - Executor：钧钧在本次任务明确授权 Codex 直接施工；不改变项目长期角色分工。本段只记录当前任务，不代表足球功能已上线。
 - Locked：不打分、不算概率、不跟踪变盘；滚球盘口、25/45/75/80分钟字段由钧钧自己看，不是系统依赖；缺资料不伪造保留/排除；后台提前准备并保留赛前版本；沿现有交易TK正源，不建平行应用或记录库。当前默认办法已补入PRD：半破初盘3球以上排除、去掉无法提供的五项四项；75分钟玩法按初盘/名单圈池、最近5场晚段支撑和已核实阵容筛选。
-- Written：`docs/足球滚大球赛前筛选-PRD.md`、`docs/足球滚大球赛前筛选-SSD.md`；旧 `docs/足球滚大球赛前筛选-idea.md` 已标为历史并指向新文档；`docs/PROJECT-MAP.md` 已补导航。
+- Written：`docs/archive/designs/足球滚大球赛前筛选-PRD.md`、`docs/archive/designs/足球滚大球赛前筛选-SSD.md`；旧 `docs/archive/designs/足球滚大球赛前筛选-idea.md` 已标为历史并指向新文档；`docs/PROJECT-MAP.md` 已补导航。
 - Current stage：足球后端模块、ESPN只读赛程/详情接口、公开摘要 `open` 初盘读取、文件缓存、工作台“足球”入口和内嵌详情页已落地；足球对象合同仍为 `planned`，尚未接生产排程。交易TK已能从足球卡跳到正式 `/api/trading-tk` 表单并带入比赛/玩法，尚未做独立比赛ID字段的结构化读回。
 - Verified：足球模块注册/架构测试通过；足球单测3项通过；隔离Vite构建通过；Playwright实测桌面与390宽手机入口、候选卡、详情阅读、足球TK预填和无横向溢出通过；真实ESPN接口取到样例赛程和2.5初盘。
 - Next：把文件缓存接入已有后台排程并补近5场晚段历史资料；再评估是否需要给交易TK增加结构化比赛ID字段。不把当前公开源覆盖当成全联赛生产能力。
@@ -49,7 +80,7 @@
 - 修复登记名单误标本场首发，保留IG全部8名登记成员并说明不代表首发；不改人员数据。定向Node／Python、编译和diff共4项必需检查通过，隔离Vite构建通过。
 - `xiaoxue-ssd-closeout-20261021` 的7个目标于23:40:23（北京时间）verified/activated，正式API已重启。1280／390正式网页进入GEN–IG看到新标签和材料，刷新后仍可读，窄屏无横向溢出。
 - 产品MCP两页读完8场，并逐场按相同revision读回非空要点；另抽读GEN–IG共享正文、引用和出处。8场均partial，不冒称已整理完成。核对前后8场revision／更新时间一致，没有主动重开研究探针、写交易／长期知识、改排程或外发消息。
-- 原10分钟自动准备及有限恢复保持；自然飞书新会话、未来连续供给、资料深度和模型质量仍有未验／缺口，但不再自动延长本次授权工程。唯一最终记录见[SSD第12节](../docs/小雪整体重构-SSD.md#12-快速收尾交付2026-10-21)。
+- 原10分钟自动准备及有限恢复保持；自然飞书新会话、未来连续供给、资料深度和模型质量仍有未验／缺口，但不再自动延长本次授权工程。唯一最终记录见[SSD第12节](../docs/archive/designs/小雪整体重构-SSD.md#12-快速收尾交付2026-10-21)。
 
 ## 前阶段：整体重构第3A批次覆盖发布（历史）
 
@@ -57,15 +88,15 @@
 - 工作台 API 重启后正式 8880 页面、近期看板、逐场覆盖 API 均 200；S16 当前窗口 8 场：部分整理 8、已准备 0、未开始 0，每页4场并给逐场限制、修订和正文读取入口。
 - 小雪 Hermes 网关重载后新 MCP 注册近期准备工具；MCP协议发现和只读调用成功，返回同窗口和分页。飞书 WebSocket 恢复连接；未代发消息、未重启小白或结衣。
 - 启动时恢复的3个既有任务读回均 partial、attempts=3；不是完整准备。现有 `LOL自动化排程器` 每10分钟运行且 last_status=ok，其包装脚本调用 `scheduler-tick`；没有新建重复定时任务。只证明这3个任务达到恢复上限，不能推导全部8场均已达到上限。
-- 整体目标仍未完成：补查质量、自然飞书对话实际使用新工具、未来多个周期的持续产出未完整验收。正式证据与限制见[整体重构 SSD 第11节](../docs/小雪整体重构-SSD.md#11-本轮实施进度2026-10-21)。
+- 整体目标仍未完成：补查质量、自然飞书对话实际使用新工具、未来多个周期的持续产出未完整验收。正式证据与限制见[整体重构 SSD 第11节](../docs/archive/designs/小雪整体重构-SSD.md#11-本轮实施进度2026-10-21)。
 
 ## 任务入口与历史边界
 
-最终收尾见[整体重构 SSD](../docs/小雪整体重构-SSD.md)第12节；第3A节保留能力合同，第11／10节为历史批次与资料卡交付。后续仅按真实使用的具体问题沿原链处理，不另建采集系统，也不因下方历史“整体未完成”字样重复施工。
+最终收尾见[整体重构 SSD](../docs/archive/designs/小雪整体重构-SSD.md)第12节；第3A节保留能力合同，第11／10节为历史批次与资料卡交付。后续仅按真实使用的具体问题沿原链处理，不另建采集系统，也不因下方历史“整体未完成”字样重复施工。
 
 ## 前期运行证据：S16准备与判断入口（03:52 摘要，历史）
 
-本段保留原记录。更晚的赛事总览可读与未完成窗口等证据见 `docs/当前赛事信息收集能力重构-SSD.md` 第 8.2 节；不要将以下“总览尚无 digest”当作本轮最新事实。
+本段保留原记录。更晚的赛事总览可读与未完成窗口等证据见 `docs/archive/designs/当前赛事信息收集能力重构-SSD.md` 第 8.2 节；不要将以下“总览尚无 digest”当作本轮最新事实。
 
 钧钧明确“全部完成”后，已接正式工作台/小雪及原后台准备链。正式8880与网关已重载，原排程器每10分钟检查，原日报07:00不改，仅消费同截止成果。默认先看粗筛与系统推导，已有理解视角可进入；长背景收起、真正阅读后记本机位置、实质变化逐条提示。19/19 S16队伍现均可读筛选观点和条件解释；其中11/19有可核发表日期，另8队日期未知但并非无成果。赛事总览仍因一次模型返回空内容未产出digest，页面诚实保持准备中，禁止误报无相关信息；未拿团队内容冒充赛事综述。正式知识、画像认可、个人判断、预案、模型/Provider均未覆盖。
 
@@ -86,7 +117,7 @@
 
 ## 前版局部实施（历史）
 
-用户目标是自动准备完整成果，不再承担搜索、抄录和拼接；仍按原 8 类 32 节点验收，不以单场采集代替全目标。已编写 `docs/当前赛事信息收集能力重构-SSD.md`，第 10 节为本次执行证据和逐节点状态唯一记录。
+用户目标是自动准备完整成果，不再承担搜索、抄录和拼接；仍按原 8 类 32 节点验收，不以单场采集代替全目标。已编写 `docs/archive/designs/当前赛事信息收集能力重构-SSD.md`，第 10 节为本次执行证据和逐节点状态唯一记录。
 
 已启用切片：原单场页面自动收集、可恢复任务与证据快照、带原句出处的中文要点、唯一产品 MCP 两个命名工具与分页、日报真实发布回执和原项目中心成品链接。正式 `8880 → 当前赛事 → KC–MVK → 比赛资料` 实测取得 7 条中文要点和 4 篇原文，刷新读回修订 `9758257313d8e4ab4ca5`；390 窄屏无横向溢出、页面异常 0，真实业务数据库字节不变。完整后端 285、前端 57、日报 40 项通过，旧正式路由全部保留。两个 verified 交付包已激活，既有 API 服务重启后 PID 955108；仅按需工作台已启用，不能推导全目标完成。
 
@@ -100,7 +131,7 @@
 - 根因（已用 Hermes 自身代码复现）：受管任务是对**同一个 Hermes once job 反复改期复用**，而 once job 创建时自带 `repeat.times=1`。`LOL赛后刷新` 10-17 06:31 跑过一次（`completed=1`），09:00 排程器把它改期到 11:30；11:30 到期扫描命中 `Job 'LOL赛后刷新': one-shot dispatch limit reached (1/1) — removing stale due entry` 直接把任务从 `jobs.json` 删掉，脚本再没执行 → 当天 07:00 C9 vs FUR 赛果未刷新、结果消息未发、10-18 赛程仍是 TBD。失败告警本身还有第二层缺陷：把"任务停用"当故障，而受管任务跑完自然停在 `completed`、本阶段无比赛会被排程器主动暂停，于是每天固定时点误报。
 - 修复（lol_data + `~/.hermes/scripts`）：①`lol_auto_planner.py` 武装顺序固定 `--repeat 0`（清消耗上限）→ `--schedule` → 按需 `resume`，任务缺失时按定义重建；受管任务定义收敛到 `config/system_config.json` 的 `automation.managed_tasks`。②`xiaoxue_automation_watchdog.py` 判据改为以排程回执为意图正源，只报"回执排了时刻却没武装/到点没跑/被暂停/回执过期"。③排程器 wrapper 的告警标记同步新文案。
 - 验证：沙箱 `hermes cron tick` 真对照——旧序列（只 `--schedule`）任务被删且零输出，新序列（`arm_steps`）跑出 `PROBE OK` 且任务保留；到期扫描对照（`times=1/completed=1` 删、`times=null` 保留）固化为 `tests/test_lol_auto_planner.py::DueScanGuaranteeTests`，告警判据 12 项；lol_data 全量 185 passed。生产现状：`LOL赛前简报` 已武装 2026-10-18 00:30（repeat ∞）、`LOL赛后刷新` 已重建并武装 2026-10-18 06:30（repeat ∞）；当日缺失数据已补（C9 vs FUR → FUR 1:3）；告警实跑静默。
-- 文档与边界：SSD `docs/LOL信息与自动化整合-工程实现.md` 5.1/5.4 补记形态约束与回归口径；`/home/ubuntu/.agents/skills/devops/cron-inspection-debugging` 新增根因 9/10。未改数据库结构、模型、Provider、权限、网关或 cron 配置；未发外部消息（只在项目既有推送目标内补跑被漏掉的那次刷新）。
+- 文档与边界：SSD `docs/archive/designs/LOL信息与自动化整合-工程实现.md` 5.1/5.4 补记形态约束与回归口径；`/home/ubuntu/.agents/skills/devops/cron-inspection-debugging` 新增根因 9/10。未改数据库结构、模型、Provider、权限、网关或 cron 配置；未发外部消息（只在项目既有推送目标内补跑被漏掉的那次刷新）。
 
 ## 2026-10-16 小雪：比赛面收拢 S16 世界赛（口径 + 自动化）
 
@@ -165,7 +196,7 @@
 ## 2026-10-15 Codex：统一骨架重构文档定稿（仅文档）
 
 - 用户明确本次目标：梳理整合现有内容进入“人—小雪—信息—普通 TK/交易 TK—结果”的统一骨架；缺信息或缺方法以后直接补内容，新增 CS、足球等交易对象不应重写公共结构。
-- 已更新：`AGENTS.md`、`docs/交易信息系统-总体设计.md`（PRD）、`docs/交易信息系统-工程实现.md`（SSD/一次性重构方案）、`docs/PROJECT-MAP.md`、`docs/小雪项目总使用说明.md`。
+- 已更新：`AGENTS.md`、`docs/archive/designs/交易信息系统-总体设计.md`（PRD）、`docs/archive/designs/交易信息系统-工程实现.md`（SSD/一次性重构方案）、`docs/PROJECT-MAP.md`、`docs/小雪项目总使用说明.md`。
 - 已固定：普通 TK 与交易 TK 的语义和写入边界；现有内容归位表；交易对象包合同；内容缺口与系统缺口区分；一次性重构目标；无 README 新增计划。
 - 已降级为历史证据：无畏契约首个 MVP、F-000 至 F-006 施工分组、旧局部验收记录。它们可供迁移和回归参考，不再定义整体产品范围或要求用户逐片批准。
 - 本轮没有修改代码、配置、数据库、Skill、运行服务或外部消息；文档完成不代表运行态完成。等待钧钧明确喊施工后再执行代码重构。
@@ -227,7 +258,7 @@
 - 本批低风险基线：`/tmp/lineup-batch4-baseline`。本地结果：`/home/ubuntu/.hermes/team/lineup-test/batch4-default.*`；独立本地验收，不代表群聊激活。
 - 未改模型/思考配置、密钥、权限、网关、数据或人格；未重启、发飞书或提交。工作树原有无关脏改动保持不动。
 
-> 最后更新：2026-10-25 02:00:11.510722 | 更新人：小雪
+> 最后更新：2026-10-29 02:01:00.213495 | 更新人：小雪
 
 ## 2026-10-14 Codex：阵容分析结构化决策包
 
@@ -499,6 +530,15 @@
 - 会后执行（钧钧当日指示）：①无畏契约内容全面暂停——`瓦赔率台账-盘口快照`/`赛果结算` 两条任务已暂停（enabled=false / state=paused），数据与配置保留、可随时恢复。②磁盘清理——删除 8-23 旧备份快照 539M（内容清单归档）+ codex-acp npx 缓存 445M + uv 缓存 264M，实际释放约 1.25G（可用 4.3G → 5.5G）；ollama 610M 查实为 ClawBench 活跃依赖未动；清理记录见 `~/.hermes/backups/cleanup-20261018/`。
 - 边界：未改数据库、模型、Provider、权限、网关或 cron 定义；本批写入为文案修复、本记录与「最后更新」更新人字段；未发外部消息。
 
+## 2026-10-26｜全链路自检
+
+- 服务健康：7 个模块（日报 / 队伍 / 认识 / 应用外壳 / 外部事实 / 方法 / 比赛）全部 healthy；整体 ok=false 的唯一原因是磁盘 93%。
+- 数据层：teams 34、schedules 580、matches 551、team_profiles 30、shared_version_analysis 134；今日 4 场赛果已入库（09:50 更新）。
+- 业务链路实测：TK 搜索与全文读取、BLG 队伍读取、版本理解目录、BLG vs KC（10-27）单场准备、待修改篮子、阿卡丽静态资料、10-26 日报（09:48 发布，verified）全部正常。
+- 部署一致性：后端无晚于进程启动的代码、前端产物最新、产品 MCP 子进程晚于脚本文件。
+- 自动化：19 个任务；10-26 09:46 知识导入 partial（B 站 6 篇中 1 篇 TK 提炼瞬时不可用、字幕已留底）已手动重跑写入并重建索引；公众号 25 篇发现中 2 篇新写入、23 篇重复（前一日已导入）。
+- 待处理：磁盘 93%（剩余约 1.0G），需清理；候选为 snapd 旧版本、npm 缓存、uv 缓存。
+
 ## 待做
 
 | 优先级 | 内容 | 备注 |
@@ -529,7 +569,7 @@
 
 ## 2026-10-16 小白：LOL 信息与自动化整合（S1/S2 已交付）
 
-- 文档：新增 `docs/LOL信息与自动化整合-PRD.md` 与 `docs/LOL信息与自动化整合-工程实现.md`，并在 `docs/PROJECT-MAP.md` 文档权威等级登记（骨架仍以总体设计为准）。
+- 文档：新增 `docs/archive/designs/LOL信息与自动化整合-PRD.md` 与 `docs/archive/designs/LOL信息与自动化整合-工程实现.md`，并在 `docs/PROJECT-MAP.md` 文档权威等级登记（骨架仍以总体设计为准）。
 - S1：新增只读能力 `xiaoxue_api/modules/lol_scope/`（范围派生 + 每场"谁上场/价格/结果"覆盖状态与洞清单），真实入口 8880 已读回；`tests/test_lol_scope_service.py` 10 项通过。
 - S2：新增唯一排程器 `lol_data/scripts/lol_auto_planner.py`（执行时刻由赛程算出，写入 Hermes cron 并写回执），新增 4 个受管任务到小雪 Profile：LOL自动化排程器 / LOL赛前简报 / LOL赛后刷新 / LOL自动化失败告警。
 - 验证：改期跟随（副本改期后执行时刻自动变化）、无比赛不排、幂等不重写、失败出声均已实测；排程器与告警脚本测试 16 项通过。

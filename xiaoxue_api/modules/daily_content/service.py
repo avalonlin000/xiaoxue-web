@@ -154,7 +154,9 @@ def _publication_state(date_str: str, receipt=None, report_path="", artifact=Non
     mode = manifest.get("mode")
     if verified:
         status = "verified"
-    elif isinstance(mode, str) and mode in {"blocked-by-data-readiness", "blocked-by-audit", "dry-run"}:
+    elif isinstance(mode, str) and mode in {
+        "no_matches", "blocked-by-data-readiness", "blocked-by-audit", "dry-run"
+    }:
         status = mode
     elif manifest.get("published") is True:
         status = "unverified"

@@ -597,20 +597,6 @@ def _search_via_local(query: str) -> str:
     return search_web_json(query, limit=SEARCH_RESULTS_PER_QUERY, timeout=remaining_timeout(20))
 
 
-def _search_via_hermes(query: str) -> str:
-    """Hermes 通用 web_search；当前配置同样指向本机零 Key 搜索服务。"""
-    hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
-    python = hermes_root / "venv/bin/python"
-    if not python.is_file():
-        raise RuntimeError("Hermes 搜索后端未就绪")
-    script = "import sys; sys.path.insert(0,sys.argv[1]); from tools.web_tools import web_search_tool; print(web_search_tool(sys.argv[2],limit=8))"
-    completed = subprocess.run([str(python), "-c", script, str(hermes_root), query],
-                               capture_output=True, text=True, timeout=remaining_timeout(20), check=False)
-    if completed.returncode or not completed.stdout.strip():
-        raise RuntimeError("Hermes 搜索未返回")
-    return completed.stdout
-
-
 def _search_via_exa(query: str) -> str:
     """Exa（免费公共端点，易被 429 限流）。"""
     binary = shutil.which("mcporter")
@@ -677,11 +663,9 @@ def _search_via_bilibili(query: str) -> str:
     return json.dumps({"results": rows}, ensure_ascii=False)
 
 
-# 实测顺序：本机零 Key 搜索 → Hermes 通用搜索 → Exa → B站 → 必应。
-# 本机搜索服务在 8338，由 systemd 常驻；Hermes 仅作同源兼容回退。
+# 实测顺序：本机零 Key 搜索 → Exa → B站 → 必应。
 SEARCH_PROVIDERS = (
     ("local/searxng", _search_via_local),
-    ("hermes/web", _search_via_hermes),
     ("agent-reach/exa", _search_via_exa),
     ("bilibili", _search_via_bilibili),
     ("domestic/bing", _search_via_domestic),
@@ -905,15 +889,13 @@ def _read_with_mirror(url: str) -> str:
 
 
 def _read_with_extract_backend(url: str) -> str:
-    hermes_root = Path("/home/ubuntu/.hermes/hermes-agent")
-    script = "import sys,asyncio;sys.path.insert(0,sys.argv[1]);from tools.web_tools import web_extract_tool;print(asyncio.run(web_extract_tool([sys.argv[2]],char_limit=40000)))"
-    try:
-        completed = subprocess.run([str(hermes_root / "venv/bin/python"), "-c", script, str(hermes_root), url], capture_output=True, text=True, timeout=remaining_timeout(12), check=False)
-        payload = json.loads(completed.stdout) if not completed.returncode else {}
-        row = next((item for item in payload.get("results", []) if item.get("url") == url and not item.get("error")), {})
-        text = str(row.get("content") or "")[:40000]
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        raise ValueError("来源正文未能取得") from None
+    """Read the article with the project's guarded public reader."""
+    from xiaoxue_api.core.public_reader import extract_public_page
+
+    payload = extract_public_page([url], char_limit=40000, timeout=remaining_timeout(12))
+    row = next((item for item in payload.get("results", [])
+                if isinstance(item, dict) and not item.get("error")), {})
+    text = str(row.get("content") or "")[:40000]
     _validate_article_text(text)
     return text
 
@@ -1174,7 +1156,7 @@ def focused_team_text(text: str, terms: list[str]) -> str:
 def call_digest_model(packet: dict) -> str:
     script = Path(__file__).resolve().parents[4] / "scripts" / "summarize_match_materials.py"
     completed = subprocess.run(
-        ["/home/ubuntu/.hermes/hermes-agent/venv/bin/python", str(script)],
+        [sys.executable, str(script)],
         input=json.dumps(packet, ensure_ascii=False), capture_output=True, text=True,
         timeout=remaining_timeout(100), check=False,
     )
@@ -1211,7 +1193,7 @@ def official_event_calendar(identity: dict | None = None) -> list[dict]:
 MARKET_PATTERN = re.compile(r"赔率|盘口|概率|预测市场|胜率|odds|moneyline|market")
 
 
-def select_digest_items(items: list[dict], limit: int = 8) -> list[dict]:
+def select_digest_items(items: list[dict], limit: int = 8, *, preserve_source_coverage: bool = False) -> list[dict]:
     """按信息类别配额输出：本场变化优先，市场预期最多一条，背景少量，不靠赔率凑数。"""
     updates, market, background = [], [], []
     for item in items:
@@ -1222,7 +1204,9 @@ def select_digest_items(items: list[dict], limit: int = 8) -> list[dict]:
             market.append(item)
         else:
             background.append(item)
-    selected = updates[:5] + background[:2] + market[:1]
+    updates, market = updates[:5], market[:1]
+    background_cap = max(0, limit - len(updates) - len(market)) if preserve_source_coverage else min(2, max(0, limit - len(updates) - len(market)))
+    selected = updates + background[:background_cap] + market
     return selected[:limit]
 
 
@@ -1292,7 +1276,9 @@ def summarize_materials(identity: dict, sections: list[dict]) -> tuple[list[dict
                 continue
             seen.update(keys)
             items.append(item)
-    items = select_digest_items(items)
+    # 赛事级筛选每批只收一篇来源，类别配额不能随后把独立来源吞掉。
+    # 单场/队伍仍保留市场一条、背景少量，避免赔率或总览灌水。
+    items = select_digest_items(items, preserve_source_coverage=event_scope)
     notice = ["部分来源仍在整理，已筛选内容可先阅读"] if incomplete else []
     subject_label = "本届赛事" if event_scope else "本队" if identity.get("scope") == "team" else "本场"
     summary = ("已筛选部分来源，" if incomplete else "已粗筛，") + f"保留 {len(items)} 条与{subject_label}有关的内容。"

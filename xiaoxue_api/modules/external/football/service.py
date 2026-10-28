@@ -198,7 +198,7 @@ def get_match(match_id: str) -> dict:
     payload = _get_json(url)
     event = payload.get("header", {}).get("competitions", [{}])[0]
     competitors = event.get("competitors", [])
-    row = _normalize_event({"id": event_id, "date": payload.get("header", {}).get("season", {}).get("year"), "competitions": [{"competitors": competitors}], "status": event.get("status", {})}, league)
+    row = _normalize_event({"id": event_id, "date": event.get("date") or "", "competitions": [{"competitors": competitors}], "status": event.get("status", {})}, league)
     facts = []
     for item in payload.get("keyEvents", []) or []:
         if item.get("type", {}).get("text") == "Goal" or item.get("type", {}).get("id") == "goal":

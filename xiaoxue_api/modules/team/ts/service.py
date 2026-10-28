@@ -339,14 +339,10 @@ def _build_match_context(team_a: dict, team_b: dict) -> dict:
 
 
 def can_compare_team_ratings(team_a: dict, team_b: dict, *, stage: str | None = None) -> bool:
-    """只有同一归一化池内的展示分可以直接比较。
+    """Only two verified domestic ratings from the same LPL/LCK pool are comparable.
 
-    国内阶段按赛区各自归一化，只允许同赛区比较；国际赛是跨赛区单池，
-    展示层在同一池内统一归一化，因此池内跨赛区可以直接比较——前提是两边
-    都拿到了本池的展示分，池外队伍仍视为不可比。
+    A generic ``INTL`` label is an ownership tag, not proof that two teams share a
+    comparable rating population. Even when an international snapshot is active,
+    cross-region and unverified-region TS values remain descriptive only.
     """
-    stage = stage if stage is not None else repository.active_stage()
-    intl_stage = repository.intl_stage()
-    if intl_stage and stage == intl_stage:
-        return team_a.get("power_score") is not None and team_b.get("power_score") is not None
     return team_a.get("region") in {"LPL", "LCK"} and team_a.get("region") == team_b.get("region")

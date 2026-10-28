@@ -82,6 +82,17 @@ test('daily and lineup modules are not mounted inside the long-term workbench', 
   assert.doesNotMatch(shell, /lineupActions|page === 'today'|showPage\('today'\)/);
 });
 
+test('every packaged workbench page has a mount root', () => {
+  const html = readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const source = readFileSync(new URL('../src/app/module-catalog.js', import.meta.url), 'utf8');
+  for (const id of ['teams', 'current-event', 'football', 'tk-library', 'project-center']) {
+    assert.match(source, new RegExp(`id: '${id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}'`));
+  }
+  for (const root of ['content-area', 'card-current-event', 'card-football']) {
+    assert.match(html, new RegExp(`id="${root}"`));
+  }
+});
+
 test('project center stays inside the workbench shell with a stable deep link', () => {
   const html = readFileSync(new URL('index.html', root), 'utf8');
   const shell = readFileSync(new URL('src/main.js', root), 'utf8');

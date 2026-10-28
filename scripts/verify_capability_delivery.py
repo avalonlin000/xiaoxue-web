@@ -20,7 +20,8 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path("/home/ubuntu/xiaoxue-web")
-HERMES = "/home/ubuntu/.hermes/hermes-agent/venv/bin/hermes"
+MCP_PYTHON = ROOT / ".venv-mcp" / "bin" / "python"
+MCP_SCRIPT = ROOT / "scripts" / "hermes" / "xiaoxue_product_mcp.py"
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
@@ -74,20 +75,32 @@ def _product_mcp_discovery() -> dict[str, Any]:
     global _MCP_DISCOVERY
     if _MCP_DISCOVERY is not None:
         return _MCP_DISCOVERY
-    env = dict(os.environ, HERMES_HOME="/home/ubuntu/.hermes")
+    probe = """
+import importlib.util
+import json
+import sys
+from pathlib import Path
+path = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location('xiaoxue_project_mcp', path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+print(json.dumps({'server': 'xiaoxue-product', 'status': 'discovered', 'tools': list(module.PUBLIC_TOOL_FUNCTIONS)}, ensure_ascii=False))
+"""
     result = subprocess.run(
-        [HERMES, "mcp", "test", "xiaoxue-product"],
-        env=env,
-        cwd="/home/ubuntu",
+        [str(MCP_PYTHON), "-c", probe, str(MCP_SCRIPT)],
+        cwd=str(ROOT),
         text=True,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         timeout=120,
         check=False,
     )
-    if result.returncode != 0 or "Tools discovered:" not in result.stdout:
-        raise AssertionError("xiaoxue-product MCP discovery failed")
-    _MCP_DISCOVERY = {"server": "xiaoxue-product", "status": "discovered"}
+    if result.returncode != 0:
+        raise AssertionError(f"xiaoxue-product project MCP discovery failed: {result.stdout[-1000:]}")
+    try:
+        _MCP_DISCOVERY = json.loads(result.stdout)
+    except json.JSONDecodeError as exc:
+        raise AssertionError("xiaoxue-product project MCP returned invalid discovery output") from exc
     return _MCP_DISCOVERY
 
 

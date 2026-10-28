@@ -8,10 +8,12 @@ from xiaoxue_api.core.project_identity import load_project_identity
 
 
 WIKI_DIR = os.environ.get("XIAOXUE_WIKI_DIR", "/home/ubuntu/workspace/knowledge/wiki")
+# Team profiles are shared project knowledge, not a Hermes profile-private
+# runtime dependency. Keep the old environment-variable names for operators
+# who already use them, but resolve absent overrides to the public Skill root.
 SKILL_DIRS = (
-    os.environ.get("XIAOXUE_SKILL_DIR_XIAOBAI", "/home/ubuntu/.hermes/profiles/xiaobai/skills"),
-    os.environ.get("XIAOXUE_SKILL_DIR_MAIN", "/home/ubuntu/.hermes/skills"),
-    os.path.expanduser("~/.hermes/hermes-agent/skills"),
+    os.environ.get("XIAOXUE_SKILL_DIR_XIAOBAI", "/home/ubuntu/.agents/skills"),
+    os.environ.get("XIAOXUE_SKILL_DIR_MAIN", "/home/ubuntu/.agents/skills"),
 )
 
 
