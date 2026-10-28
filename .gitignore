@@ -7,6 +7,8 @@ dist/
 # Python/runtime cache
 __pycache__/
 *.py[cod]
+.venv/
+.venv-*/
 
 # Local backups made during remote maintenance
 .xiaobai-backups/
