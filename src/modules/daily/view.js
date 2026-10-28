@@ -13,7 +13,7 @@ export function createDailyView(root) {
       if (!list) return;
       list.innerHTML = view.items.length
         ? view.items.map((item) => `<article class="today-entry exists"><b>${escapeHtml(item.title || '赛前判断')}</b><span class="today-summary">${escapeHtml(item.summary || '内容已生成，暂无摘要。')}</span></article>`).join('')
-        : '<div class="today-empty">还没有需要你看的内容。有新的赛前判断时，小雪会把摘要放到这里。</div>';
+        : '<div class="today-empty">还没有需要你看的内容。有新的赛前判断时，当前接入助手会把摘要放到这里。</div>';
     },
     error() {
       if (status) status.textContent = '今日赛前内容暂时无法读取';

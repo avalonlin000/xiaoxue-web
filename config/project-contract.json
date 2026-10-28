@@ -20,17 +20,17 @@
     "objects": {
       "lol": {
         "status": "active", "display_name": "英雄联盟",
-        "current_capability": "已有队伍、TS、五项画像、首发、版本理解、当前赛事、普通 TK 和交易 TK 入口；完整十英雄可交给小雪做纯阵容分析。",
+        "current_capability": "已有队伍、TS、五项画像、首发、版本理解、当前赛事、普通 TK 和交易 TK 入口；完整十英雄分析可由当前接入助手承接。",
         "limitations": "主业务已接入不等于全部稳定可用。日报、自动化和各模块的当下状态要单独看；资料读取正常也不证明新鲜度或完整对话复盘已经验收。",
-        "entry": "工作台的队伍资料、当前赛事、TK 资料库；分析与讨论在小雪对话。",
+        "entry": "工作台的队伍资料、当前赛事、TK 资料库；分析与讨论由当前接入助手承接。",
         "next_step": "先核对日报与数据准备状态，再补资料新鲜度、跨模块追溯及真实对话主路径验收。",
         "known_gaps": ["部分资料新鲜度、跨模块追溯和真实主路径仍需核对"]
       },
       "valorant": {
         "status": "partial", "display_name": "无畏契约",
-        "current_capability": "可在小雪对话中按专项方法讨论，并查回已有普通 TK、交易 TK 和原文，核对一条认识的依据与适用条件。",
+        "current_capability": "可在当前接入助手中按专项方法讨论，并查回已有普通 TK、交易 TK 和原文，核对一条认识的依据与适用条件。",
         "limitations": "已有 TK 不代表已核实今天的比赛或实时价格；不能把历史赔率当实时报价，也不能把 LOL 当前赛事页面当成已接通的无畏契约单场入口。",
-        "entry": "小雪对话中点名无畏契约、队伍和问题；长期材料可从 TK 资料库查找。",
+        "entry": "在接入助手中点名无畏契约、队伍和问题；长期材料可从 TK 资料库查找。",
         "next_step": "补齐当前赛事与价格来源，再验证从事实核对、当场应用到结果复盘的真实路径。",
         "known_gaps": ["实时赛事与价格覆盖", "跨游戏单场与结果链仍待真实验收"]
       },
@@ -38,7 +38,7 @@
         "status": "partial", "display_name": "CS",
         "current_capability": "已有专项讨论入口和部分知识、交易 TK，可先解释盘口与回合数等问题，查回已有材料和方法。",
         "limitations": "地图、选手状态、赛程、盘口和结果来源覆盖不完整；尚不能承诺像 LOL 一样提供完整的当前赛事工作台或实时跟踪。",
-        "entry": "小雪对话中点名 CS、赛事或市场问题；已有长期材料从 TK 资料库查找。",
+        "entry": "在接入助手中点名 CS、赛事或市场问题；已有长期材料从 TK 资料库查找。",
         "next_step": "按实际要看的比赛补地图、阵容状态、赛事、盘口和结果来源，再逐项验证可用范围。",
         "known_gaps": ["地图、选手状态、赛事资料、盘口和结果源覆盖"]
       },
@@ -79,14 +79,9 @@
     "current_event_plan": "/home/ubuntu/workspace/knowledge/wiki/{knowledge_namespace}/20_游戏理解/当前赛事/当前交易预案.md"
   },
   "rules_source": "AGENTS.md",
-  "rules": {
-    "daily_window": "AGENTS.md#项目定位与产物",
-    "development_window": "AGENTS.md#变更与验证",
-    "integrity": "AGENTS.md#变更与验证",
-    "model_read_contract": "AGENTS.md#变更与验证",
-    "ui_redesign_not_patch": "AGENTS.md#变更与验证",
-    "capability_needs_entry": "AGENTS.md#变更与验证",
-    "timeout_match": "AGENTS.md#变更与验证",
-    "no_repeat_work": "AGENTS.md#变更与验证"
+  "rule_sections": {
+    "position": "AGENTS.md#项目定位与产物",
+    "boundaries": "AGENTS.md#业务边界",
+    "change_and_verification": "AGENTS.md#变更与验证"
   }
 }

@@ -550,15 +550,15 @@
 | 模块 | 验收 |
 |------|------|
 | 运维 | `vibe-status` 服务全 active，proxy residue 为 none，根分区低于 85% 优先；85%-92% 警告，92% 以上必须清理 |
-| 盘口记录 | 前端新建、读取、删除只走 `/api/market-notes`；单条记录可先预览、明确确认后写回复盘，且只改原记录；不自动交易、不自动写 TK/画像 |
-| 赛前交易判断能力 | 交易 TK、当前交易预案和盘口记录分别走各自正式入口；不生成第二份日报、不注入交易判断层、不作为 LOL 日报发布门禁；缺数据时明确“暂不推荐” |
+| 交易记录 | 旧 `/api/market-notes` 已退役并返回 404；前端新建、读取、标记失效只走 `/api/trading-tk`，写入后从同一正源读回；不自动交易、不自动写长期 TK/画像 |
+| 赛前交易判断能力 | 交易 TK、当前交易预案和交易记录分别走各自正式入口；不生成第二份日报、不注入交易判断层、不作为 LOL 日报发布门禁；缺数据时明确“暂不推荐” |
 | LOL 日报 v2 | 生产只走 `daily_pipeline.py --publish`；唯一 daily artifact 是 `LOL电竞日报_{date}.md`；发布前 readiness manifest 必须是当天完整刷新、`mode=full / ok=true` 且两个阶段成功 |
 | BP 八步法 | `/api/lineup-workflow/prepare` 校验蓝红方和双方五位置，返回固定八步与 `保留/降权/取消/等待`；前端只整理输入，小雪对话执行动态判断 |
 | 画像页 | 优先 Wiki，其次 SKILL.md，再用数据库只读兜底；兜底画像必须标明来源和“不替代人工画像” |
 | 版本理解 | 全局版本读取 `shared_version_analysis`；旧 `/api/version-understanding/{team}` 仅作兼容，前端不再展示队伍版本栏目 |
 | TK 搜索 | `/api/tk/search` 读 MemPalace `xiaoxue-tk` 分区，再用 Wiki 文件补齐；旧 8768 服务和自动回退代码已删除；日期从 frontmatter/mtime 提取，结果按日期降序，不能按文件名字母序提前截断 |
 | TK资料库 | 默认最新优先；今天/7天/30天/月/全部可切换；队伍与关键词可筛选；每次加载 30 条；点开读取完整正文且不显示来源/文件名等后台字段 |
-| memory-bank | 新对话先读 `README.md`、改模块读 `modules.md`、汇报进度读本文件 |
+| memory-bank | 长期规则只读根 `AGENTS.md`；本文件只记录当前状态、证据与未验证项 |
 | 模块隔离 | 默认运行 `scripts/acceptance_check.py` 做只读逐模块验收；某一模块失败后继续检查其余模块；架构门禁要求后端严格三层、跨模块只走 `public.py`，前端跨模块只走 `public.js`/语义事件；只有显式传入写入开关才允许做临场记录写入验收 |
 
 ## 2026-10-13 Codex：LOL完整阵容分析性能窄切片

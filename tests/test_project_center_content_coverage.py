@@ -15,13 +15,13 @@ class ProjectCenterContentCoverageTests(unittest.TestCase):
         self.assertEqual(self.content["schema"], "xiaoxue-project-center-content-v2")
         chapters = {item["id"]: item for item in self.content["book"]["chapters"]}
         self.assertEqual(set(chapters), {
-            "what-is-xiaoxue", "three-windows", "flexible-thread", "why-this-design",
+            "what-is-this-project", "three-windows", "flexible-thread", "why-this-design",
             "capability-map", "real-status", "long-term-road", "how-to-improve",
         })
         for chapter in chapters.values():
             self.assertTrue(chapter["paragraphs"])
             self.assertTrue(chapter["module_tree_ids"])
-        self.assertTrue(any("不会替你下单" in paragraph for paragraph in chapters["what-is-xiaoxue"]["paragraphs"]))
+        self.assertTrue(any("不会替你下单" in paragraph for paragraph in chapters["what-is-this-project"]["paragraphs"]))
         self.assertTrue(any("不是必须照着跑的流水线" in paragraph for paragraph in chapters["flexible-thread"]["paragraphs"]))
         self.assertTrue(any("五项画像" in paragraph for paragraph in chapters["why-this-design"]["paragraphs"]))
         self.assertTrue(any("待修改" in paragraph for paragraph in chapters["how-to-improve"]["paragraphs"]))

@@ -441,6 +441,9 @@ export default {
           return null;
         }
       },
+      openTradeRecord() {
+        context.events?.emit('project-center:open-entry', { page: 'tk' });
+      },
     };
     const refreshButton = root.querySelector('[data-event-action="refresh"]');
     refreshButton?.addEventListener('click', refresh);

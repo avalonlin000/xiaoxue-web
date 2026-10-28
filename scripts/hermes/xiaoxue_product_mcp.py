@@ -945,7 +945,7 @@ async def _api_request(
             response.raise_for_status()
             return response.json()
     except httpx.TimeoutException as exc:
-        raise RuntimeError("小雪工作台响应超时；操作结果尚不确定，请先读回原对象，不要重复提交。") from exc
+        raise RuntimeError("交易人生项目响应超时；操作结果尚不确定，请先读回原对象，不要重复提交。") from exc
     except httpx.HTTPStatusError as exc:
         detail = ""
         try:
@@ -954,9 +954,9 @@ async def _api_request(
         except (TypeError, ValueError):
             pass
         suffix = f"：{detail}" if detail else ""
-        raise RuntimeError(f"小雪工作台拒绝操作（{exc.response.status_code}）{suffix}") from exc
+        raise RuntimeError(f"交易人生项目拒绝操作（{exc.response.status_code}）{suffix}") from exc
     except httpx.HTTPError as exc:
-        raise RuntimeError("小雪工作台连接中断；操作结果尚不确定，请先从原入口读回。") from exc
+        raise RuntimeError("交易人生项目连接中断；操作结果尚不确定，请先从原入口读回。") from exc
 
 
 def _local_api_endpoint(endpoint: str) -> str:

@@ -232,7 +232,7 @@ export function createCurrentEventView(root) {
           <input id="event-gol-game-id" inputmode="numeric" placeholder="Gol.gg 局号（按需）" aria-label="Gol.gg 对局编号">
           <button class="compare-close" data-event-action="load-gol-evidence">查逐局事实</button>
           <button class="btn-tk-new" data-event-action="copy-match">复制给小雪</button>
-          <button class="compare-close" data-shell-action="open-market-helper">记录盘口</button>
+          <button class="compare-close" data-event-action="open-trade-record">记录交易</button>
           <span>分析在聊天里完成，这里留下原始记录和回看线索。</span>
         </div>`;
       updateRunStageUi();
@@ -382,6 +382,7 @@ export function createCurrentEventView(root) {
         if (button.dataset.eventAction === 'focus-run') actions.focusRun();
         if (button.dataset.eventAction === 'pause-run') actions.pauseRun();
         if (button.dataset.eventAction === 'save-trade-entry') actions.saveTradeEntry();
+        if (button.dataset.eventAction === 'open-trade-record') actions.openTradeRecord();
         if (button.dataset.eventAction === 'save-trade-plan-item') actions.saveTradePlanItem();
         if (button.dataset.eventAction === 'cancel-trade-plan-edit') actions.cancelTradePlanEdit();
         if (button.dataset.eventAction === 'edit-trade-plan-item') actions.editTradePlanItem(button.dataset.tradePlanItem);
@@ -463,7 +464,7 @@ export function renderPreparedMaterials(payload = {}) {
     ${renderReadingNotice(payload.reading)}
     ${payload?.task?.state === 'paused' ? `<p class="match-desk-line">${escapeHtml(readableMaterialText(payload.task.message, '原资料仍可查看。'))}</p>` : ''}
     ${material?.updated_at ? `<p class="match-desk-line">截至 ${escapeHtml(readableMaterialTime(material.updated_at))}（北京时间）</p>` : ''}
-    <p class="match-desk-line">${escapeHtml(readableMaterialText(material?.summary) || (active ? '小雪正在收集、核对并整理公开资料；已有比赛信息仍可直接查看。' : '暂时没有可读取的准备成果。'))}</p>
+    <p class="match-desk-line">${escapeHtml(readableMaterialText(material?.summary) || (active ? '当前接入助手正在收集、核对并整理公开资料；已有比赛信息仍可直接查看。' : '暂时没有可读取的准备成果。'))}</p>
     ${sections}
     ${limitations.length ? `<details class="event-context"><summary>尚待核实</summary><div class="event-context-body">${[...new Set(limitations)].map((text) => `<p>${escapeHtml(text)}</p>`).join('')}</div></details>` : ''}`;
 }
@@ -599,8 +600,8 @@ function renderFramework(target, framework = {}) {
   target.innerHTML = `
     <div class="framework-head"><b>${historical ? '历史赛段参考' : '当前赛段框架'}</b><span>${historical ? '仅供查阅，不作为本届当前判断' : '阶段背景，不是每场必须照抄'}</span></div>
     <p class="framework-summary">${escapeHtml(summary)}</p>
-    ${content ? `<details class="framework-details"><summary>展开全文</summary><div>${escapeHtml(content)}</div></details>` : '<div class="framework-empty">先和小雪聊清阶段判断，确认后再形成框架。</div>'}
-    <em>${escapeHtml(framework.updated_at ? `更新于 ${framework.updated_at}` : '尚未记录更新时间')} · ${escapeHtml(framework.boundary || '需要变化时再和小雪讨论并确认。')}</em>`;
+    ${content ? `<details class="framework-details"><summary>展开全文</summary><div>${escapeHtml(content)}</div></details>` : '<div class="framework-empty">先和当前接入助手聊清阶段判断，确认后再形成框架。</div>'}
+    <em>${escapeHtml(framework.updated_at ? `更新于 ${framework.updated_at}` : '尚未记录更新时间')} · ${escapeHtml(framework.boundary || '需要变化时再和当前接入助手讨论并确认。')}</em>`;
 }
 
 function renderVersionUnderstanding(target, data = null) {
@@ -616,7 +617,7 @@ function renderVersionUnderstanding(target, data = null) {
   target.innerHTML = `<div class="framework-head"><b>当前版本理解</b><span>${escapeHtml(item.created_at ? `更新于 ${item.created_at}` : '时间暂未记录')}</span></div>
     <p class="framework-summary">${escapeHtml(item.topic || '统一版本理解')}</p>
     <details class="framework-details"><summary>展开阅读：${escapeHtml(title)}</summary><div class="pc-version-content">${versionContentHtml(content)}</div></details>
-    <em>这是当前赛事和单场判断共用的版本依据；需要调整时直接和小雪讨论。</em>`;
+    <em>这是当前赛事和单场判断共用的版本依据；需要调整时直接和当前接入助手讨论。</em>`;
 }
 
 function versionContentHtml(content) {
@@ -668,7 +669,7 @@ function renderMethods(target, cards = []) {
 export function renderJudgmentMethods(cards = []) {
   const renderCard = (card) => {
     const ready = card.status === 'ready' && card.id;
-    return `<article class="method-card"><b>${escapeHtml(readableMaterialText(card.title, '判断视角'))}</b><p>${escapeHtml(readableMaterialText(card.purpose))}</p>${ready ? `<button type="button" class="compare-close" data-event-method="${escapeHtml(card.id)}" aria-pressed="false">进入判断</button>` : `<small>${card.channel === 'xiaoxue_chat' ? '原能力仍可与小雪聊；这里尚未接通' : '此入口尚未接通'}</small>`}</article>`;
+    return `<article class="method-card"><b>${escapeHtml(readableMaterialText(card.title, '判断视角'))}</b><p>${escapeHtml(readableMaterialText(card.purpose))}</p>${ready ? `<button type="button" class="compare-close" data-event-method="${escapeHtml(card.id)}" aria-pressed="false">进入判断</button>` : `<small>${card.channel === 'xiaoxue_chat' ? '原能力仍可由当前接入助手承接；这里尚未接通' : '此入口尚未接通'}</small>`}</article>`;
   };
   const sorted = [...cards].sort((a, b) => (Number(a.order) || 0) - (Number(b.order) || 0));
   const primary = sorted.filter((card) => card.primary !== false);
@@ -709,13 +710,13 @@ export function renderJudgmentContext(payload = {}) {
     ${limitations.length ? `<div class="judgment-notice">${limitations.map((text) => `<p>${escapeHtml(text)}</p>`).join('')}</div>` : ''}
     ${contents || (!needed && payload.status !== 'unavailable' ? '<p class="tk-empty">当前还没有可读取的对应内容，不会代填判断。</p>' : '')}
     ${analysis}
-    ${payload.discussion_available ? '<p class="judgment-save-note">可以继续讨论；仅保留本次会话，未自动保存或采用。要长期修改，请沿用小雪对应内容的原维护入口。</p>' : ''}`;
+    ${payload.discussion_available ? '<p class="judgment-save-note">可以继续讨论；仅保留本次会话，未自动保存或采用。要长期修改，请沿对应内容的原维护入口。</p>' : ''}`;
 }
 
 export function renderJudgmentDiscussion(payload = {}) {
   const references = [...new Set((payload.references || []).map((item) => readableMaterialText(item.title)).filter(Boolean))];
   const basis = [payload.method_title ? `讨论视角：${readableMaterialText(payload.method_title)}` : '', payload.basis_updated ? '这条回答所用依据已有更新' : ''].filter(Boolean).join(' · ');
-  return `<article class="judgment-exchange">${basis ? `<small>${escapeHtml(basis)}</small>` : ''}<b>你的问题</b><p>${escapeHtml(readableMaterialText(payload.question))}</p><b>小雪</b><div class="judgment-prose">${versionContentHtml(discussionDisplayText(readableMaterialText(payload.answer)))}</div>${references.length ? `<small>参考：${escapeHtml(references.join('、'))}</small>` : ''}<small>本次讨论未保存，不代表你已认可或采用。</small></article>`;
+  return `<article class="judgment-exchange">${basis ? `<small>${escapeHtml(basis)}</small>` : ''}<b>你的问题</b><p>${escapeHtml(readableMaterialText(payload.question))}</p><b>助手回答</b><div class="judgment-prose">${versionContentHtml(discussionDisplayText(readableMaterialText(payload.answer)))}</div>${references.length ? `<small>参考：${escapeHtml(references.join('、'))}</small>` : ''}<small>本次讨论未保存，不代表你已认可或采用。</small></article>`;
 }
 
 export function discussionDisplayText(value) {
@@ -852,7 +853,7 @@ function renderMatchRun(run = {}, viewState = {}) {
     }).join('');
     const savedHtml = stageEntries.length
       ? `<ul class="match-stage-entries">${stageEntries.map((entry) => `<li><b>${escapeHtml(entry.label || '')}</b><span>${escapeHtml(entry.content || '')}</span><em>${escapeHtml(entry.updated_at || '')}</em></li>`).join('')}</ul>`
-      : '<div class="match-run-empty">还没和小雪聊到这里。</div>';
+      : '<div class="match-run-empty">还没和当前接入助手聊到这里。</div>';
     return `<section class="match-stage-panel" data-run-stage-panel="${stage}"${stage === activeStage ? '' : ' hidden'}>
       <p class="stage-purpose">${escapeHtml(meta.purpose || '')}</p>
       <div class="run-entry-chips">${chips}</div>${savedHtml}
@@ -883,8 +884,8 @@ function renderMatchRun(run = {}, viewState = {}) {
       <button class="compare-close" data-event-action="focus-run">切到这一项</button>
       <button class="compare-close" data-event-action="save-trade-entry">只更新这一项</button>
     </div>
-    <details class="match-basis"><summary>本场依据</summary><span class="basis-hint">TS、队伍资料、交易 TK 和赛果只作为依据，单场判断仍由你和小雪讨论。</span>${facts ? `<ul class="match-run-facts">${facts}</ul>` : '<div class="match-run-empty">暂时没有可用依据。</div>'}</details>
-    <div class="match-workspace-actions">${runAction}<span>有错误直接告诉小雪具体内容，不需要记编号。</span></div>
+    <details class="match-basis"><summary>本场依据</summary><span class="basis-hint">TS、队伍资料、交易 TK 和赛果只作为依据，单场判断仍由你和当前接入助手讨论。</span>${facts ? `<ul class="match-run-facts">${facts}</ul>` : '<div class="match-run-empty">暂时没有可用依据。</div>'}</details>
+    <div class="match-workspace-actions">${runAction}<span>有错误直接告诉当前接入助手具体内容，不需要记编号。</span></div>
   </section>`;
 }
 

@@ -10,7 +10,7 @@ from xiaoxue_api.core.module_loader import attach_feature_routers
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="小雪工作台")
+    app = FastAPI(title="交易人生项目")
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],

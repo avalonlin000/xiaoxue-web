@@ -58,8 +58,11 @@ test('views never call feature data adapters directly', () => {
 test('market notes surface is retired', () => {
   const html = readFileSync(new URL('index.html', root), 'utf8');
   const shell = readFileSync(new URL('src/main.js', root), 'utf8');
+  const event = readFileSync(new URL('src/modules/current-event/view.js', root), 'utf8');
   assert.doesNotMatch(html, /id="card-trades"|open-market-helper|盘口记录/);
   assert.doesNotMatch(shell, /market-notes/);
+  assert.doesNotMatch(event, /open-market-helper|记录盘口/);
+  assert.match(event, /data-event-action="open-trade-record">记录交易/);
 });
 
 test('the shell stays a composition layer without legacy feature handlers', () => {
@@ -101,4 +104,17 @@ test('project center stays inside the workbench shell with a stable deep link', 
   assert.match(shell, /project-center/);
   assert.match(shell, /book\|architecture\|objects\|modules\|requests\|deliveries\|manual/);
   assert.doesNotMatch(html, /project-center[^\n]*<iframe/i);
+});
+
+test('project-level copy describes the assistant without making it the project identity', () => {
+  const view = readFileSync(new URL('src/modules/project-center/view.js', root), 'utf8');
+  const event = readFileSync(new URL('src/modules/current-event/view.js', root), 'utf8');
+  const content = readFileSync(new URL('config/project-center-content.json', root), 'utf8');
+
+  assert.match(view, /项目负责什么/);
+  assert.match(view, /当前接入助手共同维护的一条主线/);
+  assert.doesNotMatch(view, /小雪负责什么|人和小雪共同维护|看懂小雪项目/);
+  assert.doesNotMatch(content, /看懂小雪项目/);
+  assert.doesNotMatch(event, /<b>小雪<\/b>|先和小雪聊清|还没和小雪聊到这里/);
+  assert.match(event, /data-event-action="copy-match">复制给小雪<\/button>/);
 });

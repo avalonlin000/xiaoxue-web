@@ -347,7 +347,7 @@ function renderProfile(profile, teamInfo, doc) {
         <h2>${escapeHtml(section.title)}</h2>
         <div class="profile-section-body">${renderProfileMarkdown(section.content)}</div>
       </section>`).join('')}</div>`
-    : `${heading}<div class="profile-empty">暂无 ${escapeHtml(shortName)} 的画像，可直接和小雪说补上。</div>`;
+    : `${heading}<div class="profile-empty">暂无 ${escapeHtml(shortName)} 的画像，可直接和当前接入助手说补上。</div>`;
 }
 
 const PROFILE_SECTION_TITLES = ['队伍定位', '怎么赢', '怎么输', '关键点', 'BP 倾向'];

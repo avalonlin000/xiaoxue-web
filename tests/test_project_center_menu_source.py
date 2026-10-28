@@ -98,8 +98,10 @@ class MenuSourceTests(unittest.TestCase):
 
     def test_model_guide_points_at_the_source_instead_of_copying_the_module_table(self) -> None:
         guide = GUIDE.read_text(encoding="utf-8")
-        self.assertIn("scripts/xiaoxue_menu.py --modules", guide)
-        self.assertIn("module_tree", guide)
+        project_map = (ROOT / "docs/architecture/PROJECT-MAP.md").read_text(encoding="utf-8")
+        self.assertIn("config/project-center-content.json", project_map)
+        self.assertIn("scripts/xiaoxue_menu.py", project_map)
+        self.assertIn("`module_tree` / `manual`", project_map)
         self.assertNotIn("| 模块 | 钧钧用它解决什么 |", guide)
         self.assertNotIn("| TS／队伍实力展示 |", guide)
 

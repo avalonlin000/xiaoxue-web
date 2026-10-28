@@ -12,7 +12,7 @@
     },
     "searxng": {
       "url": "http://127.0.0.1:8338/searxng",
-      "health": "http://127.0.0.1:8338/health"
+      "health": "http://127.0.0.1:8338/__admin/health"
     }
   }
 }

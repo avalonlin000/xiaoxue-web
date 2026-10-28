@@ -35,7 +35,7 @@ def main() -> int:
         fail("模型项目使用说明未指向根 AGENTS.md")
     if project_contract.get("rules_source") != "AGENTS.md":
         fail("项目约定未指向根 AGENTS.md")
-    rule_refs = project_contract.get("rules") or {}
+    rule_refs = project_contract.get("rule_sections") or {}
     if not rule_refs or any(not str(value).startswith("AGENTS.md#") for value in rule_refs.values()):
         fail("project-contract.json 仍维护独立规则正文")
     legacy_guide = ROOT / "docs/小雪项目总使用说明.md"

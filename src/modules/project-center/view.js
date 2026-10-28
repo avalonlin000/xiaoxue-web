@@ -93,7 +93,7 @@ function render(state) {
 
 function pageHtml(state, data) {
   const { overview, modules, objectCatalog, manual, basket, requests, deliveries, versionUnderstanding, versionUnderstandingError, readError } = data;
-  const projectName = overview?.project?.name || '小雪项目中心';
+  const projectName = overview?.project?.name || '交易人生项目';
   const main = {
     book: bookHtml(state, overview, deliveries),
     architecture: architectureHtml(),
@@ -134,7 +134,7 @@ function pageHtml(state, data) {
 function architectureHtml() {
   const steps = [
     ['人', '定边界、看信息、做判断、决定是否写入'],
-    ['小雪', '整理信息、调用方法、找反证、指出缺口'],
+    ['当前接入助手', '整理信息、调用方法、找反证、指出缺口'],
     ['信息', '比赛、赔率、伤停、版本、舆情、赛果和用户材料'],
     ['普通 TK', '长期知识、规律、画像、方法和对象理解'],
     ['交易 TK', '带适用条件、交易含义和失效条件的交易认识'],
@@ -142,7 +142,7 @@ function architectureHtml() {
     ['结果 / 复盘', '回看当时依据，决定保留、修订或暂停'],
   ];
   return `<section class="pc-architecture" aria-label="交易信息系统结构图">
-    <div class="pc-section-heading"><div><span class="pc-kicker">系统结构图</span><h2>人和小雪共同维护的一条主线</h2><p>这张图来自项目统一骨架，不是 TK 关系图；新增对象只接入对象适配层，不改公共主线。</p></div><button class="pc-text-action" data-pc-action="view" data-view="objects">查看交易对象目录 →</button></div>
+    <div class="pc-section-heading"><div><span class="pc-kicker">系统结构图</span><h2>人和当前接入助手共同维护的一条主线</h2><p>这张图来自项目统一骨架，不是 TK 关系图；更换接入助手不会改变项目主线。</p></div><button class="pc-text-action" data-pc-action="view" data-view="objects">查看交易对象目录 →</button></div>
     <div class="pc-flow">${steps.map(([title, detail], index) => `<div class="pc-flow-step"><div class="pc-flow-node pc-flow-${index}"><b>${title}</b><span>${detail}</span></div>${index < steps.length - 1 ? '<span class="pc-flow-arrow" aria-hidden="true">↓</span>' : ''}</div>`).join('')}</div>
     <div class="pc-architecture-notes"><article><b>唯一载体</b><p>普通 TK 和交易 TK 都是长期内容，但交易 TK 不等于自动交易指令。</p></article><article><b>不自动升级</b><p>当前判断、临场记录、结果和外部资料不会自动变成长期 TK。</p></article><article><b>可插拔对象</b><p>LOL、CS、足球等只需补主体、事件、信息源、结果源和方法。</p></article></div>
   </section>`;
@@ -166,7 +166,7 @@ function quickStartHtml() {
   return `<section class="pc-start-panel" aria-label="从这里开始">
     <div class="pc-start-heading"><span class="pc-kicker">从这里开始</span><b>不用先理解整个系统，按你现在的问题选一条</b></div>
     <div class="pc-start-actions">
-      <button class="pc-start-card" data-pc-action="copy-chat" data-copy-recipient="小雪" data-prompt="聊聊我现在最想解决的问题"><strong>先问小雪</strong><span>有比赛、BP、交易或复盘问题，直接说现在想弄清什么。</span></button>
+      <button class="pc-start-card" data-pc-action="copy-chat" data-copy-recipient="小雪" data-prompt="聊聊我现在最想解决的问题"><strong>先问助手</strong><span>有比赛、BP、交易或复盘问题，直接说现在想弄清什么。</span></button>
       <button class="pc-start-card" data-pc-action="open-entry" data-page="teams"><strong>先看资料</strong><span>横向看队伍、TS、画像、首发和长期资料。</span></button>
       <button class="pc-start-card" data-pc-action="view" data-view="manual"><strong>先看怎么用</strong><span>按场景查看去哪、怎么说、能得到什么。</span></button>
     </div>
@@ -193,10 +193,10 @@ function bookHtml(state, overview, deliveries) {
         <p>${escapeHtml(runtime.reason || '正在读取当前运行状态。')}</p>
         <div class="pc-live-row"><span class="pc-live-dot ${escapeHtml(runtime.status || 'degraded')}"></span><span>${escapeHtml(daily.label || '今天内容状态待确认')}</span><small>${escapeHtml(dailyNextStep(daily))}</small></div>
         <button class="pc-text-action" data-pc-action="view" data-view="manual">按使用说明选择入口 →</button>
-        <button class="pc-why" data-pc-action="why" data-prompt="${escapeAttr(`为什么小雪现在显示「${runtime.label || '状态待确认'}」？请用人话说明它对今天使用有什么影响。`)}">问问为什么</button>
+        <button class="pc-why" data-pc-action="why" data-prompt="${escapeAttr(`为什么项目现在显示「${runtime.label || '状态待确认'}」？请用人话说明它对今天使用有什么影响。`)}">问问为什么</button>
       </article>
       <article class="pc-boundary-card">
-        <span class="pc-kicker">小雪负责什么</span>
+        <span class="pc-kicker">项目负责什么</span>
         <p>${escapeHtml(overview.project?.boundary || '')}</p>
         <button class="pc-text-action" data-pc-action="view" data-view="manual">查看使用说明书 →</button>
       </article>
@@ -341,7 +341,7 @@ function versionInlineHtml(value) {
 function entryWhere(entry) {
   if (entry.type === 'web') return entry.label || '在工作台打开对应页面';
   if (entry.type === 'project' || entry.type === 'status') return entry.label || '在项目中心查看当前状态';
-  return '回飞书和小雪说';
+  return '在接入助手中继续';
 }
 
 
@@ -389,7 +389,7 @@ function manualExtrasHtml(extras) {
   const groups = (extras || []).filter(group => group && (group.say || []).length);
   if (!groups.length) return '';
   const rows = groups.map(group => `<span class="pc-kicker">${escapeHtml(group.label || '')}</span><div class="pc-example-list">${(group.say || []).map(example => `<button data-pc-action="copy-chat" data-copy-recipient="小雪" data-prompt="${escapeAttr(example)}"><b>复制这句话</b><span>${escapeHtml(example)}</span></button>`).join('')}</div>`).join('');
-  return `<div class="pc-manual-extras"><p class="pc-manual-extras-lead">说明书之外，这些说法小雪同样认得（和小雪的菜单来自同一份内容，改这里两边一起变）。</p>${rows}</div>`;
+  return `<div class="pc-manual-extras"><p class="pc-manual-extras-lead">说明书之外，当前接入助手同样认得这些说法；项目菜单与这里来自同一份内容源。</p>${rows}</div>`;
 }
 
 
@@ -652,7 +652,7 @@ function statusTone(status) {
 
 
 function loadingHtml() {
-  return `<section class="pc-shell"><div class="pc-loading"><span></span><b>正在整理小雪项目中心…</b><p>项目目标、当前状态和交付进度会分开显示。</p></div></section>`;
+  return `<section class="pc-shell"><div class="pc-loading"><span></span><b>正在整理交易人生项目…</b><p>项目目标、当前状态和交付进度会分开显示。</p></div></section>`;
 }
 
 
