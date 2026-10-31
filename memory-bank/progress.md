@@ -2,15 +2,18 @@
 
 > 导航更新：2026-10-29 | 本次授权：项目规范合并与按模板整理目录
 
-## 2026-10-31 · 项目中心开发模块图更新（本地已验收，待发布）
+## 2026-10-31 · 项目中心开发模块图更新（已发布并核验）
 
 - Goal / Locked decisions：按钧钧“补清楚就执行”的当次授权，在原项目中心开发模块页面内部整理个人开发定位图。按英雄联盟、足球、CS2、无畏契约和项目共用分页，每页保留少量主模块、细项折叠，写清目的及“现在有 / 还缺 / 下一步改什么”；后台维护信息不进入展示层。
 - Changed：本地提交 `34d95c0`（`Update project center development map by variety`），内容版本 `2026-10-31.2`。当前主模块数为 4/1/1/1/2，不固定未来数量；32 项旧叶子能力各有唯一归属，另展示 2 项共用父级详情。接口、同源菜单、开发书跳转、待修改记录和旧 ID 兼容同步更新，切页保留展开与草稿，不同品种的待修改记录保持独立。PRD 为 `docs/requirements/项目中心开发模块更新-PRD.md`。
 - Maintenance：项目地图已链接 `docs/architecture/PROJECT-CENTER-MODULE-MAINTENANCE.md`，要求能力、入口和缺口发生变化时在同一轮更新模块图。新增只读核对入口 `scripts/tasks/xiaoxue_project_center_module_review.py`，确定性检查及 dry-run 已通过；实际模型核对调用超时，模型分支运行效果仍未验证。没有注册生产排程，也没有自动写回内容。
 - Verified（已观察）：相关 Python 测试 29 项、前端测试 103 项、模块合同检查、语法与 diff 检查通过；隔离构建位于 `/tmp/xiaoxue-project-center-qa.kGjICt/build`。1440×900 与 390×844 浏览器核对分页、折叠、草稿、待修改备注、书内跳转、URL 和 Escape 焦点恢复通过；34 项详情展开后没有技术信息泄漏或页面横向溢出。独立只读复审未发现本轮范围内未解决的 P1/P2。截图为 `/tmp/pc-final-audit-1440.png`、`/tmp/pc-final-audit-390.png`；这些是临时证据路径，不是持久部署产物。临时验收服务 `/tmp/project_center_qa_server.py 40373` 已停止。
+- Published（已观察，2026-10-31 19:23 CST）：钧钧明确回复“发布”后执行。重新隔离构建，入口和四个 JS 分块与先前验收产物逐字节一致；通过原子目录交换发布，保留旧版四个哈希分块，随后正式入口的五个关键文件校验哈希一致、四个旧分块均 HTTP 200。项目 API 已于 19:22:27 按授权重启（MainPID `2737547`），`/api/health` 为 healthy，`/api/project-center/modules` 返回内容版本 `2026-10-31.2`、五页模块数 4/1/1/1/2。正式 8880 入口在 1440×900 和 390×844 下核验 9 个主模块、34 项详情、默认折叠、分页、草稿保持及说明书/开发书跳转，均无页面异常、HTTP 失败或文档横向溢出；浏览器验证全程禁止非 GET/HEAD/OPTIONS 请求，实际没有触发写请求。没有从服务器外网络单独验证公网可达性。
+- Release evidence / rollback：备份与发布回执保存在 `.xiaobai-backups/project-center-release-20261031.xtYNG3/`（git 忽略），含 `dist-before`、`dist-at-switch`、`source-before.tgz`、`service-before.txt`、`working-tree-before.patch`、`publish.json`、`http-verification.json`、`browser-verification.json` 与双端截图。首次切换脚本因未计入构建附带的 `bili_qr.png` 提前停止、未修改正式产物；修正检查后成功原子切换。该附带图片没有对应根路径静态路由，与既有行为一致，不在关键发布文件 HTTP 校验中。正式服务只重启一次，未改服务配置或生产排程。
+- Restart side effects（已观察）：发布前记录 66 项采集任务，其中 `7e8a5c45d2411fbf55cd1aee` 和 `a1cb2a949f570da0374366af` 已处于 failed 且有待执行恢复时间；授权 API 重启后，既有启动恢复链令两项重试从 attempts=1 变为 2，状态仍 failed，并更新下一次恢复时间。已保留 `collection-before.json` / `collection-after.json`，未手动触发、暂停、回滚或修复业务采集；该既有失败不升级为本轮模块页面发布失败，也不冒称已修复。
 - Production incident / recovery（已观察及未知）：早前构建误覆盖正式 `dist/`，随后按旧提交 `dadd68356816bc5cd3478e55a873f733f5a35c60` 重建恢复，无法证明与误覆盖前部署逐字节一致；误移出的三个懒加载资源已从 `/tmp/xiaoxue-dist-baseline-clean.ykAAGJ/dist/assets/` 恢复，相关四个资源均已通过正式入口 HTTP 200 核对。不能据此声称生产从未改变，也不能当作新版正式发布成功。
 - Collection incident（已观察及未知）：早前临时 API 启动在约 11:24 改动真实采集任务与检查点；`16c2c6c095e1232619e8106b`、`40d632530587dbdc0ae4136f`、`787a6b0cde2ac94e79e2cea7`、`538d3e4ec175b19eec849a22` 为 paused，`3c042583e09608cbbbea064b` 为 failed。原状态未知，未猜测回滚；已向用户说明。主业务库与项目中心库检查时的时间戳没有变化，但这不证明所有业务状态未变。此后验收只使用临时存储与项目中心路由，不运行业务启动生命周期。
-- Next / Limits：实现与隔离验收已完成，新版尚未正式发布；覆盖正式静态产物及重启 `xiaoxue-workbench-api.service` 仍需按 `AGENTS.md` 单独取得发布授权，并从真实入口补验。模型核对超时和前述事故的恢复限制保持明确，不升级为“全部完成”。既有无关工作树改动（包括本文件原时间戳更新）已保留。
+- Next / Limits：本轮开发模块图已按授权正式发布，并从正式入口完成双端只读核验；后续可直接在原项目中心查看、按“品种 → 模块”提出修改。只读模型核对运行效果仍未验证，未启用新生产调度；前述历史事故恢复限制和两项既有采集失败保持明确，不据本轮页面验收外推整个项目全部完成。既有无关工作树改动（包括本文件原时间戳更新）已保留。
 
 ## 2026-10-29 · 规范与目录收敛
 
