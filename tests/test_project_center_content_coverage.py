@@ -1,4 +1,5 @@
 import json
+import copy
 import unittest
 from pathlib import Path
 
@@ -56,6 +57,20 @@ class ProjectCenterContentCoverageTests(unittest.TestCase):
             self.assertIn("source", node["engineering_details"])
             self.assertIn("verification", node["engineering_details"])
 
+    def test_development_map_is_the_user_facing_variety_hierarchy(self):
+        groups = self.content["development_map"]["groups"]
+        self.assertEqual([group["id"] for group in groups], ["lol", "football", "cs2", "valorant", "shared"])
+        module_ids = []
+        for group in groups:
+            self.assertTrue(group["modules"])
+            for module in group["modules"]:
+                module_ids.append(module["id"])
+                for key in ("purpose", "now", "gaps", "next_step", "basket_module_id"):
+                    self.assertTrue(module[key], f"{group['id']}/{module['id']} missing {key}")
+                self.assertIsInstance(module["detail_node_ids"], list)
+        self.assertEqual(len(module_ids), len(set(module_ids)))
+        self.assertNotIn("八个一级模块", self.content["book"]["chapters"][4]["summary"])
+
     def test_manual_covers_daily_scenarios_and_keeps_them_routed_by_context(self):
         sections = {item["id"]: item for item in self.content["manual"]["sections"]}
         self.assertEqual(set(sections), {
@@ -77,6 +92,58 @@ class ProjectCenterContentCoverageTests(unittest.TestCase):
             "first-time", "teams-and-tk", "current-event", "match-prep", "lineup-and-trading",
             "record-and-review", "review-and-long-term", "knowledge-maintenance", "daily-and-improve", "fixed-boundaries",
         ])
+
+    def test_all_detail_leaves_have_one_owner_and_variety_specific_details_stay_separate(self):
+        nodes = {node["id"]: node for node in walk_nodes(self.content["module_tree"])}
+        owners = {}
+        for group in self.content["development_map"]["groups"]:
+            for module in group["modules"]:
+                for ref in module["detail_node_ids"]:
+                    for node in walk_nodes([nodes[ref]]):
+                        self.assertNotIn(node["id"], owners)
+                        owners[node["id"]] = group["id"]
+                        for key in ("current_capability", "known_gap", "next_step"):
+                            self.assertTrue(node.get(key), f"{node['id']}/{key}")
+                        text = " ".join(node[key] for key in ("current_capability", "known_gap", "next_step"))
+                        for technical in ("MCP", "镜像文件", "正源", "合同", "/api/"):
+                            self.assertNotIn(technical, text, node["id"])
+        self.assertTrue({node_id for node_id, node in nodes.items() if not node.get("children")}.issubset(owners))
+        for node_id in ("hero-static-data", "team-and-market-tk", "daily-report", "golgg-fact-check", "maintenance-and-quality", "schedule-driven-push", "external-fact-intake"):
+            self.assertEqual(owners[node_id], "lol")
+        self.assertEqual(owners["football-board"], "football")
+        self.assertEqual(owners["tk-library-and-search"], "shared")
+
+    def test_invalid_mapping_cannot_silently_lose_or_duplicate_modules(self):
+        from xiaoxue_api.modules.platform.center.service import _validate_content, ProjectCenterError
+
+        for mutation in ("missing", "duplicate", "wrong_variety", "blank", "broken_book"):
+            content = copy.deepcopy(self.content)
+            groups = content["development_map"]["groups"]
+            if mutation == "missing":
+                groups[0]["modules"][1]["detail_node_ids"].remove("hero-static-data")
+            elif mutation == "duplicate":
+                groups[-1]["modules"][0]["detail_node_ids"].append("hero-static-data")
+            elif mutation == "wrong_variety":
+                groups[1]["object_id"] = "lol"
+            elif mutation == "blank":
+                groups[0]["modules"][0]["now"] = " "
+            else:
+                content["book"]["chapters"][0]["module_tree_ids"].append("missing-node")
+            with self.subTest(mutation=mutation), self.assertRaises(ProjectCenterError):
+                _validate_content(content)
+
+    def test_review_packet_includes_facts_and_rejects_unattributed_model_claims(self):
+        from scripts.tasks.xiaoxue_project_center_module_review import build_packet, parse_model_json
+
+        packet = build_packet()
+        self.assertEqual(packet["structure_check"], "passed")
+        self.assertIn("modules", packet["sources"]["config/module-contract.json"])
+        self.assertIn("module_tree", packet["sources"]["config/project-center-content.json"])
+        valid = {"status": "ok", "findings": [], "checked_at": packet["checked_at"]}
+        self.assertEqual(parse_model_json(json.dumps(valid), packet), valid)
+        invalid = {**valid, "status": "review_needed", "findings": [{"kind": "stale", "path": "development_map.groups", "claim": "过时", "evidence": "无来源", "source": "invented.md", "action": "改写"}]}
+        with self.assertRaises(ValueError):
+            parse_model_json(json.dumps(invalid), packet)
 
     def test_default_content_does_not_leak_implementation_paths_or_retired_primary_routes(self):
         public_content = CONTENT.read_text(encoding="utf-8")

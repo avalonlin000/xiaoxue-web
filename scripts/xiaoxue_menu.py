@@ -8,8 +8,8 @@
 用法：
   python3 scripts/xiaoxue_menu.py              # 菜单：每个场景一行「场景 → 示例说法」
   python3 scripts/xiaoxue_menu.py --scenario teams-and-tk   # 单个场景的完整口径
-  python3 scripts/xiaoxue_menu.py --modules    # 模块一览：每个一级模块一行
-  python3 scripts/xiaoxue_menu.py --module long-term-understanding   # 单个模块的完整口径
+  python3 scripts/xiaoxue_menu.py --modules    # 模块一览：按品种分组展示主模块
+  python3 scripts/xiaoxue_menu.py --module lol-team-version   # 单个主模块；旧 ID 仍兼容
 只读；读不到时返回非零并给出人话说明，调用方据此给简版。
 """
 from __future__ import annotations
@@ -70,15 +70,26 @@ def render_scenario(manual: dict, scenario_id: str) -> str:
     return f"没有这个场景：{scenario_id}（可用：{known}）"
 
 
-def render_modules(tree: list[dict], version: str) -> str:
+def render_modules(groups: list[dict], version: str) -> str:
     lines = [f"【模块一览（内容版本 {version}）】"]
-    for node in tree:
-        lines.append(f"- {node.get('name', '')}：{node.get('purpose', '')}")
-        lines.append(f"  什么时候用：{node.get('when_to_use', '')}")
+    for group in groups:
+        lines.append(f"- {group.get('name', '')}")
+        for module in group.get("modules") or []:
+            lines.append(f"  - {module.get('name', '')}：{module.get('purpose', '')}")
     return "\n".join(lines)
 
 
-def render_module(tree: list[dict], module_id: str) -> str:
+def render_module(tree: list[dict], module_id: str, groups: list[dict] | None = None) -> str:
+    for group in groups or []:
+        for module in group.get("modules") or []:
+            if module.get("id") == module_id:
+                return "\n".join([
+                    f"模块：{group['name']} → {module['name']}",
+                    f"用途：{module['purpose']}",
+                    f"现在有：{module['now']}",
+                    f"还缺：{module['gaps']}",
+                    f"下一步改什么：{module['next_step']}",
+                ])
     for node in tree:
         if node.get("id") != module_id:
             continue
@@ -101,7 +112,7 @@ def render_module(tree: list[dict], module_id: str) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="读取项目中心内容里的使用说明与模块树")
     parser.add_argument("--scenario", help="只看一个场景（用场景 id）")
-    parser.add_argument("--modules", action="store_true", help="模块一览（一级模块）")
+    parser.add_argument("--modules", action="store_true", help="模块一览（按品种分组）")
     parser.add_argument("--module", help="只看一个模块（用模块 id）")
     args = parser.parse_args()
 
@@ -112,10 +123,11 @@ def main() -> int:
         return 2
 
     if args.module:
-        print(render_module(tree, args.module))
+        print(render_module(tree, args.module, (_content.get("development_map") or {}).get("groups")))
         return 0
     if args.modules:
-        print(render_modules(tree, version))
+        development_map = _content.get("development_map") or {}
+        print(render_modules(development_map.get("groups") or [], version))
         return 0
     if args.scenario:
         print(render_scenario(manual, args.scenario))

@@ -25,6 +25,8 @@ export function createProjectCenterView({ root, events }) {
     records: {},
     lastFocusKey: '',
     expandedNodes: new Set(),
+    developmentGroup: 'lol',
+    moduleNotes: {},
     expandedBookChapters: new Set(),
     currentBookChapterId: '',
     bookInitialized: false,
@@ -32,8 +34,14 @@ export function createProjectCenterView({ root, events }) {
 
   root.addEventListener('click', event => onClick(event, state));
   root.addEventListener('toggle', event => onBookChapterToggle(event, state), true);
+  root.addEventListener('input', event => {
+    if (event.target.matches('[data-note-module]')) state.moduleNotes[event.target.dataset.noteModule] = event.target.value;
+  });
   root.addEventListener('keydown', event => {
-    if (event.key === 'Escape' && state.drawerOpen) closeDrawer(state);
+    if (event.key === 'Escape' && state.drawerOpen) {
+      event.stopPropagation();
+      closeDrawer(state);
+    }
   });
   events.on('project-center:shown', ({ view }) => {
     state.view = validView(view) ? view : state.view;
@@ -73,18 +81,16 @@ function render(state) {
   const records = state.records;
   const overview = records.overview?.data?.data || null;
   const moduleData = records.modules?.data?.data || {};
-  const modules = moduleData.tree || moduleData.items || [];
+  const developmentMap = moduleData.development_map || [];
   const objectCatalog = moduleData.object_catalog || overview?.object_catalog || {};
   const manual = records.manual?.data?.data?.manual || null;
   const basket = records.basket?.data?.data || { items: [], count: 0, focus: null };
   const requests = records.requests?.data?.data?.items || [];
   const deliveries = records.deliveries?.data?.data?.items || [];
-  const versionUnderstanding = records.versionUnderstanding?.data?.data || null;
-  const versionUnderstandingError = records.versionUnderstanding?.error || '';
   const readError = firstError(records);
   const body = state.loading && !state.loaded
     ? loadingHtml()
-    : pageHtml(state, { overview, modules, objectCatalog, manual, basket, requests, deliveries, versionUnderstanding, versionUnderstandingError, readError });
+    : pageHtml(state, { overview, developmentMap, objectCatalog, manual, basket, requests, deliveries, readError });
   state.root.innerHTML = body;
   if (state.drawerOpen) focusDrawer(state);
   revealCurrentTab(state);
@@ -92,13 +98,13 @@ function render(state) {
 
 
 function pageHtml(state, data) {
-  const { overview, modules, objectCatalog, manual, basket, requests, deliveries, versionUnderstanding, versionUnderstandingError, readError } = data;
+  const { overview, developmentMap, objectCatalog, manual, basket, requests, deliveries, readError } = data;
   const projectName = overview?.project?.name || '交易人生项目';
   const main = {
     book: bookHtml(state, overview, deliveries),
     architecture: architectureHtml(),
     objects: objectsHtml(objectCatalog),
-    modules: modulesHtml(modules, state, versionUnderstanding, versionUnderstandingError),
+    modules: modulesHtml(developmentMap, state),
     requests: requestsHtml(basket, requests, state.selectedIds),
     deliveries: deliveriesHtml(deliveries),
     manual: manualHtml(manual),
@@ -124,7 +130,7 @@ function pageHtml(state, data) {
       </div>
       ${state.notice ? `<p class="pc-notice" role="status">${escapeHtml(state.notice)}</p>` : ''}
       ${readError ? `<div class="pc-state pc-state-warning"><b>有一部分状态暂时读不到</b><span>${escapeHtml(readError)}，不影响你查看其他已加载内容。</span></div>` : ''}
-      ${quickStartHtml()}
+      ${state.view === 'modules' ? '' : quickStartHtml()}
       ${state.drawerOpen ? basketDrawerHtml(basket, state.selectedIds) : ''}
       <main class="pc-main">${main}</main>
     </section>`;
@@ -205,7 +211,7 @@ function bookHtml(state, overview, deliveries) {
       <div class="pc-section-heading"><div><span class="pc-kicker">${escapeHtml(book.directory_label || '项目开发书目录')}</span><h2>从这里看懂整个项目</h2><p>按章节阅读，或直接跳到对应模块和使用场景。</p></div><button class="pc-text-action" data-pc-action="view" data-view="manual">按场景看使用说明 →</button></div>
       <div class="pc-directory-list">${chapters.map((chapter, index) => bookDirectoryItemHtml(chapter, index, state.currentBookChapterId === chapter.id)).join('')}</div>
     </section>
-    <section class="pc-book-chapters">${chapters.map((chapter, index) => bookChapterHtml(chapter, index, state.expandedBookChapters.has(chapter.id), state.currentBookChapterId === chapter.id)).join('')}</section>
+    <section class="pc-book-chapters">${chapters.map((chapter, index) => bookChapterHtml(chapter, index, state.expandedBookChapters.has(chapter.id), state.currentBookChapterId === chapter.id, state)).join('')}</section>
     <section class="pc-section pc-two-columns">
       <article class="pc-list-card pc-status-guide"><span class="pc-kicker">当前状态怎样读</span>${(book.status_guide || []).map(item => `<p><b>${escapeHtml(item.label)}</b><span>${escapeHtml(item.meaning)}</span></p>`).join('')}<button class="pc-text-action" data-pc-action="jump-module" data-module-tree-id="daily-and-automation">看状态相关模块 →</button></article>
       <article class="pc-list-card"><span class="pc-kicker">最近交付</span>${deliveryMiniList(deliveries)}<button class="pc-text-action" data-pc-action="view" data-view="deliveries">查看当前交付 →</button><p class="pc-muted">${escapeHtml(book.not_now || '')}</p></article>
@@ -218,133 +224,47 @@ function bookDirectoryItemHtml(chapter, index, isCurrent) {
 }
 
 
-function bookChapterHtml(chapter, index, isOpen, isCurrent) {
-  return `<details id="pc-book-${escapeAttr(chapter.id)}" data-book-id="${escapeAttr(chapter.id)}" class="pc-book-chapter ${isCurrent ? 'is-current' : ''}"${isOpen ? ' open' : ''}><summary class="pc-book-chapter-title"><span>${String(index + 1).padStart(2, '0')}</span><div><div class="pc-book-heading"><h2>${escapeHtml(chapter.title)}</h2><em class="pc-book-current ${isCurrent ? 'is-visible' : ''}">正在阅读</em></div><p>${escapeHtml(chapter.summary)}</p></div></summary><div class="pc-book-copy">${(chapter.paragraphs || []).map(paragraph => `<p>${escapeHtml(bookParagraph(paragraph))}</p>`).join('')}</div><div class="pc-link-row">${(chapter.module_tree_ids || []).map(id => `<button class="pc-link-chip" data-pc-action="jump-module" data-module-tree-id="${escapeAttr(id)}">查看对应模块</button>`).join('')}<button class="pc-back-link" data-pc-action="scroll-top">返回目录 ↑</button></div></details>`;
+function bookChapterHtml(chapter, index, isOpen, isCurrent, state) {
+  const links = new Map();
+  for (const id of chapter.module_tree_ids || []) {
+    const target = developmentTarget(state, id);
+    const key = target?.module.id || id;
+    if (!links.has(key)) links.set(key, { id, label: target ? `${target.group.name} · ${target.module.name}` : '查看对应模块' });
+  }
+  return `<details id="pc-book-${escapeAttr(chapter.id)}" data-book-id="${escapeAttr(chapter.id)}" class="pc-book-chapter ${isCurrent ? 'is-current' : ''}"${isOpen ? ' open' : ''}><summary class="pc-book-chapter-title"><span>${String(index + 1).padStart(2, '0')}</span><div><div class="pc-book-heading"><h2>${escapeHtml(chapter.title)}</h2><em class="pc-book-current ${isCurrent ? 'is-visible' : ''}">正在阅读</em></div><p>${escapeHtml(chapter.summary)}</p></div></summary><div class="pc-book-copy">${(chapter.paragraphs || []).map(paragraph => `<p>${escapeHtml(bookParagraph(paragraph))}</p>`).join('')}</div><div class="pc-link-row">${[...links.values()].map(link => `<button class="pc-link-chip" data-pc-action="jump-module" data-module-tree-id="${escapeAttr(link.id)}">${escapeHtml(link.label)}</button>`).join('')}<button class="pc-back-link" data-pc-action="scroll-top">返回目录 ↑</button></div></details>`;
 }
 
 
-function modulesHtml(modules, state, versionUnderstanding, versionUnderstandingError) {
-  if (!modules.length) return unavailableHtml('开发模块还没读到', '稍后刷新；这不会影响原有工作台。');
+function modulesHtml(developmentMap, state) {
+  if (!developmentMap.length) return unavailableHtml('开发模块还没读到', '稍后刷新；这不会影响原有工作台。');
+  const current = developmentMap.find(group => group.id === state.developmentGroup) || developmentMap[0];
+  const count = developmentMap.reduce((total, group) => total + group.modules.length, 0);
   return `
-    <section class="pc-section-heading pc-module-heading"><div><span class="pc-kicker">开发模块</span><h2>按问题展开，不用记技术名</h2><p>先看一级概览，需要时展开二级能力。每一块都说明现在怎样、从哪里用和不能越过的边界。</p></div><button class="pc-btn pc-btn-quiet" data-pc-action="open-basket" data-pc-focus-key="modules-basket" aria-controls="pc-change-basket" aria-expanded="false">打开待修改</button></section>
-    ${[
-      { key: 'mainline', label: '每天的主线', hint: '日报 → 比赛 → 临场 → 复盘，按时间往前走。' },
-      { key: 'foundation', label: '支撑你的底座', hint: '资料、方法、数据、工具和对话边界，按需查。' },
-    ].map(group => {
-      const items = modules.filter(module => (module.group || 'foundation') === group.key);
-      if (!items.length) return '';
-      return `<div class="pc-module-group"><h3 class="pc-module-group-title">${group.label}<small>${group.hint}</small></h3><div class="pc-module-tree">${items.map(module => moduleNodeHtml(module, state, 1, versionUnderstanding, versionUnderstandingError)).join('')}</div></div>`;
-    }).join('')}`;
+    <section class="pc-section-heading pc-module-heading"><div><span class="pc-kicker">开发模块</span><h2>先选品种，再看要改哪一块</h2><p>共 ${count} 个主模块，点开看现状和缺口。</p></div></section>
+    <nav class="pc-development-pages" aria-label="按品种查看开发模块">${developmentMap.map(group => `<button data-pc-action="development-group" data-group-id="${escapeAttr(group.id)}" ${group.id === current.id ? 'aria-current="page"' : ''}>${escapeHtml(group.name)}<span>${group.modules.length}</span></button>`).join('')}</nav>
+    <div class="pc-development-map">${developmentGroupHtml(current, state)}</div>`;
 }
 
 
-function moduleNodeHtml(module, state, level, versionUnderstanding, versionUnderstandingError) {
-  const entry = module.entry || {};
-  const entryAction = entryActionHtml(entry);
+function developmentGroupHtml(group, state) {
+  const statusClass = statusTone(group.status === 'active' ? 'Released' : group.status === 'partial' ? 'Implemented' : 'Planned');
+  return `<section id="pc-development-group-${escapeAttr(group.id)}" class="pc-development-group" aria-label="${escapeAttr(group.name)}的开发模块"><header class="pc-development-group-heading"><h3>${escapeHtml(group.name)}</h3><span class="pc-status ${statusClass}">${escapeHtml(group.status_label || '状态待确认')}</span></header><div class="pc-development-group-body"><div class="pc-development-modules">${(group.modules || []).map(module => developmentModuleHtml(module, state)).join('')}</div></div></section>`;
+}
+
+
+function developmentModuleHtml(module, state) {
   const open = state.expandedNodes.has(module.id) ? ' open' : '';
-  const children = (module.children || []).map(child => moduleNodeHtml(child, state, level + 1, versionUnderstanding, versionUnderstandingError)).join('');
-  const versionBody = module.id === 'version-understanding'
-    ? globalVersionUnderstandingHtml(versionUnderstanding, versionUnderstandingError)
-    : '';
-  return `
-    <details id="pc-module-${escapeAttr(module.id)}" class="pc-module-node pc-level-${level}"${open}>
-      <summary><span class="pc-tree-mark">${level === 1 ? '模块' : '能力'}</span><span class="pc-tree-summary"><b>${escapeHtml(module.name)}</b><small>${escapeHtml(module.purpose)}</small></span><span class="pc-status ${escapeAttr(module.runtime?.status || 'degraded')}">${escapeHtml(module.runtime?.label || '状态待确认')}</span></summary>
-      <div class="pc-module-body">
-        <div class="pc-module-current"><span>当前状态与限制</span><p>${escapeHtml(module.runtime?.label || '状态待确认')}：${escapeHtml(module.runtime?.reason || '尚未核实当前运行结果。')}</p>${(module.runtime_details || []).map(item => `<p>${escapeHtml(item.name)}：${escapeHtml(item.label)}，${escapeHtml(item.reason)}。</p>`).join('')}<p>入口正常只说明可以进入，不代表资料齐全或整条对话已验收。</p></div>
-        <div class="pc-module-current"><span>当前能做什么</span><p>${escapeHtml(module.current_capability || '')}</p></div>
-        ${versionBody}
-        <dl class="pc-module-facts"><div><dt>什么时候用</dt><dd>${escapeHtml(module.when_to_use)}</dd></div><div><dt>从哪里进入</dt><dd>${escapeHtml(entryWhere(entry))}</dd></div><div><dt>下一步</dt><dd>${module.runtime?.status === 'broken' ? '先核对上面列出的异常部分，其他可用入口可继续使用。' : ''}${escapeHtml(module.next_step || '')}</dd></div></dl>
-        <details class="pc-boundary-details"><summary>关联与使用边界</summary>${module.related_modules?.length ? `<p><b>和这些地方有关：</b>${escapeHtml(module.related_modules.join('、'))}</p>` : ''}<p><b>使用边界：</b>${escapeHtml(module.boundaries || '')}</p><p><b>资料还缺什么：</b>${escapeHtml(module.known_gap || '资料不足时会明确说明')}</p></details>
-        <div class="pc-card-actions">${entryAction}<button class="pc-btn pc-btn-primary" data-pc-action="add-basket" data-module-id="${escapeAttr(module.basket_module_id || module.id)}" data-pc-focus-key="module-${escapeAttr(module.id)}">加入待修改</button></div>
-        <input class="pc-note-input" data-note-module="${escapeAttr(module.basket_module_id || module.id)}" aria-label="给${escapeAttr(module.name)}补一句" placeholder="可补一句：哪里不顺（不填也行）">
-        ${children ? `<div class="pc-module-children">${children}</div>` : ''}
-      </div>
-    </details>`;
+  const details = (module.details || []).map(detail => developmentDetailHtml(detail, state)).join('');
+  const detailCount = (module.details || []).length;
+  return `<details id="pc-module-${escapeAttr(module.id)}" data-node-id="${escapeAttr(module.id)}" class="pc-module-node pc-development-module"${open}><summary><span class="pc-tree-summary"><b>${escapeHtml(module.name)}</b><small>${escapeHtml(module.purpose)}</small></span></summary><div class="pc-module-body"><dl class="pc-development-facts"><div><dt>现在有</dt><dd>${escapeHtml(module.now)}</dd></div><div><dt>还缺</dt><dd>${escapeHtml(module.gaps)}</dd></div><div><dt>下一步改什么</dt><dd>${escapeHtml(module.next_step)}</dd></div></dl>${detailCount ? `<details class="pc-development-details" data-node-id="details-${escapeAttr(module.id)}"${state.expandedNodes.has(`details-${module.id}`) ? ' open' : ''}><summary>查看细项（${detailCount}）</summary><div class="pc-development-detail-list">${details}</div></details>` : ''}<input class="pc-note-input" data-note-module="${escapeAttr(module.id)}" value="${escapeAttr(state.moduleNotes[module.id] || '')}" aria-label="给${escapeAttr(module.name)}补一句" placeholder="可补一句：哪里不顺（不填也行）"><div class="pc-card-actions"><button class="pc-btn pc-btn-primary" data-pc-action="add-basket" data-module-id="${escapeAttr(module.id)}" data-pc-focus-key="module-${escapeAttr(module.id)}">加入待修改</button></div></div></details>`;
 }
 
 
-function entryActionHtml(entry) {
-  if (entry.type === 'web') return `<button class="pc-btn pc-btn-quiet" data-pc-action="open-entry" data-page="${escapeAttr(entry.page)}">${escapeHtml(entry.label)}</button>`;
-  if (entry.type === 'project' || entry.type === 'status') return `<button class="pc-btn pc-btn-quiet" data-pc-action="view" data-view="book">${escapeHtml(entry.label)}</button>`;
-  return `<button class="pc-btn pc-btn-quiet" data-pc-action="copy-chat" data-copy-recipient="小雪" data-prompt="${escapeAttr(entry.chat_prompt)}">${escapeHtml(entry.action_label || '复制发给小雪的话')}</button>`;
+function developmentDetailHtml(detail, state) {
+  const open = state.expandedNodes.has(detail.id) ? ' open' : '';
+  const children = (detail.children || []).map(child => developmentDetailHtml(child, state)).join('');
+  return `<details id="pc-module-${escapeAttr(detail.id)}" data-node-id="${escapeAttr(detail.id)}" class="pc-development-detail"${open}><summary><b>${escapeHtml(detail.name)}</b></summary><div class="pc-development-detail-body"><p><b>现在有：</b>${escapeHtml(detail.current_capability || '')}</p><p><b>还缺：</b>${escapeHtml(detail.known_gap || '资料不足时会明确提示')}</p><p><b>下一步：</b>${escapeHtml(detail.next_step || '')}</p>${children ? `<div class="pc-development-detail-children">${children}</div>` : ''}</div></details>`;
 }
-
-
-function globalVersionUnderstandingHtml(versionUnderstanding, error) {
-  const item = versionUnderstanding?.item;
-  if (!item) {
-    const reason = error || '统一版本理解对象暂时没有可展示的正文。';
-    return `<div class="pc-module-current"><span>当前版本正文</span><p>当前版本正文暂时读不到</p><small>${escapeHtml(reason)}</small></div>`;
-  }
-  return `<div class="pc-module-current"><span>当前版本理解状态</span><p><b>${escapeHtml(item.topic || '统一版本理解')}</b> · 更新于 ${escapeHtml(formatVersionTime(item.created_at))}</p><small>正文已接入当前赛事页，项目中心只保留开发状态和入口说明。</small></div>`;
-}
-
-
-function formatVersionTime(value) {
-  const text = String(value || '').trim();
-  return text || '时间暂未记录';
-}
-
-
-function versionContentHtml(content) {
-  const lines = String(content || '').trim().split('\n').map(line => line.trim());
-  if (!lines.some(Boolean)) return '<p>当前版本正文暂时读不到</p>';
-  const output = [];
-  for (let index = 0; index < lines.length;) {
-    const line = lines[index];
-    if (!line) { index += 1; continue; }
-    if (/^(#{1,6})\s+/.test(line)) {
-      output.push(`<h4>${versionInlineHtml(line.replace(/^#{1,6}\s+/, ''))}</h4>`);
-      index += 1;
-      continue;
-    }
-    const listMatch = line.match(/^([-*]|\d+\.)\s+(.+)/);
-    if (listMatch) {
-      const ordered = /^\d+\.$/.test(listMatch[1]);
-      const items = [];
-      while (index < lines.length) {
-        const item = lines[index].match(ordered ? /^\d+\.\s+(.+)/ : /^[-*]\s+(.+)/);
-        if (!item) break;
-        items.push(`<li>${versionInlineHtml(item[1])}</li>`);
-        index += 1;
-      }
-      output.push(`<${ordered ? 'ol' : 'ul'}>${items.join('')}</${ordered ? 'ol' : 'ul'}>`);
-      continue;
-    }
-    if (/^>\s?/.test(line)) {
-      const quotes = [];
-      while (index < lines.length && /^>\s?/.test(lines[index])) {
-        quotes.push(versionInlineHtml(lines[index].replace(/^>\s?/, '')));
-        index += 1;
-      }
-      output.push(`<blockquote>${quotes.join('<br>')}</blockquote>`);
-      continue;
-    }
-    const paragraph = [];
-    while (index < lines.length && lines[index] && !/^(#{1,6})\s+|^[-*]\s+|^\d+\.\s+|^>\s?/.test(lines[index])) {
-      paragraph.push(versionInlineHtml(lines[index]));
-      index += 1;
-    }
-    output.push(`<p>${paragraph.join('<br>')}</p>`);
-  }
-  return output.join('');
-}
-
-
-function versionInlineHtml(value) {
-  return escapeHtml(value)
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>');
-}
-
-
-function entryWhere(entry) {
-  if (entry.type === 'web') return entry.label || '在工作台打开对应页面';
-  if (entry.type === 'project' || entry.type === 'status') return entry.label || '在项目中心查看当前状态';
-  return '在接入助手中继续';
-}
-
-
 function requestsHtml(basket, requests, selectedIds) {
   return `
     <section class="pc-section-heading"><div><span class="pc-kicker">待修改与处理</span><h2>先收集感觉，再让小白把它变成一件值得做的事</h2><p>待修改不代表已经承诺施工；飞书聊清楚以后，才会进入正式处理。</p></div><button class="pc-btn pc-btn-primary" data-pc-action="open-basket" data-pc-focus-key="requests-basket" aria-controls="pc-change-basket" aria-expanded="false">查看待修改 ${basket.count || 0}</button></section>
@@ -447,6 +367,12 @@ async function onClick(event, state) {
   if (action === 'jump-book') return openBookChapter(state, target.dataset.bookId);
   if (action === 'jump-manual') return openManualSection(state, target.dataset.manualId);
   if (action === 'jump-module') return jumpToModule(state, target.dataset.moduleTreeId);
+  if (action === 'development-group') {
+    state.developmentGroup = target.dataset.groupId;
+    render(state);
+    state.root.querySelector(`[data-group-id="${CSS.escape(state.developmentGroup)}"]`)?.focus({ preventScroll: true });
+    return;
+  }
   if (action === 'scroll-top') return scrollToTop(state);
   if (action === 'refresh') return refresh(state);
   if (action === 'open-basket') {
@@ -551,6 +477,11 @@ function openManualSection(state, sectionId) {
 
 function onBookChapterToggle(event, state) {
   const chapter = event.target;
+  if (chapter instanceof HTMLDetailsElement && chapter.dataset.nodeId) {
+    if (chapter.open) state.expandedNodes.add(chapter.dataset.nodeId);
+    else state.expandedNodes.delete(chapter.dataset.nodeId);
+    return;
+  }
   if (!(chapter instanceof HTMLDetailsElement) || !chapter.classList.contains('pc-book-chapter')) return;
   const chapterId = chapter.dataset.bookId;
   if (!chapterId) return;
@@ -599,12 +530,39 @@ function bookParagraph(paragraph) {
 }
 
 
+function developmentTarget(state, moduleId) {
+  const map = state.records.modules?.data?.data?.development_map || [];
+  const contains = nodes => nodes.some(node => node.id === moduleId || contains(node.children || []));
+  const group = map.find(group => group.modules.some(item => item.id === moduleId || (item.legacy_node_ids || []).includes(moduleId) || contains(item.details || [])));
+  const module = group?.modules.find(item => item.id === moduleId || (item.legacy_node_ids || []).includes(moduleId) || contains(item.details || []));
+  if (!module) return null;
+  const isDetail = contains(module.details || []);
+  const targetId = isDetail ? moduleId : module.id;
+  return { group, module, isDetail, targetId };
+}
+
+
 function jumpToModule(state, moduleId) {
-  if (!moduleId) return;
+  const targetInfo = developmentTarget(state, moduleId);
+  if (!targetInfo) return;
+  const { group, module, isDetail, targetId } = targetInfo;
   state.view = 'modules';
-  state.expandedNodes.add(moduleId);
+  state.developmentGroup = group.id;
+  state.expandedNodes.add(module.id);
+  if (isDetail) state.expandedNodes.add(`details-${module.id}`);
+  state.expandedNodes.add(targetId);
   render(state);
-  requestAnimationFrame(() => state.root.querySelector(`#pc-module-${CSS.escape(moduleId)}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+  state.events.emit('project-center:navigate', { view: 'modules' });
+  requestAnimationFrame(() => {
+    const target = state.root.querySelector(`#pc-module-${CSS.escape(targetId)}`);
+    let parent = target?.parentElement?.closest('details');
+    while (parent) {
+      parent.open = true;
+      if (parent.dataset.nodeId) state.expandedNodes.add(parent.dataset.nodeId);
+      parent = parent.parentElement?.closest('details');
+    }
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  });
 }
 
 

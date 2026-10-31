@@ -67,23 +67,36 @@ test('objects explain their real scope instead of treating registration as deliv
     assert.ok(objects.includes(`item.${field}`));
   }
   assert.doesNotMatch(objects, /暂无登记缺口|对象标识|catalog.required_adapters/);
-  assert.match(view, /module.runtime_details/);
 });
 
 
 test('expanded module content is user ordered and does not expose engineering-only fields', () => {
   const view = read('src/modules/project-center/view.js');
-  const moduleNode = view.slice(view.indexOf('function moduleNodeHtml'), view.indexOf('function entryActionHtml'));
+  const moduleNode = view.slice(view.indexOf('function developmentModuleHtml'), view.indexOf('function developmentDetailHtml'));
 
   assert.doesNotMatch(moduleNode, /解决什么/);
   assert.doesNotMatch(moduleNode, /pc-engineering/);
   assert.doesNotMatch(moduleNode, /engineering_details/);
-  assert.match(moduleNode, /当前能做什么/);
-  assert.match(moduleNode, /什么时候用/);
-  assert.match(moduleNode, /从哪里进入/);
-  assert.match(moduleNode, /下一步/);
-  assert.match(moduleNode, /关联与使用边界/);
+  assert.match(moduleNode, /现在有/);
+  assert.match(moduleNode, /还缺/);
+  assert.match(moduleNode, /下一步改什么/);
   assert.match(moduleNode, /加入待修改/);
+});
+
+
+test('development modules render by variety with compact facts and folded details', () => {
+  const view = read('src/modules/project-center/view.js');
+  const html = read('index.html');
+
+  assert.match(view, /moduleData\.development_map/);
+  assert.match(view, /function developmentGroupHtml\(group, state\)/);
+  assert.match(view, /function developmentModuleHtml\(module, state\)/);
+  assert.match(view, /现在有/);
+  assert.match(view, /还缺/);
+  assert.match(view, /下一步改什么/);
+  assert.match(view, /function developmentDetailHtml\(detail, state\)/);
+  assert.match(html, /\.pc-development-map/);
+  assert.match(html, /\.pc-development-facts/);
 });
 
 
@@ -93,7 +106,7 @@ test('all copy actions describe copying, and the basket explicitly hands the tex
   assert.match(view, /复制发给小白的话/);
   assert.match(view, /data-copy-recipient="小白"/);
   assert.match(view, /回飞书发给\$\{recipient\}就行/);
-  assert.match(view, /复制发给小雪的话/);
+  assert.match(view, /data-copy-recipient="小雪"/);
   assert.match(view, /复制这句话/);
 });
 

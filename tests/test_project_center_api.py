@@ -90,6 +90,37 @@ class ProjectCenterApiTests(unittest.TestCase):
         self.assertTrue(tree[0]["children"])
         self.assertIn("engineering_details", tree[0])
         self.assertNotIn("/api/", str(tree))
+        development_map = modules.json()["data"]["development_map"]
+        self.assertEqual([group["id"] for group in development_map], ["lol", "football", "cs2", "valorant", "shared"])
+        self.assertEqual(development_map[0]["name"], "英雄联盟")
+        self.assertIn("now", development_map[0]["modules"][0])
+        self.assertIn("gaps", development_map[0]["modules"][0])
+        self.assertIn("next_step", development_map[0]["modules"][0])
+        self.assertTrue(development_map[0]["modules"][0]["details"])
+
+    def test_development_basket_preserves_variety_module_and_note_through_request(self):
+        items = []
+        for module_id, note in [("lol-match", "赛程筛选"), ("football-match", "足球筛选"), ("cs2-foundation", "地图资料")]:
+            response = self.client.post("/api/project-center/change-basket", json={"module_id": module_id, "optional_note": note})
+            self.assertEqual(response.status_code, 200, response.text)
+            item = response.json()["data"]["item"]
+            items.append(item)
+            self.assertEqual(item["module_id"], module_id)
+            self.assertEqual(item["optional_note"], note)
+            self.assertEqual(item["context_snapshot"]["development_module_id"], module_id)
+            self.assertIn(" · ", item["module_name"])
+        self.assertEqual(self.client.get("/api/project-center/change-basket").json()["data"]["count"], 3)
+        duplicate = self.client.post("/api/project-center/change-basket", json={"module_id": "football-match"}).json()["data"]
+        self.assertTrue(duplicate["deduplicated"])
+        self.assertEqual(duplicate["item"]["id"], items[1]["id"])
+        request = self.client.post("/api/project-center/requests", json={
+            "basket_item_ids": [items[1]["id"]], "user_problem": "足球筛选难找", "desired_experience": "一眼看清筛选", "desired_result": "足球筛选更清楚", "discussion_confirmed": True,
+        })
+        self.assertEqual(request.status_code, 200, request.text)
+        self.assertEqual(request.json()["data"]["item"]["module_id"], "football-match")
+        detail = self.client.get("/api/project-center/modules/football-match")
+        self.assertEqual(detail.status_code, 200)
+        self.assertEqual(detail.json()["data"]["item"]["group_id"], "football")
 
     def test_basket_discussion_request_delivery_and_feedback_round_trip(self):
         created = self.client.post("/api/project-center/change-basket", json={

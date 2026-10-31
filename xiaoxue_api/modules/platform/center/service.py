@@ -78,10 +78,12 @@ def list_modules() -> dict[str, Any]:
     catalog = {item["id"]: item for item in module_catalog()}
     modules = _group_user_modules([_public_module(item, content, runtime_by_module) for item in catalog.values()])
     tree = [_public_tree_node(node, content, catalog, runtime_by_module) for node in content["module_tree"]]
+    objects = object_catalog()
     return _result("ok", "已读取当前模块与实际入口", {
         "items": modules,
         "tree": tree,
-        "object_catalog": object_catalog(),
+        "development_map": _public_development_map(content, tree, objects),
+        "object_catalog": objects,
         "source": "项目模块合同与当前运行状态",
         "observed_at": _now(),
         "content_version": content["content_version"],
@@ -90,10 +92,15 @@ def list_modules() -> dict[str, Any]:
 
 
 def get_module(module_id: str) -> dict[str, Any]:
+    content = _content()
+    development = _development_module(module_id, content)
+    if development:
+        group, module = development
+        item = {**module, **_snapshot_for(module_id, content), "name": f"{group['name']} · {module['name']}"}
+        return _result("ok", "已读取开发模块快照", {"item": item, "source": "项目开发模块", "observed_at": _now(), "content_version": content["content_version"], "stale": False})
     module = module_by_id(_clean_module_id(module_id))
     if not module:
         raise NotFoundError("没有找到这个项目模块")
-    content = _content()
     item = _public_module(module, content, (_safe_health().get("modules") or {}))
     return _result("ok", "已读取模块快照", {"item": item, "source": "项目模块合同", "observed_at": _now(), "content_version": content["content_version"], "stale": False})
 
@@ -427,13 +434,74 @@ def _public_tree_node(node: dict[str, Any], content: dict[str, Any], catalog: di
         ],
         "related_modules": list(node["related_modules"]),
         "boundaries": node["boundaries"],
-        "known_gap": "；".join(dict.fromkeys(ability["known_gap"] for ability in abilities)),
+        "known_gap": node.get("known_gap") or "；".join(dict.fromkeys(ability["known_gap"] for ability in abilities)),
         "next_step": node["next_step"],
         "basket_module_id": node["basket_module_id"],
         "engineering_details": dict(node["engineering_details"]),
         "group": node.get("group", ""),
         "children": [_public_tree_node(child, content, catalog, runtime_by_module) for child in node.get("children", [])],
     }
+
+
+def _public_development_map(content: dict[str, Any], tree: list[dict[str, Any]], objects: dict[str, Any]) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+
+    def index(nodes: list[dict[str, Any]]) -> None:
+        for node in nodes:
+            by_id[node["id"]] = node
+            index(node.get("children") or [])
+
+    index(tree)
+    object_rows = objects.get("objects") or {}
+    result: list[dict[str, Any]] = []
+    for group in content["development_map"]["groups"]:
+        object_id = group.get("object_id")
+        object_row = object_rows.get(object_id) if object_id else None
+        modules: list[dict[str, Any]] = []
+        for module in group["modules"]:
+            details = [_public_development_detail(by_id[node_id]) for node_id in module["detail_node_ids"]]
+            modules.append({
+                "id": module["id"],
+                "name": module["name"],
+                "purpose": module["purpose"],
+                "now": module["now"],
+                "gaps": module["gaps"],
+                "next_step": module["next_step"],
+                "basket_module_id": module["basket_module_id"],
+                "legacy_node_ids": list(module.get("legacy_node_ids") or []),
+                "details": details,
+            })
+        result.append({
+            "id": group["id"],
+            "name": group["name"],
+            "object_id": object_id,
+            "status": object_row.get("status", "shared") if object_row else "shared",
+            "status_label": _object_status_label(object_row.get("status") if object_row else "shared"),
+            "current_capability": object_row.get("current_capability", "跨品种共用的项目能力") if object_row else "跨品种共用的项目能力",
+            "limitations": object_row.get("limitations", "") if object_row else "",
+            "known_gaps": list(object_row.get("known_gaps") or []) if object_row else [],
+            "modules": modules,
+        })
+    return result
+
+
+def _public_development_detail(node: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": node["id"],
+        "name": node["name"],
+        "purpose": node["purpose"],
+        "when_to_use": node["when_to_use"],
+        "current_capability": node["current_capability"],
+        "known_gap": node.get("known_gap", "资料不足时会明确提示"),
+        "next_step": node["next_step"],
+        "children": [_public_development_detail(child) for child in node.get("children") or []],
+    }
+
+
+def _object_status_label(status: str) -> str:
+    return {"active": "当前主线", "partial": "部分覆盖", "blocked": "暂不完整", "shared": "跨品种共用"}.get(status, "状态待确认")
+
+
 def _group_user_modules(items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     grouped: OrderedDict[str, list[dict[str, Any]]] = OrderedDict()
     for item in items:
@@ -460,6 +528,18 @@ def _combined_runtime(items: list[dict[str, str]]) -> dict[str, str]:
 
 
 def _snapshot_for(module_id: str | None, content: dict[str, Any]) -> dict[str, Any]:
+    development = _development_module(module_id, content)
+    if development:
+        group, module = development
+        return {
+            "module_name": f"{group['name']} · {module['name']}",
+            "group_id": group["id"], "group_name": group["name"],
+            "development_module_id": module["id"],
+            "ability_id": module["basket_module_id"],
+            "purpose": module["purpose"], "now": module["now"],
+            "known_gap": module["gaps"], "next_step": module["next_step"],
+            "content_version": content["content_version"],
+        }
     module = module_by_id(module_id or "")
     if not module:
         return {"module_name": "还没找到模块的想法", "purpose": "先保留这句感受，讨论时再归类", "entry": {"type": "chat", "label": "在飞书和小白聊聊"}}
@@ -472,6 +552,14 @@ def _snapshot_for(module_id: str | None, content: dict[str, Any]) -> dict[str, A
         "known_gap": public["known_gap"],
         "impact": public["impact"],
     }
+
+
+def _development_module(module_id: str | None, content: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]] | None:
+    for group in content["development_map"]["groups"]:
+        for module in group["modules"]:
+            if module["id"] == module_id:
+                return group, module
+    return None
 
 
 def _module_runtime(states: list[Any], contract_status: str) -> dict[str, str]:
@@ -563,6 +651,9 @@ def _validate_content(payload: object) -> dict[str, Any]:
     tree_ids: set[str] = set()
     for node in tree:
         _validate_tree_node(node, catalog_ids, tree_ids, require_group=True)
+    _validate_development_map(payload.get("development_map"), tree, catalog_ids)
+    if any(node_id not in tree_ids for chapter in chapters for node_id in chapter["module_tree_ids"]):
+        raise ProjectCenterError("项目开发书引用了不存在的模块")
     if not isinstance(payload["manual"].get("sections"), list) or not payload["manual"]["sections"]:
         raise ProjectCenterError("使用说明书内容不完整")
     for section in payload["manual"]["sections"]:
@@ -602,6 +693,70 @@ def _validate_tree_node(node: object, catalog_ids: set[str], tree_ids: set[str],
         raise ProjectCenterError("开发模块子节点格式不正确")
     for child in children:
         _validate_tree_node(child, catalog_ids, tree_ids)
+
+
+def _validate_development_map(value: object, tree: list[dict[str, Any]], catalog_ids: set[str]) -> None:
+    if not isinstance(value, dict) or not isinstance(value.get("groups"), list) or not value["groups"]:
+        raise ProjectCenterError("开发模块展示映射不完整")
+    expected_groups = {"lol", "football", "cs2", "valorant", "shared"}
+    group_ids: set[str] = set()
+    module_ids: set[str] = set()
+    nodes: dict[str, dict[str, Any]] = {}
+
+    def descendants(node: dict[str, Any]):
+        yield node
+        for child in node.get("children", []):
+            yield from descendants(child)
+
+    for root in tree:
+        nodes.update((node["id"], node) for node in descendants(root))
+    detail_owners: dict[str, str] = {}
+    legacy_owners: set[str] = set()
+    object_ids = set((object_catalog().get("objects") or {}).keys())
+    for group in value["groups"]:
+        _require_fields(group, ("id", "name", "object_id", "modules"), "开发模块品种分组")
+        group_id = group["id"]
+        if not isinstance(group_id, str) or not group_id or group_id in group_ids:
+            raise ProjectCenterError("开发模块品种分组 ID 缺失或重复")
+        group_ids.add(group_id)
+        if not isinstance(group["name"], str) or not group["name"].strip():
+            raise ProjectCenterError("开发模块品种名称不能为空")
+        object_id = group.get("object_id")
+        if group_id == "shared":
+            if object_id is not None:
+                raise ProjectCenterError("项目共用分组不能绑定品种")
+        elif object_id not in object_ids or object_id != group_id:
+            raise ProjectCenterError("开发模块品种分组引用了不存在的项目对象")
+        modules = group.get("modules")
+        if not isinstance(modules, list) or not modules:
+            raise ProjectCenterError("开发模块品种分组缺少主模块")
+        for module in modules:
+            _require_fields(module, ("id", "name", "purpose", "now", "gaps", "next_step", "basket_module_id", "legacy_node_ids", "detail_node_ids"), "开发模块主模块")
+            module_id = module["id"]
+            if not isinstance(module_id, str) or not module_id or module_id in module_ids:
+                raise ProjectCenterError("开发模块主模块 ID 缺失或重复")
+            module_ids.add(module_id)
+            if module_id in catalog_ids or not module_id.startswith(f"{group_id}-"):
+                raise ProjectCenterError("开发模块主模块 ID 必须保留品种归属")
+            if any(not isinstance(module[key], str) or not module[key].strip() for key in ("name", "purpose", "now", "gaps", "next_step")):
+                raise ProjectCenterError("开发模块主模块的说明不能为空")
+            if module["basket_module_id"] not in catalog_ids:
+                raise ProjectCenterError("开发模块主模块缺少待修改归属")
+            if not isinstance(module["legacy_node_ids"], list) or any(not isinstance(node_id, str) or node_id not in nodes or node_id in legacy_owners for node_id in module["legacy_node_ids"]):
+                raise ProjectCenterError("开发模块主模块旧 ID 引用不正确")
+            legacy_owners.update(module["legacy_node_ids"])
+            detail_ids = module["detail_node_ids"]
+            if not isinstance(detail_ids, list) or any(not isinstance(detail_id, str) or detail_id not in nodes for detail_id in detail_ids):
+                raise ProjectCenterError("开发模块主模块引用了不存在的细项")
+            for detail_id in detail_ids:
+                for node in descendants(nodes[detail_id]):
+                    if node["id"] in detail_owners:
+                        raise ProjectCenterError("开发模块细项重复归属")
+                    detail_owners[node["id"]] = module_id
+    if group_ids != expected_groups:
+        raise ProjectCenterError("开发模块品种分组必须覆盖 LOL、足球、CS2、无畏契约和项目共用")
+    if any(node_id not in detail_owners for node_id, node in nodes.items() if not node.get("children")):
+        raise ProjectCenterError("开发模块展示遗漏了已有细项")
 
 
 def _require_fields(value: object, fields: tuple[str, ...], label: str) -> None:
@@ -709,6 +864,8 @@ def _clean_module_id(value: Any) -> str:
 
 def _clean_optional_module_id(value: Any) -> str:
     clean = _clean_text(value or "", "模块", maximum=80, required=False)
+    if clean and _development_module(clean, _content()):
+        return clean
     return _clean_module_id(clean) if clean else ""
 
 

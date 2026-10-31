@@ -67,11 +67,13 @@ class MenuSourceTests(unittest.TestCase):
 
     def test_skill_menu_points_at_the_single_source_and_keeps_no_copy(self) -> None:
         text = SKILL.read_text(encoding="utf-8")
-        self.assertIn("## 引导与菜单", text)
-        menu_section = text.split("## 引导与菜单", 1)[1].split("\n## ", 1)[0]
-
+        reference = "references/product/help-and-sources.md"
+        self.assertIn(reference, text)
+        help_text = (SKILL.parent / reference).read_text(encoding="utf-8")
+        menu_section = help_text.split("## 帮助", 1)[1].split("\n## ", 1)[0]
+        self.assertIn("config/project-center-content.json", menu_section)
         self.assertIn("scripts/xiaoxue_menu.py", menu_section)
-        self.assertIn("不另抄功能清单", menu_section)
+        self.assertIn("唯一正源", menu_section)
         for group in self.manual["extras"]:
             self.assertNotIn(group["label"], menu_section)
             for example in group["say"]:
@@ -84,17 +86,27 @@ class MenuSourceTests(unittest.TestCase):
             self.assertTrue(group["say"])
 
     def test_module_list_reads_the_same_source_as_the_project_center(self) -> None:
-        tree = json.loads(CONTENT.read_text(encoding="utf-8"))["module_tree"]
+        groups = json.loads(CONTENT.read_text(encoding="utf-8"))["development_map"]["groups"]
         text = run_menu("--modules")
-        for node in tree:
-            self.assertIn(node["name"], text, node["id"])
-            self.assertIn(node["purpose"], text, node["id"])
+        for group in groups:
+            self.assertIn(group["name"], text, group["id"])
+            for module in group["modules"]:
+                self.assertIn(module["name"], text, module["id"])
+                self.assertIn(module["purpose"], text, module["id"])
 
     def test_single_module_returns_capability_and_boundary(self) -> None:
         node = json.loads(CONTENT.read_text(encoding="utf-8"))["module_tree"][2]
         text = run_menu("--module", node["id"])
         for key in ("purpose", "when_to_use", "current_capability", "boundaries", "next_step"):
             self.assertIn(node[key], text, key)
+
+    def test_new_module_lookup_preserves_variety_and_compact_facts(self) -> None:
+        for group in self.content["development_map"]["groups"]:
+            for module in group["modules"]:
+                text = run_menu("--module", module["id"])
+                self.assertIn(f"{group['name']} → {module['name']}", text)
+                for key in ("purpose", "now", "gaps", "next_step"):
+                    self.assertIn(module[key], text)
 
     def test_model_guide_points_at_the_source_instead_of_copying_the_module_table(self) -> None:
         guide = GUIDE.read_text(encoding="utf-8")
