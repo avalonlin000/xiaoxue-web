@@ -2,6 +2,16 @@
 
 > 导航更新：2026-10-29 | 本次授权：项目规范合并与按模板整理目录
 
+## 2026-10-31 · 项目中心开发模块图更新（本地已验收，待发布）
+
+- Goal / Locked decisions：按钧钧“补清楚就执行”的当次授权，在原项目中心开发模块页面内部整理个人开发定位图。按英雄联盟、足球、CS2、无畏契约和项目共用分页，每页保留少量主模块、细项折叠，写清目的及“现在有 / 还缺 / 下一步改什么”；后台维护信息不进入展示层。
+- Changed：本地提交 `34d95c0`（`Update project center development map by variety`），内容版本 `2026-10-31.2`。当前主模块数为 4/1/1/1/2，不固定未来数量；32 项旧叶子能力各有唯一归属，另展示 2 项共用父级详情。接口、同源菜单、开发书跳转、待修改记录和旧 ID 兼容同步更新，切页保留展开与草稿，不同品种的待修改记录保持独立。PRD 为 `docs/requirements/项目中心开发模块更新-PRD.md`。
+- Maintenance：项目地图已链接 `docs/architecture/PROJECT-CENTER-MODULE-MAINTENANCE.md`，要求能力、入口和缺口发生变化时在同一轮更新模块图。新增只读核对入口 `scripts/tasks/xiaoxue_project_center_module_review.py`，确定性检查及 dry-run 已通过；实际模型核对调用超时，模型分支运行效果仍未验证。没有注册生产排程，也没有自动写回内容。
+- Verified（已观察）：相关 Python 测试 29 项、前端测试 103 项、模块合同检查、语法与 diff 检查通过；隔离构建位于 `/tmp/xiaoxue-project-center-qa.kGjICt/build`。1440×900 与 390×844 浏览器核对分页、折叠、草稿、待修改备注、书内跳转、URL 和 Escape 焦点恢复通过；34 项详情展开后没有技术信息泄漏或页面横向溢出。独立只读复审未发现本轮范围内未解决的 P1/P2。截图为 `/tmp/pc-final-audit-1440.png`、`/tmp/pc-final-audit-390.png`；这些是临时证据路径，不是持久部署产物。临时验收服务 `/tmp/project_center_qa_server.py 40373` 已停止。
+- Production incident / recovery（已观察及未知）：早前构建误覆盖正式 `dist/`，随后按旧提交 `dadd68356816bc5cd3478e55a873f733f5a35c60` 重建恢复，无法证明与误覆盖前部署逐字节一致；误移出的三个懒加载资源已从 `/tmp/xiaoxue-dist-baseline-clean.ykAAGJ/dist/assets/` 恢复，相关四个资源均已通过正式入口 HTTP 200 核对。不能据此声称生产从未改变，也不能当作新版正式发布成功。
+- Collection incident（已观察及未知）：早前临时 API 启动在约 11:24 改动真实采集任务与检查点；`16c2c6c095e1232619e8106b`、`40d632530587dbdc0ae4136f`、`787a6b0cde2ac94e79e2cea7`、`538d3e4ec175b19eec849a22` 为 paused，`3c042583e09608cbbbea064b` 为 failed。原状态未知，未猜测回滚；已向用户说明。主业务库与项目中心库检查时的时间戳没有变化，但这不证明所有业务状态未变。此后验收只使用临时存储与项目中心路由，不运行业务启动生命周期。
+- Next / Limits：实现与隔离验收已完成，新版尚未正式发布；覆盖正式静态产物及重启 `xiaoxue-workbench-api.service` 仍需按 `AGENTS.md` 单独取得发布授权，并从真实入口补验。模型核对超时和前述事故的恢复限制保持明确，不升级为“全部完成”。既有无关工作树改动（包括本文件原时间戳更新）已保留。
+
 ## 2026-10-29 · 规范与目录收敛
 
 - Goal / Locked decisions：项目是部署在腾讯云的自用电竞交易辅助系统，包含前端、后端、数据库、知识和自动化；网页只是一个入口。体验、效率和实用性优先，沿同一项目正源服务网页与已接入的 Agent。项目规则统一在根 `AGENTS.md`，上位角色规则、专业 Skill 与机器合同各保留原职责。
