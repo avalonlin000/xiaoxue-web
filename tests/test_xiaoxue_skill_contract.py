@@ -35,47 +35,43 @@ class XiaoxueSkillContractTests(unittest.TestCase):
     def test_soul_routes_natural_business_intent_without_an_execution_phrase(self) -> None:
         text = _soul_path().read_text(encoding="utf-8")
 
-        self.assertIn("自然提到能识别的电竞对象或任务", text)
-        self.assertIn("读取现有信息和建立可丢弃的临时上下文不要求执行口令", text)
-        self.assertIn("产品能力支持的小范围业务写回不要求逐次确认", _soul_path().read_text(encoding="utf-8"))
+        self.assertIn("自然接住他的对象和问题，不要求先选模式、说口令或确认进入项目", text)
+        self.assertIn("项目有自己的正式规则与数据，你按需使用和查看", text)
+        self.assertIn("你保留完整业务使用与按需查看能力", text)
         self.assertNotIn("普通聊天只回答；明确要求执行才进入业务 Skill", text)
+        self.assertNotIn("执行口令", text)
 
     def test_soul_aligns_recommendations_to_current_user_goal(self) -> None:
         text = _soul_path().read_text(encoding="utf-8")
 
-        self.assertIn("不以自己的默认方向替代钧钧明确的方法、限制或已经形成的结论", text)
-        self.assertIn("当前明确目标 → 钧钧指定的方法与限制 → 可验证的当前事实", text)
-        self.assertIn("不是罗列所有可做事项，也不为了显得全面扩展无关模块", text)
-        self.assertIn("只查、只聊、只维护时不自动转成交易建议", text)
-        self.assertIn("默认只说必需项", text)
-        self.assertIn("我刚才把重点理解成 X，实际应是 Y", text)
+        self.assertIn("先接住钧钧正在推进的判断，再补最关键的一环", text)
+        self.assertIn("跟着当前思路讨论，不抢结论、不重启一份标准报告", text)
+        self.assertIn("不为了全面扩展无关事项", text)
+        self.assertIn("只查、只聊、只维护时就围绕该目标完成，不自动转成交易建议", text)
+        self.assertIn("简单问题短答", text)
+        self.assertIn("只有不同理解会显著改变结果、成本或副作用时，才问一个关键问题", text)
 
     def test_all_modules_use_semantic_intent_instead_of_magic_phrases(self) -> None:
         text = _skill_path().read_text(encoding="utf-8")
 
-        self.assertIn("自然使用合同", text)
-        self.assertIn("动作后果与权限", text)
-        self.assertIn("不需要说“执行、调用、打开、开始分析、继续”等标准句式", text)
-        self.assertIn("明确要求最新、外部、新闻、实时核对或搜索", text)
-        self.assertIn("已有正源上的小范围保存、更新、整理", text)
-        self.assertIn("普通单英雄/双英雄对位", text)
-        self.assertIn("模型底座", text)
-        self.assertIn("比如、例如", text)
-        self.assertIn("只是举例、不要打开、先聊方法", text)
-        self.assertIn("这些是能力，不是固定步骤", text)
-        self.assertIn("辅助通用能力：保留但不抢答", text)
-        self.assertIn("默认先用最贴近的 `xiaoxue-product`", text)
-        self.assertIn("明确要求最新、外部、新闻、实时核对或搜索时，直接执行只读搜索", text)
+        self.assertIn("## 按意图选择", text)
+        self.assertIn("只加载本轮需要的专项，不把表当流程", text)
+        self.assertIn("日常直接接业务，不选模式", text)
+        self.assertIn("沿当前对象和明确方法继续", text)
+        self.assertIn("专项提供专业方法，回答形式服从本轮目标", text)
+        self.assertIn("能力介绍以当前配置和实际工具为准", text)
+        self.assertIn("项目规则见 `/home/ubuntu/xiaoxue-web/AGENTS.md`", text)
         self.assertNotIn("_PHRASES", text)
         self.assertNotIn("first_turn_brief", text)
         self.assertNotIn("/home/ubuntu/lol_data", text)
+        self.assertNotIn("执行口令", text)
 
     def test_specialized_confirmation_stays_out_of_the_root_skill(self) -> None:
         text = _skill_path().read_text(encoding="utf-8")
 
         self.assertNotIn("dispatch_pending_reply.py", text)
-        self.assertIn("专项 Skill", text)
-        self.assertIn("高风险动作", text)
+        self.assertIn("专项提供专业方法", text)
+        self.assertIn("不复制另一套流程", _soul_path().read_text(encoding="utf-8"))
 
     def test_specialized_workflows_never_ask_for_an_exact_confirmation_phrase(self) -> None:
         paths = [
@@ -102,10 +98,14 @@ class XiaoxueSkillContractTests(unittest.TestCase):
 
     def test_external_news_uses_the_single_product_tool_and_canonical_routing_contract(self) -> None:
         root = _skill_path().read_text(encoding="utf-8")
+        sources = _product_reference("help-and-sources.md").read_text(encoding="utf-8")
         routing = Path("/home/ubuntu/.agents/skills/engineering/xiaoxue-dev-index/references/search-routing.md").read_text(encoding="utf-8")
 
-        self.assertIn("新的外部搜索", root)
+        self.assertIn("| 外部资料（external） | `references/product/help-and-sources.md` 的外部资料入口 |", root)
         self.assertNotIn("xiaoxue_search_external_news", root)
+        self.assertIn("明确要最新、新闻、外部核对或搜索时执行只读搜索", sources)
+        self.assertIn("search_web.py", sources)
+        self.assertNotIn("xiaoxue_search_external_news", sources)
         self.assertIn("xiaoxue_search_external_news", routing)
         self.assertIn("Agent Reach 的 Exa", routing)
         self.assertIn("赔率/预测", routing)
@@ -116,8 +116,8 @@ class XiaoxueSkillContractTests(unittest.TestCase):
     def test_free_module_switching_reuses_the_match_open_tool(self) -> None:
         text = _skill_path().read_text(encoding="utf-8")
 
-        self.assertIn("建立、切换、暂停、恢复临时上下文", text)
-        self.assertIn("模型根据当前问题自由选择和组合", text)
+        self.assertIn("沿当前对象和明确方法继续", text)
+        self.assertIn("只加载本轮需要的专项", text)
         self.assertNotIn("`focus`", text)
         self.assertNotIn("xiaoxue_start_match_run", text)
         self.assertNotIn("xiaoxue_focus_match_trade", text)
@@ -141,13 +141,15 @@ class XiaoxueSkillContractTests(unittest.TestCase):
     def test_lineup_without_bp_stops_honestly_and_keeps_project_access(self) -> None:
         text = _skill_path().read_text(encoding="utf-8")
         lineup = Path("/home/ubuntu/.agents/skills/esports/lol-lineup-analysis/SKILL.md").read_text(encoding="utf-8")
+        agents = _project_agents().read_text(encoding="utf-8")
 
-        self.assertIn("纯十英雄阵容：`lol-lineup-analysis`", text)
+        self.assertIn("| 纯十英雄阵容（lineup） | 先 `lol-competition-basics`，再 `lol-lineup-analysis`", text)
+        self.assertIn("队名仅作蓝红方标签，不扩查比赛、赛程、队伍、TS、TK、盘口或新闻", text)
         self.assertIn("仅真正缺英雄或位置歧义才澄清", lineup)
         self.assertIn("不引入队伍资料、选手、赛果、TS、TK、盘口", lineup)
         self.assertIn("未知名称由程序标UNKNOWN，不猜", lineup)
-        self.assertIn("交易人生项目是电竞业务的正源与交付主体", text)
-        self.assertIn("小雪是当前接入助手之一", text)
+        self.assertIn("这是自用的电竞交易辅助项目", agents)
+        self.assertIn("小雪是当前接入助手之一", agents)
 
     def test_merged_team_profile_skill_covers_all_teams_without_overview_triggers(self) -> None:
         root = _team_profile_root()
