@@ -19,6 +19,18 @@ def _team_profile_root() -> Path:
     )
 
 
+def _product_reference(name: str) -> Path:
+    return _skill_path().parent / "references" / "product" / name
+
+
+def _project_agents() -> Path:
+    return Path(__file__).resolve().parents[1] / "AGENTS.md"
+
+
+def _business_guide(name: str) -> Path:
+    return Path(__file__).resolve().parents[1] / "docs" / "business" / name
+
+
 class XiaoxueSkillContractTests(unittest.TestCase):
     def test_soul_routes_natural_business_intent_without_an_execution_phrase(self) -> None:
         text = _soul_path().read_text(encoding="utf-8")
@@ -116,18 +128,15 @@ class XiaoxueSkillContractTests(unittest.TestCase):
             "不自动读取或附加 TS、TK、盘口，以及 volatility/trend 等内部字段。"
             "只有用户明确要求组合时，才读取并展示对应模块。"
         )
-        texts = "\n".join((
-            _skill_path().read_text(encoding="utf-8"),
-            (Path(__file__).resolve().parents[1] / "AGENTS.md").read_text(encoding="utf-8"),
-        ))
+        lol_guide = _business_guide("lol.md").read_text(encoding="utf-8")
+        agents = _project_agents().read_text(encoding="utf-8")
+        records = _product_reference("data-and-records.md").read_text(encoding="utf-8")
 
-        self.assertEqual(texts.count(contract), 2)
-        self.assertIn(
-            "队伍画像、首发、队伍资料单问不附加 TS、TK、盘口或内部字段",
-            _skill_path().read_text(encoding="utf-8").split("---", 2)[2],
-        )
-        self.assertIn("TS 的普通用户结果只用“综合实力、稳定性、趋势、势头、状态”五个固定中文名称", _skill_path().read_text(encoding="utf-8"))
-        self.assertIn("不主动输出“实力分”“波动/波动度”、英文键、速度/加速度、原始量或历史数列", texts)
+        self.assertIn(contract, lol_guide)
+        self.assertNotIn(contract, agents)
+        self.assertIn("单问画像、首发或队伍资料，只取五项画像及明确请求的事实，不附带 TS、TK、盘口或内部字段", records)
+        self.assertIn("TS 用户结果用“综合实力、稳定性、趋势、势头、状态”", records)
+        self.assertIn("不主动输出英文键、速度/加速度、波动度、原始量和历史数列", records)
 
     def test_lineup_without_bp_stops_honestly_and_keeps_project_access(self) -> None:
         text = _skill_path().read_text(encoding="utf-8")

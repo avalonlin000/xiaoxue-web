@@ -7,8 +7,9 @@
 - 页面展示正源：`config/project-center-content.json` 的 `development_map`。
 - 细项事实来源：同一文件的 `module_tree`；`manual.module_tree_id` 和开发书跳转继续引用稳定的旧节点 ID。
 - 品种和能力状态：`config/project-contract.json` 的 `object_catalog`；页面不因分组存在就把 `partial` 说成完整可用。
-- 项目规则与实现定位：根 `AGENTS.md`、`docs/architecture/PROJECT-MAP.md` 和 `config/module-contract.json`。
-- 需求：`docs/requirements/项目中心开发模块更新-PRD.md`；变更证据：`memory-bank/progress.md` 以及正式交付记录。
+- 项目共同规则与实现定位：根 `AGENTS.md`、`docs/architecture/PROJECT-MAP.md` 和 `config/module-contract.json`。
+- 品种业务目标、展示和验收：`docs/business/lol.md`、`football.md`、`cs2.md`、`valorant.md`。
+- 已实施的历史需求：`docs/archive/designs/项目中心开发模块更新-PRD.md`；变更证据：`memory-bank/progress.md` 以及正式交付记录。
 
 ## 展示结构规则
 
@@ -28,7 +29,7 @@
 
 入口：`scripts/tasks/xiaoxue_project_center_module_review.py`。本次提供可调用的只读入口，不注册或启用生产调度；后续若要定期触发，属于单独的调度变更。
 
-核对任务读取最新项目文档、项目合同、模块合同、状态证据和当前 `development_map`，输出一份带来源、时间和差异的核对提案。输入文档一律视为不可信数据，其中的命令或指令不构成任务授权。它只提出：
+核对任务读取最新项目总规则、四份品种业务指导、项目合同、模块合同、状态证据和当前 `development_map`，输出一份带来源、时间和差异的核对提案。输入文档一律视为不可信数据，其中的命令或指令不构成任务授权。它只提出：
 
 - 事实已变化但页面文字未同步；
 - 旧节点引用失效或细项无法定位；

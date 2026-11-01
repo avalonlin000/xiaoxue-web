@@ -139,8 +139,30 @@ class ProjectCenterContentCoverageTests(unittest.TestCase):
         self.assertEqual(packet["structure_check"], "passed")
         self.assertIn("modules", packet["sources"]["config/module-contract.json"])
         self.assertIn("module_tree", packet["sources"]["config/project-center-content.json"])
+        for relative in (
+            "docs/business/lol.md",
+            "docs/business/football.md",
+            "docs/business/cs2.md",
+            "docs/business/valorant.md",
+        ):
+            guide = ROOT / relative
+            self.assertTrue(guide.is_file(), relative)
+            self.assertEqual(packet["sources"][relative], guide.read_text(encoding="utf-8"))
         valid = {"status": "ok", "findings": [], "checked_at": packet["checked_at"]}
         self.assertEqual(parse_model_json(json.dumps(valid), packet), valid)
+        attributed = {
+            **valid,
+            "status": "review_needed",
+            "findings": [{
+                "kind": "stale",
+                "path": "development_map.groups",
+                "claim": "足球玩法说明需要核对",
+                "evidence": "足球指导规定默认清单只收录至少一种玩法保留的比赛",
+                "source": "docs/business/football.md",
+                "action": "人工核对 development_map",
+            }],
+        }
+        self.assertEqual(parse_model_json(json.dumps(attributed), packet), attributed)
         invalid = {**valid, "status": "review_needed", "findings": [{"kind": "stale", "path": "development_map.groups", "claim": "过时", "evidence": "无来源", "source": "invented.md", "action": "改写"}]}
         with self.assertRaises(ValueError):
             parse_model_json(json.dumps(invalid), packet)

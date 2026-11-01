@@ -115,6 +115,16 @@ class ProjectModuleContractTests(TestCase):
         self.assertNotIn("小雪是整个项目的完整业务入口", skill)
         self.assertIn("/home/ubuntu/xiaoxue-web/AGENTS.md", skill)
         self.assertIn("普通已有对象的小范围记录、修正、补充可以直接处理并读回", skill)
+        guides = {
+            "LOL": ROOT / "docs/business/lol.md",
+            "足球": ROOT / "docs/business/football.md",
+            "CS2": ROOT / "docs/business/cs2.md",
+            "无畏契约": ROOT / "docs/business/valorant.md",
+        }
+        for name, path in guides.items():
+            self.assertTrue(path.is_file(), path.as_posix())
+            self.assertIn(name, guide_text)
+            self.assertIn(f"](docs/business/{path.name})", guide_text)
 
     def test_ts_contract_has_one_display_mapping_used_by_frontend_and_consumers(self) -> None:
         ts = next(item for item in load_module_contract()["modules"] if item["id"] == "ts_strength")

@@ -1,11 +1,22 @@
 # 个人电竞交易辅助系统 — 任务进度
 
-> 导航更新：2026-10-29 | 本次授权：项目规范合并与按模板整理目录
+> 导航更新：2026-11-02 | 当前业务入口：根 `AGENTS.md` 与 `docs/business/` 对应品种指导
+
+## 2026-11-02 · 品种业务指导落地与文档归档（已实施并验证）
+
+- Goal / Authorization：按钧钧本轮“执行并且提交上线”的明确授权，实施已审阅方案，用根 `AGENTS.md` 加四份品种业务指导承接现行业务要求；保留既有未提交的足球等改动，不扩大到业务数据、页面发布、生产任务、模型、权限或密钥。
+- Changed：新增 `docs/business/lol.md`、`football.md`、`cs2.md`、`valorant.md`，分别写清用户目标、使用方式、首屏内容、判断口径、资料边界和验收场景；AGENTS 改为项目总规则并可从正文进入四份指导，文档索引、技术地图、维护说明和兼容入口同步迁移。项目中心模块核对任务显式读取四份指导完整正文，合同测试改从新正式位置保护原业务含义。
+- Archived：`docs/requirements/赛前方法引导与主要矛盾判断-PRD.md`、`项目中心开发模块更新-PRD.md` 和本次 `品种业务指导与文档整理方案.md` 已迁入 `docs/archive/designs/`；活跃引用改指历史入口，防止旧方案与现行指导并列生效。
+- Verified（已观察）：长期内容落点校验 5/5 通过；业务指导、核对输入、模块合同和 Skill 合同定向测试 32 项通过；项目完整测试入口通过前端 103 项、工作台后端 472 项（另 1 skipped）、TK 6 项、产品 MCP 68 项；`git diff --check` 通过，新增指导与归档相关 Markdown 链接无断链。
+- Review packet（已观察）：`scripts/tasks/xiaoxue_project_center_module_review.py --dry-run` 成功，输入包中的四份指导正文与磁盘文件逐字一致。本轮未调用模型核对，因此不改变既有“模型实测超时、未启用生产排程”的结论。
+- Health / services（已观察）：`scripts/health_check.py --json` 返回 `ok: true`，API healthy 且无降级模块；`xiaoxue-workbench-api`、`xiaoxue-workbench-vite`、`xiaoxue-tk-mempalace` 三个用户级服务均为 active。
+- Release：本轮按授权走源码提交和远端推送上线；指导与核对输入在文件读取时生效，因此没有重启服务、覆盖正式 `dist/`、写真实业务数据或修改生产调度。可恢复快照为 `.xiaoxue-backups/variety-guidance-20261102/pre-change.tar.gz`。
+- Limits：LOL 赛前真实多轮入口仍未验收；文档整理完成、合同测试通过和 health 正常不能替代该项真实用户体验证据。足球现有来源覆盖、晚段历史与完整端到端体验仍按既有 partial 状态处理。
 
 ## 2026-10-31 · 项目中心开发模块图更新（已发布并核验）
 
 - Goal / Locked decisions：按钧钧“补清楚就执行”的当次授权，在原项目中心开发模块页面内部整理个人开发定位图。按英雄联盟、足球、CS2、无畏契约和项目共用分页，每页保留少量主模块、细项折叠，写清目的及“现在有 / 还缺 / 下一步改什么”；后台维护信息不进入展示层。
-- Changed：本地提交 `34d95c0`（`Update project center development map by variety`），内容版本 `2026-10-31.2`。当前主模块数为 4/1/1/1/2，不固定未来数量；32 项旧叶子能力各有唯一归属，另展示 2 项共用父级详情。接口、同源菜单、开发书跳转、待修改记录和旧 ID 兼容同步更新，切页保留展开与草稿，不同品种的待修改记录保持独立。PRD 为 `docs/requirements/项目中心开发模块更新-PRD.md`。
+- Changed：本地提交 `34d95c0`（`Update project center development map by variety`），内容版本 `2026-10-31.2`。当前主模块数为 4/1/1/1/2，不固定未来数量；32 项旧叶子能力各有唯一归属，另展示 2 项共用父级详情。接口、同源菜单、开发书跳转、待修改记录和旧 ID 兼容同步更新，切页保留展开与草稿，不同品种的待修改记录保持独立。PRD 为 `docs/archive/designs/项目中心开发模块更新-PRD.md`。
 - Maintenance：项目地图已链接 `docs/architecture/PROJECT-CENTER-MODULE-MAINTENANCE.md`，要求能力、入口和缺口发生变化时在同一轮更新模块图。新增只读核对入口 `scripts/tasks/xiaoxue_project_center_module_review.py`，确定性检查及 dry-run 已通过；实际模型核对调用超时，模型分支运行效果仍未验证。没有注册生产排程，也没有自动写回内容。
 - Verified（已观察）：相关 Python 测试 29 项、前端测试 103 项、模块合同检查、语法与 diff 检查通过；隔离构建位于 `/tmp/xiaoxue-project-center-qa.kGjICt/build`。1440×900 与 390×844 浏览器核对分页、折叠、草稿、待修改备注、书内跳转、URL 和 Escape 焦点恢复通过；34 项详情展开后没有技术信息泄漏或页面横向溢出。独立只读复审未发现本轮范围内未解决的 P1/P2。截图为 `/tmp/pc-final-audit-1440.png`、`/tmp/pc-final-audit-390.png`；这些是临时证据路径，不是持久部署产物。临时验收服务 `/tmp/project_center_qa_server.py 40373` 已停止。
 - Published（已观察，2026-10-31 19:23 CST）：钧钧明确回复“发布”后执行。重新隔离构建，入口和四个 JS 分块与先前验收产物逐字节一致；通过原子目录交换发布，保留旧版四个哈希分块，随后正式入口的五个关键文件校验哈希一致、四个旧分块均 HTTP 200。项目 API 已于 19:22:27 按授权重启（MainPID `2737547`），`/api/health` 为 healthy，`/api/project-center/modules` 返回内容版本 `2026-10-31.2`、五页模块数 4/1/1/1/2。正式 8880 入口在 1440×900 和 390×844 下核验 9 个主模块、34 项详情、默认折叠、分页、草稿保持及说明书/开发书跳转，均无页面异常、HTTP 失败或文档横向溢出；浏览器验证全程禁止非 GET/HEAD/OPTIONS 请求，实际没有触发写请求。没有从服务器外网络单独验证公网可达性。

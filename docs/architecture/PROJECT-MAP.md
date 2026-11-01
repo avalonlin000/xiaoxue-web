@@ -1,6 +1,6 @@
 # 交易人生项目 — 技术导航
 
-这份文件只帮助按任务定位实现，不提供另一套工作流程。项目定位、协作、数据边界和完成标准统一见 [AGENTS.md](../../AGENTS.md)。模块的正式接口与字段映射来自 [module-contract.json](../../config/module-contract.json)，下表是实现索引，不复制完整合同和能力状态。
+这份文件只帮助按任务定位实现，不提供另一套工作流程。项目定位、协作、数据边界和完成标准统一见 [AGENTS.md](../../AGENTS.md)；品种使用目标、默认展示和验收见 [LOL](../business/lol.md)、[足球](../business/football.md)、[CS2](../business/cs2.md) 和 [无畏契约](../business/valorant.md) 业务指导。模块的正式接口与字段映射来自 [module-contract.json](../../config/module-contract.json)，下表是实现索引，不复制完整合同和能力状态。
 
 ## 目录方案
 
@@ -20,6 +20,7 @@ xiaoxue-web/
 ├── deploy/            部署模板
 ├── docs/
 │   ├── architecture/  当前实现导航
+│   ├── business/      四份品种业务指导
 │   ├── requirements/  未标记冻结的需求资料
 │   └── archive/       冻结设计、历史审计与旧规范快照
 ├── memory-bank/       进度和变更证据
