@@ -2,6 +2,16 @@
 
 > 导航更新：2026-11-02 | 当前业务入口：根 `AGENTS.md` 与 `docs/business/` 对应品种指导
 
+## 2026-11-02 · 足球观察台发布与正式入口验收
+
+- Goal / Authorization：按钧钧本轮“直接全部整理验收提交”的明确授权，完成足球观察台剩余的筛选、中文展示、来源、详情和失败态整合，并发布正式入口、提交源码与推送远端。
+- Changed：默认观察清单收口为半破与 75 分钟后至少一个“保留”的同场并集；默认每场只出现一次，半破和 75 分钟后并列展示，待补、排除和不在圈池的场次保留在“核对全部”。卡片提供中文对阵、北京时间、具体依据、初盘、完整来源、缓存时间和资料缺口，详情在卡片内展开；“核对全部”保留两种玩法的完整结论。来源读取失败明确提示，不显示成“没有比赛”。
+- Verified（已观察）：全量测试通过——前端 103 项、主后端 472 项（另 1 skipped）、TK 6 项、产品 MCP 68 项；`node --check src/modules/football/public.js`、模块合同检查和 `git diff --check` 通过。正式 API 中候选并集为 11 场，两种“核对全部”各 44 场，响应均 unique、readiness=`ready`、stale=`false`、errors 为空。
+- Published（已观察，2026-11-02 01:44 CST）：通过 `renameat2(RENAME_EXCHANGE)` 原子切换正式 `dist/`，发布前后 `index.html` 哈希分别为 `0cbdce477b3b8dc03c06f0717872db6efeba92fb38024b669046e21ee0674e9d` 与 `27efca37126210c8e77561491e1ace2141a577591b2ee59d9f37ef0ecded95ec`。API 已重启，MainPID `3294285`，当前 active/running；`/api/health` 返回 `ok: true`、`status: healthy`，首页和四个新 JS 分块均 HTTP 200。
+- Browser acceptance（已观察）：从正式 `http://127.0.0.1:8880/#football` 实测默认清单 11 场；半破筛选 11 场、75 分钟后筛选 9 场；“核对全部”为 44 场、88 个玩法结论，两种玩法均能看到非 keep 结论。候选时间窗 12 场，keep 并集 11 场，与正式 API 逐场一致。详情中文对阵、来源和缺口完整，展开后搜索与刷新仍可用；390px 下文档宽 390、列表宽 322、无卡片横向溢出。强制来源失败时出现明确错误文案；无页面异常或非 favicon HTTP 失败，浏览器只发出 GET，写请求拦截记录为 0。
+- Release evidence / rollback：回退与验收材料位于 `.xiaoxue-backups/football-release-20261102/`，含切换前后 `dist`、隔离构建、发布脚本与回执、发布前后服务状态、正式 API 响应、浏览器验收 JSON 和桌面/详情/手机截图。
+- Restart side effects / Limits（已观察及未知）：本轮只核对了重启后的自动化快照；预置读取路径写成了不存在的 `/home/ubuntu/.hermes/xiaoxue-tasks/jobs.json`，实际路径为 `/home/ubuntu/.hermes/cron/jobs.json`，因此没有精确的前后任务状态对比，不能声称所有自动化任务均未改变。未从服务器外网络单独验证公网可达性；足球仍为 partial，实时盘口、水位、完整来源覆盖与更完整晚段历史尚未接入，LOL 真实多轮赛前入口仍未验收。
+
 ## 2026-11-02 · 品种业务指导落地与文档归档（已实施并验证）
 
 - Goal / Authorization：按钧钧本轮“执行并且提交上线”的明确授权，实施已审阅方案，用根 `AGENTS.md` 加四份品种业务指导承接现行业务要求；保留既有未提交的足球等改动，不扩大到业务数据、页面发布、生产任务、模型、权限或密钥。
@@ -12,6 +22,17 @@
 - Health / services（已观察）：`scripts/health_check.py --json` 返回 `ok: true`，API healthy 且无降级模块；`xiaoxue-workbench-api`、`xiaoxue-workbench-vite`、`xiaoxue-tk-mempalace` 三个用户级服务均为 active。
 - Release：本轮按授权走源码提交和远端推送上线；指导与核对输入在文件读取时生效，因此没有重启服务、覆盖正式 `dist/`、写真实业务数据或修改生产调度。可恢复快照为 `.xiaoxue-backups/variety-guidance-20261102/pre-change.tar.gz`。
 - Limits：LOL 赛前真实多轮入口仍未验收；文档整理完成、合同测试通过和 health 正常不能替代该项真实用户体验证据。足球现有来源覆盖、晚段历史与完整端到端体验仍按既有 partial 状态处理。
+
+## 2026-11-01 · 足球观察台整合、发布与正式入口验收
+
+- Goal / Locked decisions：按钧钧“继续优化足球观察台”“先整合足球内容”及最后“执行”的当次授权，把页面收口为能直接看出想看的比赛：默认观察清单只显示半破或75分钟后至少一个“保留”的并集，同一场只出现一次；待补、排除和不在圈池的场次留在“核对全部”。自用项目，非目标用户覆盖和长期多租户设计不作为本轮门槛。
+- Changed：足球模块默认候选视图、同场双玩法并列及卡片内详情完成整合；卡片展示中文对阵、北京时间、适用玩法、具体依据和初盘。读取失败明确提示，不显示成“没有比赛”。“核对全部”保留两种玩法完整结论。相关实现位于 `src/modules/football/public.js`、`xiaoxue_api/modules/external/football/service.py` 与可展开卡片样式。
+- Verified（已观察）：足球与合同测试 44 项、前端测试 103 项通过；Node 语法、模块合同和 `git diff --check` 通过；隔离 Vite 构建成功。正式 API 和浏览器同口径核对中，当前候选时间窗共 19 场，半破与75分钟后“保留”的并集恰为 17 场，默认清单逐场一致；readiness 为 ready、errors 为空。独立样本覆盖仅半破、仅75分钟后和双玩法保留。
+- Published（已观察，2026-11-01 23:32 CST）：通过 `renameat2(RENAME_EXCHANGE)` 原子切换正式 `dist/`，保留旧四个哈希分块。API 服务随后重启，MainPID `3245560`，启动时间 23:32:38；当前 active/running，`/api/health` healthy。正式入口首页、新旧四个前端分块和健康接口均 HTTP 200。
+- Browser acceptance（已观察）：从正式 `http://127.0.0.1:8880/#football` 实测，2026-11-01 23:33 前后实时显示 17 场观察清单，半破筛选 14 场、75分钟后筛选 15 场；列表与实际 API 响应逐场一致，默认不出现待补、排除或不在圈池场次。“核对全部”显示 44 场和 88 个玩法结论，双玩法卡片在卡片内展开详情，工具栏保持可用。390px 下文档宽度为 390、无卡片横向溢出；强制读取失败时出现明确错误状态。浏览器仅发出 GET 请求，没有页面异常或非 favicon HTTP 失败。
+- Restart side effects（已观察）：API 重启触发既有恢复链，两项原本 failed 且已过期的采集任务 `0b7f90d46912c42aae7fe00b`、`7e1d3b325d3768a9a0f13179` 变为 paused，尝试次数未增加。未手动触发采集、未写真实业务数据，也未修改生产排程。
+- Release evidence / rollback：回退与验收材料位于 `.xiaobai-backups/football-release-20261101.a15YhO/`，含切换前后 `dist`、隔离构建、发布回执、服务与采集前后快照、API 响应、浏览器验收 JSON 和桌面/手机截图。只重启 API，未重启 Vite，未覆盖无关工作树改动。
+- Limits：未从服务器外网络单独验证公网可达性；本轮验收证明本机正式入口和当前真实业务 API 可用，不把局部浏览器验收外推为整个项目全部能力完成。
 
 ## 2026-10-31 · 项目中心开发模块图更新（已发布并核验）
 
@@ -282,7 +303,7 @@
 - 本批低风险基线：`/tmp/lineup-batch4-baseline`。本地结果：`/home/ubuntu/.hermes/team/lineup-test/batch4-default.*`；独立本地验收，不代表群聊激活。
 - 未改模型/思考配置、密钥、权限、网关、数据或人格；未重启、发飞书或提交。工作树原有无关脏改动保持不动。
 
-> 最后更新：2026-10-29 02:01:00.213495 | 更新人：小雪
+> 最后更新：2026-11-01 02:00:01.435392 | 更新人：小雪
 
 ## 2026-10-14 Codex：阵容分析结构化决策包
 
