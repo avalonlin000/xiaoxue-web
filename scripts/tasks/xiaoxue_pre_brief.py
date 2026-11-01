@@ -9,10 +9,11 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 import urllib.error
 import urllib.request
 
-API = "http://127.0.0.1:8880/api/lol-scope/coverage?date=today&days=1"
+API = "http://127.0.0.1:8880/api/lol-scope/coverage?date=today&days=2"
 STATUS_LABEL = {"ok": "齐", "stale": "陈旧", "missing": "缺", "pending": "待"}
 
 
@@ -30,14 +31,31 @@ def main() -> int:
     matches = payload.get("matches") or []
     if not matches:
         return 0
+    now = datetime.now()
+    upcoming: list[tuple[datetime, dict]] = []
+    for item in matches:
+        try:
+            start = datetime.strptime(str(item.get("time") or "")[:19], "%Y-%m-%d %H:%M:%S")
+        except ValueError:
+            continue
+        # 只发还没开打的场次；已开打/已出结果的一律不再进入“赛前简报”。
+        if start <= now:
+            continue
+        if (item.get("result") or {}).get("status") == "ok":
+            continue
+        upcoming.append((start, item))
+    if not upcoming:
+        return 0
+    next_day = min(start.date() for start, _ in upcoming)
+    upcoming = [(start, item) for start, item in upcoming if start.date() == next_day]
     scope = payload.get("event") or "当前赛事"
     lines = [f"⏰ 赛前简报｜{scope}"]
-    for item in matches:
+    for start, item in upcoming:
         lineup = item.get("lineup") or {}
         price = item.get("price") or {}
         result = item.get("result") or {}
         lines.append(
-            f"{str(item.get('time') or '')[5:16]} {item.get('label')}"
+            f"{start.strftime('%m-%d %H:%M')} {item.get('label')}"
             f"（{item.get('format') or ''}）"
             f"｜谁上场 {STATUS_LABEL.get(lineup.get('status'), lineup.get('status'))}"
             f"｜价格 {STATUS_LABEL.get(price.get('status'), price.get('status'))}"
@@ -49,7 +67,8 @@ def main() -> int:
         )
         if detail:
             lines.append(f"  洞：{detail}")
-    lines.append(f"（{payload.get('summary') or ''}）")
+    gap_count = sum(len(item.get("gaps") or []) for _, item in upcoming)
+    lines.append(f"（{len(upcoming)} 场比赛，{gap_count} 项缺口）")
     print("\n".join(lines))
     return 0
 

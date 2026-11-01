@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import date
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -45,6 +46,9 @@ def render_receipt(receipt: dict[str, Any], *, exit_code: int) -> str:
         for item in errors:
             if isinstance(item, dict):
                 lines.append(f"- {item.get('source', 'unknown')}：{item.get('error', 'unknown error')}")
+    budget = receipt.get("budget") if isinstance(receipt.get("budget"), dict) else {}
+    if budget.get("deferred"):
+        lines.append(f"- 本轮时间用尽，剩余 {budget.get('deferred')} 项留到下次继续")
     return "\n".join(lines) + "\n"
 
 
@@ -55,16 +59,30 @@ def main() -> int:
     if not EXECUTOR.is_file():
         print(f"# 小雪知识导入回执\n\n- 总状态：failed\n- 原因：执行器不存在：{EXECUTOR}\n")
         return 2
-    proc = subprocess.run(
-        [sys.executable, str(EXECUTOR), "--source", "all"],
-        cwd=str(ROOT), text=True, capture_output=True,
-    )
+    budget = int(float(os.environ.get("XIAOXUE_IMPORT_BUDGET_SECONDS", "2400") or 0))
+    timeout = budget + 300 if budget else None
+    timed_out = False
+    try:
+        proc = subprocess.run(
+            [sys.executable, str(EXECUTOR), "--source", "all"],
+            cwd=str(ROOT), text=True, capture_output=True, timeout=timeout,
+        )
+        returncode = proc.returncode
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        returncode = 3
     try:
         payload = json.loads(receipt.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         payload = {"status": "failed", "source_errors": [{"source": "executor", "error": "receipt missing or invalid"}]}
-    print(render_receipt(payload, exit_code=proc.returncode), end="")
-    return proc.returncode
+    if timed_out:
+        payload["status"] = "partial" if payload.get("items") else "failed"
+        payload.setdefault("source_errors", [])
+        if not isinstance(payload.get("source_errors"), list):
+            payload["source_errors"] = []
+        payload["source_errors"].append({"source": "executor", "error": f"执行超过 {timeout} 秒被收尾"})
+    print(render_receipt(payload, exit_code=returncode), end="")
+    return returncode
 
 
 if __name__ == "__main__":

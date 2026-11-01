@@ -25,6 +25,10 @@ RECEIPT_PATH = Path("/home/ubuntu/lol_data/runs/lol_auto_plan.json")
 STATE_PATH = Path("/home/ubuntu/lol_data/runs/lol_watchdog_state.json")
 PLANNER_JOB = "LOL自动化排程器"
 MANAGED = ("LOL赛前简报", "LOL赛后刷新", PLANNER_JOB)
+SELF_JOB = "LOL自动化失败告警"
+# 除本告警任务外，所有启用的自动化任务只要上次执行失败或连续失败都要出声；
+# 只盯排程器相关三个任务会漏掉知识导入、巡检、日报这类失败。
+FAILURE_MONITOR_ALL = True
 REPEAT_AFTER_SECONDS = 6 * 3600
 RECEIPT_MAX_AGE_SECONDS = 26 * 3600
 LATE_TOLERANCE = timedelta(minutes=2)
@@ -75,6 +79,9 @@ def main() -> int:
     now = time.time()
     now_dt = datetime.now()
     alerts: list[str] = []
+    # 失败告警按「哪一次执行失败」去重：同一次失败只喊一次，
+    # 不会因为还没到下次运行而每 6 小时重复打扰。
+    run_keys: dict[str, str] = {}
     jobs = load_json(JOBS_PATH, {})
     jobs = jobs.get("jobs") if isinstance(jobs, dict) else jobs
     by_name = {str(job.get("name") or ""): job for job in (jobs or [])}
@@ -108,6 +115,7 @@ def main() -> int:
         failed = failure_alert(name, job)
         if failed:
             alerts.append(failed)
+            run_keys[failed] = str(job.get("last_run_at") or "")
         if name == PLANNER_JOB:
             if str(job.get("state")) == "paused" or not job.get("enabled", True):
                 alerts.append(f"⚠️ {name} 处于暂停/停用状态，赛程变化不会自动跟随")
@@ -131,15 +139,39 @@ def main() -> int:
                 f"⚠️ {name} 到点没跑：回执排的 {row.get('fire_at')}，上次执行 {job.get('last_run_at') or '从未'}"
             )
 
+    if FAILURE_MONITOR_ALL:
+        for job in jobs or []:
+            name = str(job.get("name") or "")
+            if not name or name == SELF_JOB or name in MANAGED:
+                continue
+            if not job.get("enabled", True):
+                continue
+            alert = failure_alert(name, job)
+            if alert and alert not in alerts:
+                alerts.append(alert)
+                run_keys[alert] = str(job.get("last_run_at") or "")
+
     state = load_json(STATE_PATH, {})
     alerted = dict(state.get("alerted") or {})
     fresh: list[str] = []
     for alert in alerts:
-        last = float(alerted.get(alert) or 0)
-        if now - last >= REPEAT_AFTER_SECONDS:
+        run = run_keys.get(alert)
+        record = alerted.get(alert)
+        if run is not None:
+            # 失败类告警：只有「又出现了更新的一次失败」才再次出声。
+            # 调度器把 last_run_at 回退（reclaim）不会重新触发，避免同一次故障反复打扰。
+            prev_run = record.get("run") if isinstance(record, dict) else None
+            if prev_run and str(run) <= str(prev_run):
+                continue
             fresh.append(alert)
-            alerted[alert] = now
-    keep = {key: value for key, value in alerted.items() if now - float(value) < 7 * 24 * 3600}
+            alerted[alert] = {"at": now, "run": str(run)}
+        else:
+            last = float(record.get("at") if isinstance(record, dict) else (record or 0))
+            if now - last >= REPEAT_AFTER_SECONDS:
+                fresh.append(alert)
+                alerted[alert] = {"at": now}
+    keep = {key: value for key, value in alerted.items()
+            if now - float(value.get("at") if isinstance(value, dict) else value) < 7 * 24 * 3600}
     STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
     temporary = STATE_PATH.with_name(f".{STATE_PATH.name}.{os.getpid()}.tmp")
     temporary.write_text(json.dumps({"alerted": keep}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")

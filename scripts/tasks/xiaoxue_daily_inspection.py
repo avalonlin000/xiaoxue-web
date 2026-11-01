@@ -104,6 +104,16 @@ def schedule_today() -> tuple[list[str], list[str]]:
     return lines, issues
 
 
+def import_running() -> bool:
+    """知识导入是否正在执行（避免把「正在跑」误报成失败）。"""
+    try:
+        out = subprocess.run(["pgrep", "-f", "apply_knowledge_import.py"],
+                             capture_output=True, text=True, timeout=5)
+        return out.returncode == 0 and bool(out.stdout.strip())
+    except Exception:
+        return False
+
+
 def cron_issues() -> list[str]:
     issues: list[str] = []
     if not JOBS_PATH.exists():
@@ -123,6 +133,10 @@ def cron_issues() -> list[str]:
         # successful manual/recovered run must clear an old scheduler error;
         # do not keep alarming from stale jobs.json metadata.
         if jid == IMPORT_JOB_ID:
+            # 知识导入以回执为准：正在跑、或最近一次回执是 complete/partial，
+            # 都说明调度器记的旧 error 已经被后续真实执行覆盖，不再重复报警。
+            if import_running():
+                continue
             receipts = sorted(
                 ROOT.joinpath("scripts").glob("knowledge_import_manifest_*-receipt.json"),
                 key=lambda path: path.stat().st_mtime,
@@ -131,7 +145,7 @@ def cron_issues() -> list[str]:
             if receipts:
                 try:
                     receipt = json.loads(receipts[0].read_text(encoding="utf-8"))
-                    if receipt.get("status") == "complete":
+                    if receipt.get("status") in {"complete", "partial", "in_progress"}:
                         continue
                 except (OSError, json.JSONDecodeError):
                     pass
@@ -221,6 +235,16 @@ def knowledge_import_issues() -> list[str]:
     # or markdown +create flow.
     if UPLOAD_SCRIPT.exists():
         upload_text = UPLOAD_SCRIPT.read_text(errors="ignore")
+        # Hermes 侧允许只做薄转发：真正的实现要在目标脚本里检查，
+        # 否则去耦后巡检会每天误报“不是当前 drive +upload 去重实现”。
+        target = None
+        match = re.search(r'TARGET\s*=\s*Path\(["\']([^"\']+)["\']\)', upload_text)
+        if match:
+            candidate = Path(match.group(1))
+            if candidate.is_file():
+                target = candidate
+        if target is not None:
+            upload_text = target.read_text(errors="ignore")
         if "placeholder" in upload_text or "no data to upload" in upload_text:
             issues.append("⚠️ 知识导入日志上传脚本仍是 placeholder")
         if "drive" not in upload_text or "+upload" not in upload_text or "import_log_uploads.json" not in upload_text:
