@@ -450,7 +450,7 @@
     {
       "id": "football",
       "display_name": "足球观察台",
-      "purpose": "读取公开足球赛程和可核实历史事实，给出半破与75分钟后两种赛前筛选结果；滚球盘口由钧钧自己核验。",
+      "purpose": "读取公开足球赛程和可核实历史事实，给出半破与75分钟后两种赛前筛选结果；队名、联赛名、筛选理由一律中文，新球队自动翻译并缓存，不要求人工补表；滚球盘口由钧钧自己核验。",
       "ownership": "外部赛程与事实（足球）",
       "user_entry": {
         "natural_examples": ["看看今天足球有什么", "半破有哪些场"],
@@ -486,7 +486,7 @@
         "boundary": "只做赛前筛选与资料，不给交易方向。"
       },
       "field_mapping": {
-        "display": {"matches": "比赛清单", "coverage": "覆盖范围", "readiness": "资料齐全度"}
+        "display": {"matches": "比赛清单", "display_name": "中文对阵", "counts": "各玩法保留/待补/排除数量", "coverage": "覆盖范围", "readiness": "资料齐全度"}
       },
       "extension_kind": "structural_capability",
       "consumers": ["足球观察台"],

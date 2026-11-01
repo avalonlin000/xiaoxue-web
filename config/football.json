@@ -1,7 +1,30 @@
 {
-  "leagues": ["eng.1", "esp.1", "ita.1", "ger.1", "aus.1", "swe.1", "qat.1", "chn.1"],
+  "leagues": [
+    "eng.1",
+    "esp.1",
+    "ita.1",
+    "ger.1",
+    "aus.1",
+    "swe.1",
+    "ksa.1",
+    "chn.1"
+  ],
   "source": "ESPN",
-  "whitelist": ["Atalanta", "Hammarby", "Paderborn", "Al Sadd", "Adelaide"],
+  "whitelist": [
+    "Atalanta",
+    "Hammarby",
+    "Paderborn",
+    "Al Sadd",
+    "Adelaide"
+  ],
   "timezone": "Asia/Shanghai",
-  "window_hours": 24
+  "window_hours": 36,
+  "translator": {
+    "enabled": true,
+    "base_url": "https://opencode.ai/zen/go/v1",
+    "model": "deepseek-v4.1-flash",
+    "api_key_env": "OPENCODE_GO_API_KEY",
+    "env_file": "/home/ubuntu/.hermes/.env",
+    "batch": 40
+  }
 }

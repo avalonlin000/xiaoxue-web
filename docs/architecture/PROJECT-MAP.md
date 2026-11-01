@@ -53,7 +53,7 @@ Codex 等工程工具 ─ 在授权范围内读取、审计或维护同一项目
 | 英雄和阵容 | `xiaoxue_api/modules/methods/` | `/api/lineup-workflow/prepare`、专业分析 Skill |
 | 日报与维护状态 | `xiaoxue_api/modules/daily_content/` | `/api/daily-content`、项目 health、任务回执 |
 | 项目中心与公共写入 | `xiaoxue_api/modules/platform/` | `src/modules/project-center/`；项目中心、业务写入口 |
-| 足球及外部事实 | `xiaoxue_api/modules/external/` | `src/modules/football/`；`/api/football/matches`、单场详情及 Gol.gg 工具 |
+| 足球及外部事实 | `xiaoxue_api/modules/external/` | `src/modules/football/`；`/api/football/matches`、单场详情及 Gol.gg 工具；队名中文由 `config/football_teams_zh.json` + `football/naming.py` 自动补全 |
 | 产品 MCP | `scripts/hermes/xiaoxue_product_mcp.py` | Hermes 等已配置客户端调用 API；`config/agents/` 选择业务适配 |
 | TK 检索服务 | `scripts/mempalace_tk_api.py` | Wiki 条目、MemPalace 索引、项目 TK API |
 | 用户模块与菜单 | `config/project-center-content.json` | `development_map` 供项目中心与 `scripts/xiaoxue_menu.py` 展示；`module_tree` / `manual` 继续提供细项与说明引用 |

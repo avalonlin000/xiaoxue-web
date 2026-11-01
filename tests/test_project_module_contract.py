@@ -110,11 +110,12 @@ class ProjectModuleContractTests(TestCase):
         project_map = (ROOT / "docs/architecture/PROJECT-MAP.md").read_text(encoding="utf-8")
         self.assertIn("# 交易人生项目 — 技术导航", project_map)
         skill = Path("/home/ubuntu/.agents/skills/小雪/SKILL.md").read_text(encoding="utf-8")
-        self.assertIn("交易人生项目是电竞业务的正源与交付主体", skill)
-        self.assertIn("小雪是当前接入助手之一", skill)
+        records = Path("/home/ubuntu/.agents/skills/小雪/references/product/data-and-records.md").read_text(encoding="utf-8")
+        self.assertIn("项目规则见 `/home/ubuntu/xiaoxue-web/AGENTS.md`", skill)
         self.assertNotIn("小雪是整个项目的完整业务入口", skill)
         self.assertIn("/home/ubuntu/xiaoxue-web/AGENTS.md", skill)
-        self.assertIn("普通已有对象的小范围记录、修正、补充可以直接处理并读回", skill)
+        self.assertIn("这是自用的电竞交易辅助项目", guide_text)
+        self.assertIn("小雪是当前接入助手之一", guide_text)
         guides = {
             "LOL": ROOT / "docs/business/lol.md",
             "足球": ROOT / "docs/business/football.md",
@@ -125,6 +126,7 @@ class ProjectModuleContractTests(TestCase):
             self.assertTrue(path.is_file(), path.as_posix())
             self.assertIn(name, guide_text)
             self.assertIn(f"](docs/business/{path.name})", guide_text)
+        self.assertIn("对象、范围、目标明确且符合项目现行授权的小范围业务补充/修正，直接处理并读回", records)
 
     def test_ts_contract_has_one_display_mapping_used_by_frontend_and_consumers(self) -> None:
         ts = next(item for item in load_module_contract()["modules"] if item["id"] == "ts_strength")
