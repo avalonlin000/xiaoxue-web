@@ -2,7 +2,7 @@
   "event": "S16 世界赛",
   "preparation": {"upcoming_days": 7},
   "aliases": ["S16全球总决赛", "Worlds 2026", "2026 World Championship", "Worlds"],
-  "confirmed_teams": ["AL", "BLG", "TES", "IG", "GEN", "HLE", "T1", "DK", "G2", "MKOI", "KC", "TLAW", "LYON", "C9", "TSW", "CFO", "MVK", "LOS", "FUR"],
+  "confirmed_teams": ["BLG", "TES", "IG", "GEN", "HLE", "T1", "DK", "MKOI", "KC", "LYON", "LOS"],
   "participants_verified": true,
   "participant_sources": [
     {"url": "https://lolesports.com/news/worlds-2026-primer", "section": "QUALIFIED TEAMS", "checked_at": "2026-10-20", "verification": "official_list_read", "boundary": "本届参赛名单，不代表全部进入瑞士轮"},
